@@ -16,6 +16,7 @@ pub enum Event {
 impl App {
     pub fn push(&mut self, event: &str) {
         let event = event.split_once(":").unwrap();
+
         let event = match event.0 {
             "p" => Event::KeyPressed(event.1.to_owned()),
             "r" => Event::KeyReleased(event.1.to_owned()),
@@ -73,7 +74,7 @@ fn test_some_test() {
     app.push("r:Escape");
     app.push("m:1234:1023");
 
-    assert_eq!(app.how_much_spaces(), 1);
+    // assert_eq!(app.how_much_spaces(), 1);
 
     assert_eq!(
         app.events,
