@@ -4,22 +4,30 @@ use indradb::{
 use lazy_static::lazy_static;
 use serde_json::json;
 
+// how to use in another file?
 lazy_static! {
-    static ref data_type: Type = Type::new("data").expect("creating vertex type");
-    static ref widget_type: Type = Type::new("widget").expect("creating vertex type");
+    pub static ref DATA_TYPE: Type = Type::new("data").expect("creating vertex type");
+    pub static ref WIDGET_TYPE: Type = Type::new("widget").expect("creating vertex type");
 }
 
 #[derive(Debug)]
 pub struct Database {
-    datastore: MemoryDatastore,
-    transaction: indradb::MemoryTransaction,
+    pub datastore: Option<MemoryDatastore>,
+    pub transaction: Option<indradb::MemoryTransaction>,
 }
 
 impl Database {
-    pub fn new(&mut self) -> Database {
-        let datastore = self.initialize_datastore();
-        self.transaction = self.create_transaction(&datastore);
-        self
+    pub fn init() -> Database {
+        let mut database = Database {
+            datastore: None,
+            transaction: None,
+        };
+        let datastore = database.initialize_datastore();
+        let transaction = database.create_transaction(&datastore);
+        Database {
+            datastore: Some(datastore),
+            transaction: Some(transaction),
+        }
     }
 
     fn initialize_datastore(&mut self) -> MemoryDatastore {
@@ -31,8 +39,10 @@ impl Database {
     }
 }
 
-fn create_vertex(
-    datastore: &MemoryDatastore,
+//
+// Create a vertex
+//
+pub fn create_vertex(
     transaction: &indradb::MemoryTransaction,
     vertex_properties: &serde_json::Value,
     vertex_type: Type,

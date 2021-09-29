@@ -4,11 +4,32 @@ mod router;
 
 use app::App;
 use app::Event;
+use database::create_vertex;
+use indradb::Type;
+use serde_json::json;
 use std::io::{self, Read};
 
 use crate::database::Database;
 
 pub fn main() -> io::Result<()> {
+    let database = Database::init();
+
+    let vertex_properties = json!({
+        "name": "John Doe",
+        "age": 43,
+        "phones": [
+            "+44 1234567",
+            "+44 2345678"
+        ]
+    });
+
+    let new_vertex = create_vertex(
+        &database.transaction.unwrap(),
+        &vertex_properties,
+        Type::new("data").expect("creating vertex type"),
+    );
+    println!("{:?}", new_vertex);
+
     let stdin = io::stdin();
     let mut app = App::default();
 
@@ -36,8 +57,6 @@ pub fn main() -> io::Result<()> {
 
         println!("{:?}", app);
     }
-
-    let data = Database::new();
 
     Ok(())
 
