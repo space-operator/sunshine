@@ -1,0 +1,83 @@
+async fn apply<T: Context>(state: Arc<Mutex<Self>>) -> Res {
+
+}
+
+fn apply<T: Context>(state: Arc<Mutex<Self>>) -> impl Future<Output = Res> {
+    async {
+        qweqwe
+    }
+}
+}
+
+async fn main() -> usize {
+    let file = fs.read("abc.txt").await;
+    fs.write("abs.txt", file).await;
+    file.len()
+}
+
+fn app() {
+    let a = main();
+    a.await;
+}
+
+
+fn main<T: Context>(state: Arc<Mutex<Self>>) -> impl Future<Output = Res> {
+    async {
+        let file = fs.read("abc.txt").await;
+        fs.write("abs.txt", file).await;
+    }
+}
+
+
+fn main<T: Context>(state: Arc<Mutex<Self>>) -> impl Future<Output = Res> {
+    stuct...Ok()
+}
+
+enum AsybcMain {
+    Init,
+    Read {
+        read_future: Future
+    }
+    Write {
+        write_future: Future
+    }
+    Ready(usize)
+}
+
+
+
+async fn fnfnfnf() {
+    let file = fs.read("abc.txt").await;
+}
+
+struct FileReader {
+    FileName: "abc.txt",
+    FileData: Option<...>,
+    is_read_called;
+}
+
+impl Future for FileReader {
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
+        match (self.data, self.is_read_called) {
+            Ready(data),
+            (Pending, false) => {
+                is_read_called = true
+                low_level_read_with_cb(|data| {
+                    self.data = data
+                    cx.waker().wake()
+                })
+            }
+        }
+    }
+}
+
+
+pub trait Future {
+    type Output;
+    fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output>;
+}
+
+pub enum Poll<T> {
+    Ready(T),
+    Pending,
+}

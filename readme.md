@@ -1,4 +1,35 @@
 
+
+
+multiline text input
+
+"Andrej is here with me today /command 
+and this is /command"
+
+
+touch, mouse,etc. 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 Rust Integrated Dart
 
 https://thlorenz.com/rid-site/

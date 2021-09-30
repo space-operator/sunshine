@@ -40,6 +40,7 @@ pub enum Event {
 
 use nom::{bytes::complete::*, character::complete::*, combinator::*, sequence::*};
 
+/*
 impl Event {
     pub fn parse(mut input: &str) -> (&str, Vec<Event>) {
         many0(parse_event)(input);
@@ -73,7 +74,7 @@ impl Event {
         preceded("id=", terminated(is_not(" "), " "))(input)
     }
 }
-
+*/
 /*
 
 

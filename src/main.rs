@@ -1,12 +1,14 @@
 mod app;
 mod database;
-mod event;
+//mod event;
 mod graph;
 mod router;
+mod state;
+mod ui_event;
 
 use app::App;
 use app::AppEvent;
-use event::Event;
+//use event::Event;
 use indradb::Type;
 use serde_json::json;
 use std::io::{self, Read};
