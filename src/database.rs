@@ -1,5 +1,6 @@
 use indradb::{
-    Datastore, EdgeKey, MemoryDatastore, SpecificVertexQuery, Transaction, Type, Vertex,
+    Datastore, EdgeKey, MemoryDatastore, MemoryTransaction, SpecificVertexQuery, Transaction, Type,
+    Vertex,
 };
 use lazy_static::lazy_static;
 use serde_json::json;
@@ -12,58 +13,55 @@ lazy_static! {
 
 #[derive(Debug)]
 pub struct Database {
-    pub datastore: Option<MemoryDatastore>,
-    pub transaction: Option<indradb::MemoryTransaction>,
+    pub datastore: MemoryDatastore,
+    pub transaction: MemoryTransaction,
 }
 
 impl Database {
-    pub fn init() -> Database {
-        let mut database = Database {
-            datastore: None,
-            transaction: None,
-        };
-        let datastore = database.initialize_datastore();
-        let transaction = database.create_transaction(&datastore);
+    pub fn new() -> Database {
+        let datastore = Database::initialize_datastore();
+        let transaction = Database::create_transaction(&datastore);
         Database {
-            datastore: Some(datastore),
-            transaction: Some(transaction),
+            datastore: datastore,
+            transaction: transaction,
         }
     }
 
-    fn initialize_datastore(&mut self) -> MemoryDatastore {
+    fn initialize_datastore() -> MemoryDatastore {
         MemoryDatastore::create("temp").expect("Initialize datastore")
     }
 
-    fn create_transaction(&mut self, datastore: &MemoryDatastore) -> indradb::MemoryTransaction {
+    fn create_transaction(datastore: &MemoryDatastore) -> indradb::MemoryTransaction {
         datastore.transaction().expect("Create transaction")
     }
-}
 
-//
-// Create a vertex
-//
-pub fn create_vertex(
-    transaction: &indradb::MemoryTransaction,
-    vertex_properties: &serde_json::Value,
-    vertex_type: Type,
-) -> Vertex {
-    let new_vertex = Vertex::new(vertex_type.clone());
+    //
+    // Create a vertex
+    //
+    pub fn create_vertex(
+        &self,
+        vertex_properties: &serde_json::Value,
+        vertex_type: Type,
+    ) -> Vertex {
+        let new_vertex = Vertex::new(vertex_type.clone());
 
-    let created = transaction
-        .create_vertex(&new_vertex)
-        .expect("Creating vertex");
+        let created = self
+            .transaction
+            .create_vertex(&new_vertex)
+            .expect("Creating vertex");
 
-    assert!(created, "Failed to add vertex to datastore");
+        assert!(created, "Failed to add vertex to datastore");
 
-    transaction
-        .set_vertex_properties(
-            indradb::VertexPropertyQuery::new(
-                SpecificVertexQuery::single(new_vertex.id).into(),
-                String::from("properties"),
-            ),
-            vertex_properties,
-        )
-        .expect("setting vertex properties");
+        self.transaction
+            .set_vertex_properties(
+                indradb::VertexPropertyQuery::new(
+                    SpecificVertexQuery::single(new_vertex.id).into(),
+                    String::from("properties"),
+                ),
+                vertex_properties,
+            )
+            .expect("setting vertex properties");
 
-    new_vertex
+        new_vertex
+    }
 }

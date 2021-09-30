@@ -1,0 +1,35 @@
+fn tst() {
+    struct Coords { x: u64, y: String };
+    let a = Coords { x: 32, y: 48 };
+    
+    //          0    4    8   12   16   20   24   28   32
+    // a:       | x = 32  | y = 48  |
+
+    let a1/*: Arc<Coords>*/ = Arc::new(a);
+    //          0    4    8   12   16   20   24   28   32
+    // a1:      |  ptr~1  |
+    // [ptr~1]: |strong=1 | weak=0  | x = 32  | y = 48  |
+
+    let a2/*: Arc<Coords>*/ = Arc::clone(&a1); // or just a1.clone()
+    //          0    4    8   12   16   20   24   28   32
+    // a1:      |  ptr~1  |
+    // a2:      |  ptr~1  |
+    // [ptr~1]: |strong=2 | weak=0  | x = 32  | y = 48  |
+
+    let w1/*: Weak<Coords>*/ = Arc::downgrade(&a1); // or just a1.clone()
+    //          0    4    8   12   16   20   24   28   32
+    // a1:      |  ptr~1  |
+    // a2:      |  ptr~1  |
+    // w1:      |  ptr~1  |
+    // [ptr~1]: |strong=2 | weak=1  | x = 32  | y = 48  |
+
+    drop(a1);
+    drop(a2);
+    //          0    4    8   12   16   20   24   28   32
+    // w1:      |  ptr~1  |
+    // [ptr~1]: |strong=0 | weak=1  | undefined         |
+
+    drop(w1);
+    //          0    4    8   12   16   20   24   28   32
+    // [ptr~1]:  freed...
+}
