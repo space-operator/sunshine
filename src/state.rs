@@ -1,18 +1,26 @@
 use crate::ui_event::*;
 use derive_more::From;
 use std::collections::HashSet;
+use std::sync::{Arc, Weak};
 
 pub const MAX_CLICK_TIME_MS: u32 = 300;
+pub const MAX_DBG_CLICK_TIME_MS: u32 = 600;
 
 pub type TimestampMs = u32;
 pub type NodeId = u32;
 
-pub type GraphCoord = i32;
+pub type GraphCoords = (i32, i32);
+
+pub type ScheduledTimeout = Arc<TimestampMs>;
 
 pub trait Context {
-    fn schedule_timeout(&mut self, timestamp: TimestampMs);
-    fn get_node_by_coords(&mut self, x: GraphCoord, y: GraphCoord) -> Option<NodeId>;
+    fn schedule_timeout(&mut self, timestamp: TimestampMs) -> ScheduledTimeout;
+
+    fn get_node_by_coords(&mut self, coords: GraphCoords) -> Option<NodeId>;
+
     fn select_node(&mut self, node_id: NodeId);
+    fn rename_node(&mut self, node_id: NodeId);
+    fn show_node_menu(&mut self, node_id: NodeId);
 }
 
 #[derive(Clone, Debug)]
@@ -26,8 +34,22 @@ pub enum State {
     NodeMouseDown(StateNodeMouseDown),
     NodeMouseLongDown(StateNodeMouseLongDown),
     NodeMouseClick(StateNodeMouseClick),
+    NodeMouseClickDown(StateNodeMouseClickDown),
     EmptyMouseDown(StateEmptyMouseDown),
 }
+
+// click
+// down <300ms up
+
+//          Default
+//              |
+// down     NodeMouseDown           -> NodeMouseLongDown
+//              |
+// up       NodeMouseClick, click   -> Default
+//              |
+// down     NodeMouseClickDown      -> NodeMouseLongDown
+//              |
+// up       Default, dblclick
 
 impl Default for State {
     fn default() -> State {
@@ -41,64 +63,48 @@ pub struct StateDefault {}
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StateNodeMouseDown {
     node_id: NodeId,
-    x: MouseCoord,
-    y: MouseCoord,
-    timestamp: TimestampMs,
+    coords: MouseCoords,
+    start_timestamp: TimestampMs,
+    timeout: ScheduledTimeout,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StateNodeMouseLongDown {
     node_id: NodeId,
-    x: MouseCoord,
-    y: MouseCoord,
-    timestamp: TimestampMs,
+    coords: MouseCoords,
+    start_timestamp: TimestampMs,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StateNodeMouseClick {
     node_id: NodeId,
-    timestamp: TimestampMs,
+    coords: MouseCoords,
+    start_timestamp: TimestampMs,
+    timeout: ScheduledTimeout,
+}
+
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StateNodeMouseClickDown {
+    node_id: NodeId,
+    coords: MouseCoords,
+    start_timestamp: TimestampMs,
+    timeout: ScheduledTimeout,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StateEmptyMouseDown {
-    x: MouseCoord,
-    y: MouseCoord,
+    coords: MouseCoords,
     timestamp: TimestampMs,
 }
 
 impl State {
-    /*pub fn on_timeout<T: Context>(self, context: &mut T, ev_timestamp: Timestamp) -> Self {
-        match self {
-            State::Default => State::Default
-            NodeMouseDown {
-                node_id,
-                x,
-                y,
-                timestamp,
-            } => {
-                let dt = ev_timestamp - timestamp;
-                if dt >= MAX_CLICK_TIME {
-                    NodeMouseLongDown {
-                        node_id,
-                        x,
-                        y,
-                        timestamp,
-                    }
-                } else {
-                    context.schedule_timeout(timestamp + MAX_CLICK_TIME);
-                }
-            }
-            _ => todo!(),
-        }
-    }*/
-
     pub fn on_timeout<T: Context>(self, context: &mut T, ev_timestamp: TimestampMs) -> Self {
         match self {
             Self::Default(state) => state.on_timeout(context, ev_timestamp),
             Self::NodeMouseDown(state) => state.on_timeout(context, ev_timestamp),
             Self::NodeMouseLongDown(state) => state.on_timeout(context, ev_timestamp),
             Self::NodeMouseClick(state) => state.on_timeout(context, ev_timestamp),
+            Self::NodeMouseClickDown(state) => state.on_timeout(context, ev_timestamp),
             Self::EmptyMouseDown(state) => state.on_timeout(context, ev_timestamp),
         }
     }
@@ -114,14 +120,19 @@ impl State {
             Self::NodeMouseDown(state) => state.apply(context, ev, ev_timestamp),
             Self::NodeMouseLongDown(state) => state.apply(context, ev, ev_timestamp),
             Self::NodeMouseClick(state) => state.apply(context, ev, ev_timestamp),
+            Self::NodeMouseClickDown(state) => state.apply(context, ev, ev_timestamp),
             Self::EmptyMouseDown(state) => state.apply(context, ev, ev_timestamp),
         }
     }
 }
 
 impl StateDefault {
-    pub fn on_timeout<T: Context>(self, context: &mut T, ev_timestamp: TimestampMs) -> State {
-        todo!()
+    pub fn new<T: Context>(context: &mut T) -> Self {
+        Self {}
+    }
+
+    pub fn on_timeout<T: Context>(self, _: &mut T, _: TimestampMs) -> State {
+        panic!();
     }
 
     pub fn apply<T: Context>(
@@ -132,26 +143,15 @@ impl StateDefault {
     ) -> State {
         match ev {
             UiEvent::MouseDown(ev) => {
-                if let Some(node_id) = context.get_node_by_coords(ev.x, ev.y) {
-                    context.schedule_timeout(ev_timestamp + MAX_CLICK_TIME_MS);
-                    StateNodeMouseDown {
-                        node_id: node_id,
-                        x: ev.x,
-                        y: ev.y,
-                        timestamp: ev_timestamp,
-                    }
-                    .into()
+                if let Some(node_id) = context.get_node_by_coords(ev.coords) {
+                    StateNodeMouseDown::new(context, node_id, ev.coords, ev_timestamp).into()
                 } else {
-                    context.schedule_timeout(ev_timestamp + MAX_CLICK_TIME_MS);
-                    StateEmptyMouseDown {
-                        x: ev.x,
-                        y: ev.y,
-                        timestamp: ev_timestamp,
-                    }
-                    .into()
+                    StateEmptyMouseDown::new(context, ev.coords, ev_timestamp).into()
                 }
             }
-            UiEvent::MouseUp(ev) => todo!(),
+            UiEvent::MouseUp(ev) => {
+                panic!();
+            }
             UiEvent::MouseMove(ev) => todo!(),
             _ => todo!(),
         }
@@ -159,20 +159,23 @@ impl StateDefault {
 }
 
 impl StateNodeMouseDown {
-    pub fn on_timeout<T: Context>(self, context: &mut T, ev_timestamp: TimestampMs) -> State {
-        let dt = ev_timestamp - self.timestamp;
-        if dt >= MAX_CLICK_TIME_MS {
-            StateNodeMouseLongDown {
-                node_id: self.node_id,
-                x: self.x,
-                y: self.y,
-                timestamp: self.timestamp,
-            }
-            .into()
-        } else {
-            context.schedule_timeout(self.timestamp + MAX_CLICK_TIME_MS);
-            self.into()
+    pub fn new<T: Context>(
+        context: &mut T,
+        node_id: NodeId,
+        coords: MouseCoords,
+        timestamp: TimestampMs,
+    ) -> Self {
+        Self {
+            node_id,
+            coords,
+            start_timestamp: timestamp,
+            timeout: context.schedule_timeout(timestamp + MAX_CLICK_TIME_MS),
         }
+    }
+
+    pub fn on_timeout<T: Context>(self, context: &mut T, ev_timestamp: TimestampMs) -> State {
+        context.show_node_menu(self.node_id);
+        StateNodeMouseLongDown::new(context, self.node_id, self.coords, self.start_timestamp).into()
     }
 
     pub fn apply<T: Context>(
@@ -183,16 +186,12 @@ impl StateNodeMouseDown {
     ) -> State {
         match ev {
             UiEvent::MouseDown(ev) => {
-                eprintln!("oh no");
-                self.into()
+                panic!();
             }
             UiEvent::MouseUp(ev) => {
                 context.select_node(self.node_id);
-                StateNodeMouseClick {
-                    node_id: self.node_id,
-                    timestamp: ev_timestamp,
-                }
-                .into()
+                StateNodeMouseClick::new(context, self.node_id, self.coords, self.start_timestamp)
+                    .into()
             }
             UiEvent::MouseMove(ev) => todo!(),
             _ => todo!(),
@@ -201,8 +200,21 @@ impl StateNodeMouseDown {
 }
 
 impl StateNodeMouseLongDown {
-    pub fn on_timeout<T: Context>(self, context: &mut T, ev_timestamp: TimestampMs) -> State {
-        todo!()
+    pub fn new<T: Context>(
+        context: &mut T,
+        node_id: NodeId,
+        coords: MouseCoords,
+        timestamp: TimestampMs,
+    ) -> Self {
+        Self {
+            node_id,
+            coords,
+            start_timestamp: timestamp,
+        }
+    }
+
+    pub fn on_timeout<T: Context>(self, _: &mut T, _: TimestampMs) -> State {
+        panic!();
     }
 
     pub fn apply<T: Context>(
@@ -211,13 +223,35 @@ impl StateNodeMouseLongDown {
         ev: UiEvent,
         ev_timestamp: TimestampMs,
     ) -> State {
-        todo!()
+        match ev {
+            UiEvent::MouseDown(ev) => {
+                panic!();
+            }
+            UiEvent::MouseUp(ev) => StateDefault::new(context).into(),
+            UiEvent::MouseMove(ev) => todo!(),
+            _ => todo!(),
+        }
     }
 }
 
 impl StateNodeMouseClick {
+    pub fn new<T: Context>(
+        context: &mut T,
+        node_id: NodeId,
+        coords: MouseCoords,
+        start_timestamp: TimestampMs,
+    ) -> Self {
+        Self {
+            node_id,
+            coords,
+            start_timestamp,
+            timeout: context.schedule_timeout(start_timestamp + MAX_DBG_CLICK_TIME_MS),
+        }
+    }
+
     pub fn on_timeout<T: Context>(self, context: &mut T, ev_timestamp: TimestampMs) -> State {
-        todo!()
+        context.show_node_menu(self.node_id);
+        StateNodeMouseLongDown::new(context, self.node_id, self.coords, self.start_timestamp).into()
     }
 
     pub fn apply<T: Context>(
@@ -226,13 +260,67 @@ impl StateNodeMouseClick {
         ev: UiEvent,
         ev_timestamp: TimestampMs,
     ) -> State {
-        todo!()
+        match ev {
+            UiEvent::MouseDown(ev) => {
+                StateNodeMouseClickDown::new(context, self.node_id, ev.coords, self.start_timestamp)
+                    .into()
+            }
+            UiEvent::MouseUp(ev) => {
+                panic!();
+            }
+            UiEvent::MouseMove(ev) => todo!(),
+            _ => todo!(),
+        }
+    }
+}
+
+impl StateNodeMouseClickDown {
+    pub fn new<T: Context>(
+        context: &mut T,
+        node_id: NodeId,
+        coords: MouseCoords,
+        start_timestamp: TimestampMs,
+    ) -> Self {
+        Self {
+            node_id,
+            coords,
+            start_timestamp,
+            timeout: context.schedule_timeout(start_timestamp + MAX_DBG_CLICK_TIME_MS),
+        }
+    }
+
+    pub fn on_timeout<T: Context>(self, context: &mut T, ev_timestamp: TimestampMs) -> State {
+        context.show_node_menu(self.node_id);
+        StateNodeMouseLongDown::new(context, self.node_id, self.coords, self.start_timestamp).into()
+    }
+
+    pub fn apply<T: Context>(
+        self,
+        context: &mut T,
+        ev: UiEvent,
+        ev_timestamp: TimestampMs,
+    ) -> State {
+        match ev {
+            UiEvent::MouseDown(ev) => {
+                panic!();
+            }
+            UiEvent::MouseUp(ev) => {
+                context.rename_node(self.node_id);
+                StateDefault::new(context).into()
+            }
+            UiEvent::MouseMove(ev) => todo!(),
+            _ => todo!(),
+        }
     }
 }
 
 impl StateEmptyMouseDown {
+    pub fn new<T: Context>(context: &mut T, coords: MouseCoords, timestamp: TimestampMs) -> Self {
+        Self { coords, timestamp }
+    }
+
     pub fn on_timeout<T: Context>(self, context: &mut T, ev_timestamp: TimestampMs) -> State {
-        todo!()
+        panic!();
     }
 
     pub fn apply<T: Context>(
@@ -241,23 +329,56 @@ impl StateEmptyMouseDown {
         ev: UiEvent,
         ev_timestamp: TimestampMs,
     ) -> State {
-        todo!()
+        match ev {
+            UiEvent::MouseDown(ev) => {
+                panic!();
+            }
+            UiEvent::MouseUp(ev) => StateDefault::new(context).into(),
+            UiEvent::MouseMove(ev) => todo!(),
+            _ => todo!(),
+        }
     }
 }
 
 #[test]
 fn test() {
+    #[derive(Clone, Debug, Default)]
     pub struct DummyContext {
-        pub last_selected_node_id: Option<NodeId>,
+        pub timeout: Weak<TimestampMs>,
+        pub selected_node_ids: Vec<NodeId>,
+        pub renamable_node_ids: Vec<NodeId>,
+        pub menu_node_ids: Vec<NodeId>,
+    }
+
+    fn apply(
+        mut state: State,
+        context: &mut DummyContext,
+        ev: UiEvent,
+        ev_timestamp: TimestampMs,
+    ) -> State {
+        while let Some(timeout) = context.timeout.upgrade() {
+            if *timeout <= ev_timestamp {
+                context.timeout = Weak::new();
+                state = state.on_timeout(context, *timeout);
+                dbg!(&state);
+            } else {
+                break;
+            }
+        }
+        state.apply(context, ev, ev_timestamp)
     }
 
     impl Context for DummyContext {
-        fn schedule_timeout(&mut self, timestamp: TimestampMs) {}
+        fn schedule_timeout(&mut self, timestamp: TimestampMs) -> ScheduledTimeout {
+            let timeout = Arc::new(timestamp);
+            self.timeout = Arc::downgrade(&timeout);
+            timeout
+        }
 
-        fn get_node_by_coords(&mut self, x: GraphCoord, y: GraphCoord) -> Option<NodeId> {
-            if x > 200 {
+        fn get_node_by_coords(&mut self, coords: GraphCoords) -> Option<NodeId> {
+            if coords.0 > 200 {
                 Some(2)
-            } else if x > 100 {
+            } else if coords.0 > 100 {
                 Some(1)
             } else {
                 None
@@ -265,36 +386,69 @@ fn test() {
         }
 
         fn select_node(&mut self, node_id: NodeId) {
-            self.last_selected_node_id = Some(node_id);
+            self.selected_node_ids.push(node_id);
+        }
+
+        fn rename_node(&mut self, node_id: NodeId) {
+            self.renamable_node_ids.push(node_id);
+        }
+
+        fn show_node_menu(&mut self, node_id: NodeId) {
+            self.menu_node_ids.push(node_id);
         }
     }
 
-    let mut context = DummyContext {
-        last_selected_node_id: None,
-    };
+    let mut context = DummyContext::default();
 
-    let st = State::default();
-    let st = st.apply(
+    let state = State::default();
+    dbg!(&state);
+    let state = apply(
+        state,
         &mut context,
         UiEventMouseDown {
-            x: 150,
-            y: 50,
+            coords: (150, 50),
             button: MouseButton::Left,
         }
         .into(),
         10000,
     );
-    let st = st.apply(
+    dbg!(&state);
+    let state = apply(
+        state,
         &mut context,
         UiEventMouseUp {
-            x: 150,
-            y: 50,
+            coords: (150, 50),
+            button: MouseButton::Left,
+        }
+        .into(),
+        10100,
+    );
+    dbg!(&state);
+    let state = apply(
+        state,
+        &mut context,
+        UiEventMouseDown {
+            coords: (150, 50),
             button: MouseButton::Left,
         }
         .into(),
         10200,
     );
-    assert_eq!(context.last_selected_node_id, Some(1));
+    dbg!(&state);
+    let state = apply(
+        state,
+        &mut context,
+        UiEventMouseUp {
+            coords: (150, 50),
+            button: MouseButton::Left,
+        }
+        .into(),
+        10300,
+    );
+    dbg!(&state);
+    assert_eq!(context.selected_node_ids, vec![1]);
+    assert_eq!(context.renamable_node_ids, vec![1]);
+    assert_eq!(context.menu_node_ids, vec![0; 0]);
 }
 
 /*pub fn apply_mouse_down(self, context: &mut T, ev: UiEventMouseDown, ev_timestamp: Timestamp) {

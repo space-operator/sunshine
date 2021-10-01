@@ -1,7 +1,7 @@
 use derive_more::From;
 use serde::{Deserialize, Serialize};
 
-pub type MouseCoord = i32;
+pub type MouseCoords = (i32, i32);
 pub type MouseWheelDelta = i32;
 pub type TouchId = u32;
 
@@ -47,49 +47,42 @@ pub enum UiEvent {
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UiEventMouseDown {
-    pub x: MouseCoord,
-    pub y: MouseCoord,
+    pub coords: MouseCoords,
     pub button: MouseButton,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UiEventMouseUp {
-    pub x: MouseCoord,
-    pub y: MouseCoord,
+    pub coords: MouseCoords,
     pub button: MouseButton,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UiEventMouseMove {
-    pub x: MouseCoord,
-    pub y: MouseCoord,
+    pub coords: MouseCoords,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UiEventMouseWheelDelta {
-    pub x: MouseCoord,
-    pub y: MouseCoord,
+    pub coords: MouseCoords,
     pub delta: MouseWheelDelta,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UiEventTouchStart {
-    pub x: MouseCoord,
-    pub y: MouseCoord,
+    pub coords: MouseCoords,
     pub touch_id: TouchId,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UiEventTouchEnd {
-    pub x: MouseCoord,
-    pub y: MouseCoord,
+    pub coords: MouseCoords,
     pub touch_id: TouchId,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct UiEventTouchMove {
-    pub x: MouseCoord,
-    pub y: MouseCoord,
+    pub coords: MouseCoords,
     pub touch_id: TouchId,
 }
 
