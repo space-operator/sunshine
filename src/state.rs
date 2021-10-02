@@ -1,4 +1,5 @@
 use crate::ui_event::*;
+use core::panic;
 use derive_more::From;
 use std::collections::HashSet;
 use std::sync::{Arc, Weak};
@@ -19,10 +20,15 @@ pub trait Context {
     fn get_node_by_coords(&mut self, coords: GraphCoords) -> Option<NodeId>;
 
     fn select_node(&mut self, node_id: NodeId);
+
     fn rename_node(&mut self, node_id: NodeId);
+
     fn show_node_menu(&mut self, node_id: NodeId);
+
+    fn nest_nodes(&mut self, nested_node_id: NodeId, parent_node_id: NodeId);
 }
 
+// Question what is this?
 #[derive(Clone, Debug)]
 pub struct StateSet {
     states: HashSet<State>,
@@ -36,20 +42,9 @@ pub enum State {
     NodeMouseClick(StateNodeMouseClick),
     NodeMouseClickDown(StateNodeMouseClickDown),
     EmptyMouseDown(StateEmptyMouseDown),
+    NodeMouseMove(StateNodeMouseMove),
+    // NodeMouseMoveMouseUp(StateNodeMouseMoveMouseUp),
 }
-
-// click
-// down <300ms up
-
-//          Default
-//              |
-// down     NodeMouseDown           -> NodeMouseLongDown
-//              |
-// up       NodeMouseClick, click   -> Default
-//              |
-// down     NodeMouseClickDown      -> NodeMouseLongDown
-//              |
-// up       Default, dblclick
 
 impl Default for State {
     fn default() -> State {
@@ -59,6 +54,13 @@ impl Default for State {
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct StateDefault {}
+
+// Needs a timeout?
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct StateEmptyMouseDown {
+    coords: MouseCoords,
+    timestamp: TimestampMs,
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StateNodeMouseDown {
@@ -92,10 +94,19 @@ pub struct StateNodeMouseClickDown {
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub struct StateEmptyMouseDown {
+pub struct StateNodeMouseMove {
+    node_id: NodeId,
     coords: MouseCoords,
-    timestamp: TimestampMs,
+    start_timestamp: TimestampMs,
 }
+
+// #[derive(Clone, Debug, Eq, PartialEq)]
+// pub struct StateNodeMouseMoveMouseUp {
+//     node_id: NodeId,
+//     coords: MouseCoords,
+//     start_timestamp: TimestampMs,
+//     end_node_id: Option<NodeId>,
+// }
 
 impl State {
     pub fn on_timeout<T: Context>(self, context: &mut T, ev_timestamp: TimestampMs) -> Self {
@@ -106,6 +117,8 @@ impl State {
             Self::NodeMouseClick(state) => state.on_timeout(context, ev_timestamp),
             Self::NodeMouseClickDown(state) => state.on_timeout(context, ev_timestamp),
             Self::EmptyMouseDown(state) => state.on_timeout(context, ev_timestamp),
+            Self::NodeMouseMove(state) => state.on_timeout(context, ev_timestamp),
+            // Self::NodeMouseMoveMouseUp(state) => state.on_timeout(context, ev_timestamp),
         }
     }
 
@@ -122,6 +135,8 @@ impl State {
             Self::NodeMouseClick(state) => state.apply(context, ev, ev_timestamp),
             Self::NodeMouseClickDown(state) => state.apply(context, ev, ev_timestamp),
             Self::EmptyMouseDown(state) => state.apply(context, ev, ev_timestamp),
+            Self::NodeMouseMove(state) => state.apply(context, ev, ev_timestamp),
+            // Self::NodeMouseMoveMouseUp(state) => state.apply(context, ev, ev_timestamp),
         }
     }
 }
@@ -193,11 +208,103 @@ impl StateNodeMouseDown {
                 StateNodeMouseClick::new(context, self.node_id, self.coords, self.start_timestamp)
                     .into()
             }
-            UiEvent::MouseMove(ev) => todo!(),
+            UiEvent::MouseMove(ev) => {
+                context.select_node(self.node_id);
+                StateNodeMouseMove::new(context, self.node_id, self.coords, self.start_timestamp)
+                    .into()
+            }
             _ => todo!(),
         }
     }
 }
+
+// Question: mouse move is a sequence of mouse moves.
+impl StateNodeMouseMove {
+    pub fn new<T: Context>(
+        context: &mut T,
+        node_id: NodeId,
+        coords: MouseCoords,
+        timestamp: TimestampMs,
+    ) -> Self {
+        Self {
+            node_id,
+            coords,
+            start_timestamp: timestamp,
+        }
+    }
+
+    pub fn on_timeout<T: Context>(self, context: &mut T, ev_timestamp: TimestampMs) -> State {
+        panic!();
+    }
+
+    pub fn apply<T: Context>(
+        self,
+        context: &mut T,
+        ev: UiEvent,
+        ev_timestamp: TimestampMs,
+    ) -> State {
+        match ev {
+            UiEvent::MouseDown(ev) => {
+                panic!();
+            }
+            UiEvent::MouseUp(ev) => {
+                let hover_node_id = context.get_node_by_coords(ev.coords);
+
+                if hover_node_id != Some(self.node_id) {
+                    context.nest_nodes(hover_node_id.unwrap(), self.node_id);
+                    StateDefault::new(context).into()
+                } else {
+                    StateDefault::new(context).into()
+                }
+                //
+            }
+            UiEvent::MouseMove(ev) => {
+                context.select_node(self.node_id);
+                StateNodeMouseMove::new(context, self.node_id, self.coords, self.start_timestamp)
+                    .into()
+            }
+            _ => todo!(),
+        }
+    }
+}
+
+// impl StateNodeMouseMoveMouseUp {
+//     pub fn new<T: Context>(
+//         context: &mut T,
+//         node_id: NodeId,
+//         coords: MouseCoords,
+//         timestamp: TimestampMs,
+//         end_node_id: Option<NodeId>,
+//     ) -> Self {
+//         Self {
+//             node_id,
+//             coords,
+//             start_timestamp: timestamp,
+//             end_node_id,
+//         }
+//     }
+
+//     pub fn on_timeout<T: Context>(self, context: &mut T, ev_timestamp: TimestampMs) -> State {
+//         panic!();
+//     }
+
+//     pub fn apply<T: Context>(
+//         self,
+//         context: &mut T,
+//         ev: UiEvent,
+//         ev_timestamp: TimestampMs,
+//     ) -> State {
+//         match ev {
+//             UiEvent::MouseDown(ev) => {
+//                 panic!();
+//             }
+//             UiEvent::MouseUp(ev) => {
+//                 //
+//             }
+//             _ => todo!(),
+//         }
+//     }
+// }
 
 impl StateNodeMouseLongDown {
     pub fn new<T: Context>(
@@ -227,7 +334,7 @@ impl StateNodeMouseLongDown {
             UiEvent::MouseDown(ev) => {
                 panic!();
             }
-            UiEvent::MouseUp(ev) => StateDefault::new(context).into(),
+            UiEvent::MouseUp(ev) => StateDefault::new(context).into(), //Question: is previous select_node still selected?
             UiEvent::MouseMove(ev) => todo!(),
             _ => todo!(),
         }
@@ -245,7 +352,7 @@ impl StateNodeMouseClick {
             node_id,
             coords,
             start_timestamp,
-            timeout: context.schedule_timeout(start_timestamp + MAX_DBG_CLICK_TIME_MS),
+            timeout: context.schedule_timeout(start_timestamp + MAX_DBG_CLICK_TIME_MS), // Question: do you ever keep constant  within impl?
         }
     }
 
@@ -285,7 +392,7 @@ impl StateNodeMouseClickDown {
             node_id,
             coords,
             start_timestamp,
-            timeout: context.schedule_timeout(start_timestamp + MAX_DBG_CLICK_TIME_MS),
+            timeout: context.schedule_timeout(start_timestamp + MAX_DBG_CLICK_TIME_MS), //Question: same timeout as StateNodeMouseClick
         }
     }
 
@@ -395,6 +502,10 @@ fn test() {
 
         fn show_node_menu(&mut self, node_id: NodeId) {
             self.menu_node_ids.push(node_id);
+        }
+
+        fn nest_nodes(&mut self, nested_node_id: NodeId, parent_node_id: NodeId) {
+            todo!()
         }
     }
 
@@ -514,3 +625,16 @@ fn test() {
         menu
 
 */
+
+// click
+// down <300ms up
+
+//          Default
+//              |
+// down     NodeMouseDown           -> NodeMouseLongDown
+//              |
+// up       NodeMouseClick, click   -> Default
+//              |
+// down     NodeMouseClickDown      -> NodeMouseLongDown
+//              |
+// up       Default, dblclick
