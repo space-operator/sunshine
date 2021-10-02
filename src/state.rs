@@ -28,7 +28,6 @@ pub trait Context {
     fn nest_nodes(&mut self, nested_node_id: NodeId, parent_node_id: NodeId);
 }
 
-// Question what is this?
 #[derive(Clone, Debug)]
 pub struct StateSet {
     states: HashSet<State>,
@@ -98,6 +97,7 @@ pub struct StateNodeMouseMove {
     node_id: NodeId,
     coords: MouseCoords,
     start_timestamp: TimestampMs,
+    // delta
 }
 
 // #[derive(Clone, Debug, Eq, PartialEq)]
@@ -209,6 +209,7 @@ impl StateNodeMouseDown {
                     .into()
             }
             UiEvent::MouseMove(ev) => {
+                // only after certain threshold
                 context.select_node(self.node_id);
                 StateNodeMouseMove::new(context, self.node_id, self.coords, self.start_timestamp)
                     .into()
@@ -218,7 +219,6 @@ impl StateNodeMouseDown {
     }
 }
 
-// Question: mouse move is a sequence of mouse moves.
 impl StateNodeMouseMove {
     pub fn new<T: Context>(
         context: &mut T,
@@ -259,7 +259,10 @@ impl StateNodeMouseMove {
                 //
             }
             UiEvent::MouseMove(ev) => {
-                context.select_node(self.node_id);
+                // 1. above minimum threshold
+                //
+                // hover above another node
+                //
                 StateNodeMouseMove::new(context, self.node_id, self.coords, self.start_timestamp)
                     .into()
             }
@@ -334,7 +337,7 @@ impl StateNodeMouseLongDown {
             UiEvent::MouseDown(ev) => {
                 panic!();
             }
-            UiEvent::MouseUp(ev) => StateDefault::new(context).into(), //Question: is previous select_node still selected?
+            UiEvent::MouseUp(ev) => StateDefault::new(context).into(),
             UiEvent::MouseMove(ev) => todo!(),
             _ => todo!(),
         }
@@ -352,7 +355,7 @@ impl StateNodeMouseClick {
             node_id,
             coords,
             start_timestamp,
-            timeout: context.schedule_timeout(start_timestamp + MAX_DBG_CLICK_TIME_MS), // Question: do you ever keep constant  within impl?
+            timeout: context.schedule_timeout(start_timestamp + MAX_DBG_CLICK_TIME_MS),
         }
     }
 
@@ -392,7 +395,7 @@ impl StateNodeMouseClickDown {
             node_id,
             coords,
             start_timestamp,
-            timeout: context.schedule_timeout(start_timestamp + MAX_DBG_CLICK_TIME_MS), //Question: same timeout as StateNodeMouseClick
+            timeout: context.schedule_timeout(start_timestamp + MAX_DBG_CLICK_TIME_MS),
         }
     }
 
