@@ -1,0 +1,95 @@
+Default
+    Shift, Ctrl, Alt
+
+    on lmb down
+        select
+        LmbPressed
+
+LmbPressed
+    on ~300ms
+        LmbLongPressed
+    on lmb release
+        click
+        LmbClick
+
+LmbClick
+    on ~300ms
+        Default
+    on lmb down
+       Lmb2ndPressed
+
+Lmb2ndPressed
+    on ~300ms
+        LmbLongPressed
+    on lmb release
+        dblclick
+        Default
+
+
+
+
+        LmbClick  on node       select node
+        LmbClick  on empty      unselect nodes
+Shift   LmbClick  on node       add node to selection
+Shift   LmbClick  on empty      -
+Ctrl    LmbClick  on node       next node under the pointer
+Ctrl    LmbClick  on empty      unselect nodes
+
+        DblClick  on empty      create node and rename
+        DblClick  on node       rename
+
+        LmbMove   on empty      selection area
+        LmbMove   on sel node   move nodes
+        LmbMove   on uns node   create edge or wait for second
+
+Shift   LmbMove   on empty      selection area to add nodes
+Shift   LmbMove   on sel node   copy and move nodes
+Shift   LmbMove   on uns node   create edge or wait for second
+
+        LmbClick  edge empty    continue edge   
+        LmbClick  edge node     connect nodes by edge
+        DblClick  edge empty    create node and rename and edge them
+        DblClick  edge node     rename node and edge them
+
+        RmbClick                menu
+        RmbMove                 screen move
+
+
+
+
+
+                    empty           node
+    LmbClick        unselect        select
+    LmbMove         select area     move/edge
+    RmbClick        menu            menu
+    RmbMove         move screen     move screen
+
+    TouchClick      unselect        select
+    TouchMove       move screen     move screen
+    LongTouchClick  menu            menu
+    LongTouchMove   select area     move/edge
+
+
+    LmbClick == TouchClick
+    LmbMove == LongTouchMove
+    RmbClick == LongTouchClick
+    RmbMove == TouchMove
+
+
+
+    LmbDown   menu outside  MenuClosed
+    MenuLmbPressed  mouse up -> do select -> Default
+    MenuClosed mouse up   -> Default
+
+
+    ScollUp/ScrollDown
+    DblTouch move / scale
+
+
+
+
+
+        LmbDown     select node
+Shift   LmbDown     add node to selection
+
+

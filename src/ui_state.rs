@@ -11,16 +11,20 @@ pub type NodeId = u32;
 
 pub type GraphCoords = (i32, i32);
 
-pub type ScheduledTimeout = Arc<UiEventTimeStampMs>;
+pub type ScheduledTimeout = Arc<UiEventTimestamp>;
 
 pub trait Context {
     fn max_click_time(&self) -> UiEventTimeDeltaMs;
 
     fn max_dbl_click_interval(&self) -> UiEventTimeDeltaMs;
 
-    fn schedule_timeout(&mut self, timestamp: UiEventTimeStampMs) -> ScheduledTimeout;
+    fn min_long_touch_time(&self) -> UiEventTimeDeltaMs;
 
-    fn get_node_by_coords(&mut self, coords: GraphCoords) -> Option<NodeId>;
+    fn schedule_timeout(&mut self, timestamp: UiEventTimestamp) -> ScheduledTimeout;
+
+    fn emit_event(&mut self, ev: HighLevelUiEvent);
+
+    /*fn get_node_by_coords(&mut self, coords: GraphCoords) -> Option<NodeId>;
 
     fn select_node(&mut self, node_id: NodeId);
 
@@ -28,55 +32,131 @@ pub trait Context {
 
     fn show_node_menu(&mut self, node_id: NodeId);
 
-    fn nest_nodes(&mut self, nested_node_id: NodeId, parent_node_id: NodeId);
+    fn nest_nodes(&mut self, nested_node_id: NodeId, parent_node_id: NodeId);*/
 }
 
-#[derive(Clone, Debug)]
-pub struct StateSet {
-    states: HashSet<StateMachine>,
-}
+/*
+    LowLevelUiEventKind | Timeout
+        =>
+    UiStateKind change, emit some HighLevelUiEventKind
 
-pub trait State: Sized {
-    fn on_timeout<T: Context>(self, ctx: &mut T, timestamp: UiEventTimeStampMs) -> StateMachine {
+*/
+
+pub trait UiState: Sized {
+    fn on_timeout<T: Context>(self, ctx: &mut T, timestamp: UiEventTimestamp) -> UiStateKind {
         panic!("state should not be called by on a timeout");
     }
 
-    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> StateMachine;
+    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> UiStateKind;
 }
 
 #[derive(From, Clone, Debug, Eq, PartialEq)]
-pub enum StateMachine {
-    Default(StateDefault),
-    NodeMouseDown(StateNodeMouseDown),
-    NodeMouseLongDown(StateNodeMouseLongDown),
-    NodeMouseClick(StateNodeMouseClick),
-    NodeMouseClickDown(StateNodeMouseClickDown),
-    EmptyMouseDown(StateEmptyMouseDown),
-    NodeMouseMove(StateNodeMouseMove),
-    // NodeMouseMoveMouseUp(StateNodeMouseMoveMouseUp),
+pub enum UiStateKind {
+    Default(UiDefaultState),
+    MousePressed(UiMousePressedState),
+    MouseMoveMaybeStart(UiMouseMoveMaybeStartState),
+    MouseMoveStart(UiMouseMoveStartState),
+    MouseMoving(UiMouseMovingState),
+    MouseMoveEnd(UiMouseMoveState),
+    MouseClick(UiMouseClickState),
+    MouseClickExact(UiMouseClickExactState),
+    MouseWheel(UiMouseWheelState),
+    TouchStart(UiTouchStartState),
+    TouchMoving(UiTouchMoveState),
+    TouchMoveEnd(UiTouchMoveState),
+    TouchClick(UiTouchClickState),
+    TouchClickExact(UiTouchClickExactState),
 }
 
-impl Default for StateMachine {
-    fn default() -> StateMachine {
-        StateMachine::Default(StateDefault::default())
+impl Default for UiStateKind {
+    fn default() -> UiStateKind {
+        UiStateKind::Default(StateDefault::default())
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
-pub struct StateDefault {}
+pub struct UiDefaultState {
+    modifiers: Modifiers,
+}
 
+#[derive(Clone, Debug, Eq, PartialEq, Default)]
+pub struct UiMousePressedState {
+    modifiers: Modifiers,
+    coords: UiEventCoords,
+    timestamp: UiEventTimestamp,
+}
+
+impl UiDefaultState {
+    pub fn new<T: Context>(ctx: &mut T) -> Self {
+        Self {}
+    }
+}
+
+impl UiState for UiDefaultState {
+    fn apply<T: Context>(self, ctx: &mut T, ev: LowLevelUiEvent) -> UiStateKind {
+        let timestamp = ev.timestamp;
+        match ev.kind {
+            UiLowLevelEventKind::MouseDown(ev) => {
+                UiMousePressedState::new(ctx, ev.coords, timestamp)
+            }
+            UiLowLevelEventKind::MouseUp(ev) => {
+                panic!();
+            }
+            UiLowLevelEventKind::MouseMove(ev) => ctx.emit_event(HighLevelUiEvent {
+                timestamp,
+                modifiers: self.modifiers.clone(),
+                kind: HighLevelUiEventKind::MouseMove(ev),
+            }),
+            UiLowLevelEventKind::MouseWheel(ev) => ctx.emit_event(HighLevelUiEvent {
+                timestamp,
+                modifiers: self.modifiers.clone(),
+                kind: HighLevelUiEventKind::MouseWheel(ev),
+            }),
+            UiLowLevelEventKind::TouchStart(ev) => UiTouchStart::new(ctx, ev.coords, timestamp),
+            UiLowLevelEventKind::TouchEnd(ev) => {
+                panic!();
+            }
+            UiLowLevelEventKind::TouchMove(ev) => {
+                panic!();
+            }
+            UiLowLevelEventKind::KeyDown(ev) => {
+                let is_added = self.modifiers.insert(ev.key);
+                assert!(is_added);
+            }
+            UiLowLevelEventKind::KeyUp(ev) => {
+                let is_removed = self.modifiers.remove(ev.key);
+                assert!(is_removed);
+                if is_removed {
+                    ctx.emit_event(HighLevelUiEvent {
+                        timestamp,
+                        modifiers: self.modifiers.clone(),
+                        kind: HighLevelUiEventKind::Key(ev),
+                    })
+                }
+            }
+            UiLowLevelEventKind::Char(ev) => ctx.emit_event(HighLevelUiEvent {
+                timestamp,
+                modifiers: self.modifiers.clone(),
+                kind: HighLevelUiEventKind::Char(ev),
+            }),
+            _ => todo!(),
+        }
+    }
+}
+
+/*
 // Needs a timeout?
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StateEmptyMouseDown {
     coords: MouseCoords,
-    timestamp: UiEventTimeStampMs,
+    timestamp: UiEventTimestamp,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StateNodeMouseDown {
     node_id: NodeId,
     coords: MouseCoords,
-    start_timestamp: UiEventTimeStampMs,
+    start_timestamp: UiEventTimestamp,
     timeout: ScheduledTimeout,
 }
 
@@ -84,14 +164,14 @@ pub struct StateNodeMouseDown {
 pub struct StateNodeMouseLongDown {
     node_id: NodeId,
     coords: MouseCoords,
-    start_timestamp: UiEventTimeStampMs,
+    start_timestamp: UiEventTimestamp,
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub struct StateNodeMouseClick {
     node_id: NodeId,
     coords: MouseCoords,
-    start_timestamp: UiEventTimeStampMs,
+    start_timestamp: UiEventTimestamp,
     timeout: ScheduledTimeout,
 }
 
@@ -99,7 +179,7 @@ pub struct StateNodeMouseClick {
 pub struct StateNodeMouseClickDown {
     node_id: NodeId,
     coords: MouseCoords,
-    start_timestamp: UiEventTimeStampMs,
+    start_timestamp: UiEventTimestamp,
     timeout: ScheduledTimeout,
 }
 
@@ -107,7 +187,7 @@ pub struct StateNodeMouseClickDown {
 pub struct StateNodeMouseMove {
     node_id: NodeId,
     coords: MouseCoords,
-    start_timestamp: UiEventTimeStampMs,
+    start_timestamp: UiEventTimestamp,
     // delta
 }
 
@@ -119,8 +199,8 @@ pub struct StateNodeMouseMove {
 //     end_node_id: Option<NodeId>,
 // }
 
-impl State for StateMachine {
-    fn on_timeout<T: Context>(self, ctx: &mut T, timestamp: UiEventTimeStampMs) -> Self {
+impl UiState for UiStateKind {
+    fn on_timeout<T: Context>(self, ctx: &mut T, timestamp: UiEventTimestamp) -> Self {
         match self {
             Self::Default(state) => state.on_timeout(ctx, timestamp),
             Self::NodeMouseDown(state) => state.on_timeout(ctx, timestamp),
@@ -153,8 +233,8 @@ impl StateDefault {
     }
 }
 
-impl State for StateDefault {
-    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> StateMachine {
+impl UiState for StateDefault {
+    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> UiStateKind {
         let timestamp = ev.timestamp;
         match ev.kind {
             UiEventKind::MouseDown(ev) => {
@@ -178,7 +258,7 @@ impl StateNodeMouseDown {
         ctx: &mut T,
         node_id: NodeId,
         coords: MouseCoords,
-        timestamp: UiEventTimeStampMs,
+        timestamp: UiEventTimestamp,
     ) -> Self {
         Self {
             node_id,
@@ -189,13 +269,13 @@ impl StateNodeMouseDown {
     }
 }
 
-impl State for StateNodeMouseDown {
-    fn on_timeout<T: Context>(self, ctx: &mut T, timestamp: UiEventTimeStampMs) -> StateMachine {
+impl UiState for StateNodeMouseDown {
+    fn on_timeout<T: Context>(self, ctx: &mut T, timestamp: UiEventTimestamp) -> UiStateKind {
         ctx.show_node_menu(self.node_id);
         StateNodeMouseLongDown::new(ctx, self.node_id, self.coords, self.start_timestamp).into()
     }
 
-    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> StateMachine {
+    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> UiStateKind {
         match ev.kind {
             UiEventKind::MouseDown(ev) => {
                 panic!();
@@ -220,7 +300,7 @@ impl StateNodeMouseMove {
         ctx: &mut T,
         node_id: NodeId,
         coords: MouseCoords,
-        timestamp: UiEventTimeStampMs,
+        timestamp: UiEventTimestamp,
     ) -> Self {
         Self {
             node_id,
@@ -230,8 +310,8 @@ impl StateNodeMouseMove {
     }
 }
 
-impl State for StateNodeMouseMove {
-    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> StateMachine {
+impl UiState for StateNodeMouseMove {
+    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> UiStateKind {
         match ev.kind {
             UiEventKind::MouseDown(ev) => {
                 panic!();
@@ -275,7 +355,7 @@ impl State for StateNodeMouseMove {
 //         }
 //     }
 
-//     fn on_timeout<T: Context>(self, ctx: &mut T, ev.timestamp: TimestampMs) -> State {
+//     fn on_timeout<T: Context>(self, ctx: &mut T, ev.timestamp: TimestampMs) -> UiState {
 //         panic!();
 //     }
 
@@ -284,7 +364,7 @@ impl State for StateNodeMouseMove {
 //         ctx: &mut T,
 //         ev: UiEvent,
 //         ev.timestamp: TimestampMs,
-//     ) -> State {
+//     ) -> UiState {
 //         match ev.kind {
 //             UiEventKind::MouseDown(ev) => {
 //                 panic!();
@@ -302,7 +382,7 @@ impl StateNodeMouseLongDown {
         ctx: &mut T,
         node_id: NodeId,
         coords: MouseCoords,
-        timestamp: UiEventTimeStampMs,
+        timestamp: UiEventTimestamp,
     ) -> Self {
         Self {
             node_id,
@@ -312,8 +392,8 @@ impl StateNodeMouseLongDown {
     }
 }
 
-impl State for StateNodeMouseLongDown {
-    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> StateMachine {
+impl UiState for StateNodeMouseLongDown {
+    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> UiStateKind {
         match ev.kind {
             UiEventKind::MouseDown(ev) => {
                 panic!();
@@ -330,7 +410,7 @@ impl StateNodeMouseClick {
         ctx: &mut T,
         node_id: NodeId,
         coords: MouseCoords,
-        start_timestamp: UiEventTimeStampMs,
+        start_timestamp: UiEventTimestamp,
     ) -> Self {
         Self {
             node_id,
@@ -341,13 +421,13 @@ impl StateNodeMouseClick {
     }
 }
 
-impl State for StateNodeMouseClick {
-    fn on_timeout<T: Context>(self, ctx: &mut T, timestamp: UiEventTimeStampMs) -> StateMachine {
+impl UiState for StateNodeMouseClick {
+    fn on_timeout<T: Context>(self, ctx: &mut T, timestamp: UiEventTimestamp) -> UiStateKind {
         ctx.show_node_menu(self.node_id);
         StateNodeMouseLongDown::new(ctx, self.node_id, self.coords, self.start_timestamp).into()
     }
 
-    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> StateMachine {
+    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> UiStateKind {
         match ev.kind {
             UiEventKind::MouseDown(ev) => {
                 StateNodeMouseClickDown::new(ctx, self.node_id, ev.coords, self.start_timestamp)
@@ -367,7 +447,7 @@ impl StateNodeMouseClickDown {
         ctx: &mut T,
         node_id: NodeId,
         coords: MouseCoords,
-        start_timestamp: UiEventTimeStampMs,
+        start_timestamp: UiEventTimestamp,
     ) -> Self {
         Self {
             node_id,
@@ -378,13 +458,13 @@ impl StateNodeMouseClickDown {
     }
 }
 
-impl State for StateNodeMouseClickDown {
-    fn on_timeout<T: Context>(self, ctx: &mut T, timestamp: UiEventTimeStampMs) -> StateMachine {
+impl UiState for StateNodeMouseClickDown {
+    fn on_timeout<T: Context>(self, ctx: &mut T, timestamp: UiEventTimestamp) -> UiStateKind {
         ctx.show_node_menu(self.node_id);
         StateNodeMouseLongDown::new(ctx, self.node_id, self.coords, self.start_timestamp).into()
     }
 
-    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> StateMachine {
+    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> UiStateKind {
         match ev.kind {
             UiEventKind::MouseDown(ev) => {
                 panic!();
@@ -400,13 +480,13 @@ impl State for StateNodeMouseClickDown {
 }
 
 impl StateEmptyMouseDown {
-    pub fn new<T: Context>(ctx: &mut T, coords: MouseCoords, timestamp: UiEventTimeStampMs) -> Self {
+    pub fn new<T: Context>(ctx: &mut T, coords: MouseCoords, timestamp: UiEventTimestamp) -> Self {
         Self { coords, timestamp }
     }
 }
 
-impl State for StateEmptyMouseDown {
-    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> StateMachine {
+impl UiState for StateEmptyMouseDown {
+    fn apply<T: Context>(self, ctx: &mut T, ev: UiEvent) -> UiStateKind {
         match ev.kind {
             UiEventKind::MouseDown(ev) => {
                 panic!();
@@ -416,19 +496,19 @@ impl State for StateEmptyMouseDown {
             _ => todo!(),
         }
     }
-}
+}*/
 
-#[test]
+/*#[test]
 fn test() {
     #[derive(Clone, Debug, Default)]
     pub struct DummyContext {
-        pub timeout: Weak<UiEventTimeStampMs>,
+        pub timeout: Weak<UiEventTimestamp>,
         pub selected_node_ids: Vec<NodeId>,
         pub renamable_node_ids: Vec<NodeId>,
         pub menu_node_ids: Vec<NodeId>,
     }
 
-    fn apply(mut state: StateMachine, ctx: &mut DummyContext, ev: UiEvent) -> StateMachine {
+    fn apply(mut state: UiStateKind, ctx: &mut DummyContext, ev: UiEvent) -> UiStateKind {
         while let Some(timeout) = ctx.timeout.upgrade() {
             if *timeout <= ev.timestamp {
                 ctx.timeout = Weak::new();
@@ -442,7 +522,7 @@ fn test() {
     }
 
     impl Context for DummyContext {
-        fn schedule_timeout(&mut self, timestamp: UiEventTimeStampMs) -> ScheduledTimeout {
+        fn schedule_timeout(&mut self, timestamp: UiEventTimestamp) -> ScheduledTimeout {
             let timeout = Arc::new(timestamp);
             self.timeout = Arc::downgrade(&timeout);
             timeout
@@ -477,7 +557,7 @@ fn test() {
 
     let mut ctx = DummyContext::default();
 
-    let state = StateMachine::default();
+    let state = UiStateKind::default();
     dbg!(&state);
     let state = apply(
         state,
@@ -534,11 +614,11 @@ fn test() {
     assert_eq!(ctx.selected_node_ids, vec![1]);
     assert_eq!(ctx.renamable_node_ids, vec![1]);
     assert_eq!(ctx.menu_node_ids, vec![0; 0]);
-}
+}*/
 
 /*fn apply_mouse_down(self, ctx: &mut T, ev: UiEventMouseDown, ev.timestamp: Timestamp) {
     mst() {
-    let st = State::
+    let st = UiState::
 }atch self {
                 x,
                 y,
@@ -547,7 +627,7 @@ fn test() {
         ) => {
             if let Some(node_id) = ctx.get_node_by_coords(x, y) {
                 ctx.schedule_timeout(ev.timestamp + MAX_CLICK_TIME);
-                State::NodeMouseDown {
+                UiState::NodeMouseDown {
                     node_id,
                     x,
                     y,
@@ -558,7 +638,7 @@ fn test() {
             }
         }
         (
-            State::NodeMouseDown {
+            UiState::NodeMouseDown {
                 node_id,
                 x,
                 y,
@@ -570,12 +650,12 @@ fn test() {
                 button: MouseButton::Left,
             },
         ) => {
-            State::NodeMouseClick {
+            UiState::NodeMouseClick {
                 node_id: node_id,
                 timestamp: ev.timestamp,
             }
         }
-        (Default, UiEventKind::MouseUp { .. }) => State::Default,
+        (Default, UiEventKind::MouseUp { .. }) => UiState::Default,
         _ => todo!(),
     }
 }*/
