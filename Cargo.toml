@@ -13,7 +13,6 @@ indradb-lib = "2.1.0"
 lazy_static = "1.4.0"
 derive_more = "0.99.16"
 
-
 [dependencies.serde]
 version = "1.0.130"
 features = [
