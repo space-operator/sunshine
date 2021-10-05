@@ -1,24 +1,24 @@
 mod context;
-//mod mouse;
+// mod mouse;
 mod touch;
 
 use crate::ui_event::*;
 use context::*;
-//use mouse::*;
+// use mouse::*;
 use std::sync::Arc;
 use touch::*;
 
 pub trait UiMouseStateMachine: Sized {
-    fn with_timeout<'a, T: Context>(self, data: Data<'a, T>) -> UiMouseState {
+    fn with_timeout<'a, T: Context>(self, data: Data<'a, T>) -> () /*UiMouseState*/ {
         panic!("state should not be called by timeout");
     }
 }
 
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct UiState {
-    modifiers: Arc<UiModifiers>,
-    //mouse_state: UiMouseState,
-    //touch_state: UiTouchState,
+    // modifiers: Arc<UiModifiers>,
+// mouse_state: UiMouseState,
+// touch_state: UiTouchState,
 }
 
 pub struct Data<'a, T: Context> {
