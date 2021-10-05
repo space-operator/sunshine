@@ -1,0 +1,105 @@
+/*
+    HashSet<UiModifier>
+    BTreeSet<UiModifier>
+
+
+
+    HashSet
+        hs.insert(9)
+            9 -> hash -> 198374
+        hs.contains(9)
+            9 -> hash -> 198374
+
+        hs.insert(12341341234134)
+            9 -> hash -> 512
+
+        hs.insert(123123)
+            9 -> hash -> 514
+
+       00 -> -
+       01 -> ********
+       02 -> -
+       03 -> ****
+       04 -> -
+       05 -> -
+       06 -> -
+       07 -> -
+       08 -> -
+       09 -> -
+       10 -> -
+       11 -> -
+       12 -> -
+       13 -> ****
+       14 -> -
+       15 -> -
+       16 -> ****
+       17 -> -
+       18 -> -
+       19 -> -
+       20 -> -
+       21 -> ********
+       22 -> vec![(12341341234134, 512)]
+       23 -> ****
+       24 -> -
+       25 -> ****
+       26 -> ****
+       27 -> -
+       28 -> -
+       29 -> -
+       ............
+       99 -> -
+
+
+
+    BinaryTree
+                    15
+                  13
+               11
+             10
+           5
+         3
+        1
+
+
+           10
+        3       13
+       1 5    11  15
+
+
+       log2(N)
+
+
+
+    LinkedList
+        1, * -> 5, * -> 10, * -> 11, * -> 17, /
+        N
+
+    Vec
+        ptr
+        len
+        capacity
+
+
+                 sorted       insert      lookup
+    Vec             -         ++++        ---
+    Vec(sorted)     +         --          ++
+    LinkedList      -         +++         ---
+    DoubleLList     -         +++         ---
+    BinaryTree      +         + log(N)     +
+    HashSet         -         ++ hash     ++++
+
+
+        small amount of elements? (1, 2, 3)
+    Vec
+        sorting?
+    BTreeSet / BTreeMap
+        quick lookup?
+    HashSet / HashMap
+        else
+    Vec
+
+
+
+
+
+*/

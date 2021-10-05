@@ -5,6 +5,7 @@ mod graph;
 mod router;
 mod state;
 mod ui_event;
+mod ui_state;
 
 use app::App;
 use app::AppEvent;
