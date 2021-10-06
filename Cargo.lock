@@ -356,6 +356,7 @@ dependencies = [
  "nom",
  "serde",
  "serde_json",
+ "uuid",
 ]
 
 [[package]]

@@ -1,3 +1,6 @@
+mod queries;
+use uuid::Uuid;
+
 use indradb::{
     Datastore, Edge, EdgeKey, EdgePropertyQuery, MemoryDatastore, MemoryTransaction,
     RangeVertexQuery, SpecificEdgeQuery, SpecificVertexQuery, Transaction, Type, Vertex,
@@ -11,6 +14,7 @@ lazy_static! {
     pub static ref TYPE_DATA: Type = Type::new("data").expect("creating vertex type");
     pub static ref WIDGET_TYPE: Type = Type::new("widget").expect("creating vertex type");
 }
+pub type NodeId = Uuid;
 
 #[derive(Debug)]
 pub struct Database {
@@ -28,11 +32,7 @@ impl Database {
     //
     // Create a vertex
     //
-    pub fn create_vertex(
-        &self,
-        vertex_type: Type,
-        vertex_properties: &serde_json::Value,
-    ) -> Vertex {
+    pub fn create_node(&self, vertex_type: Type, vertex_properties: &serde_json::Value) -> Vertex {
         let new_vertex = Vertex::new(vertex_type.clone());
 
         let new_vertex = match self
@@ -112,7 +112,7 @@ fn test_database() {
         ]
     });
 
-    let vertex_1 = dummy_database.create_vertex(node_type.clone(), &vertex_1_props);
+    let vertex_1 = dummy_database.create_node(node_type.clone(), &vertex_1_props);
 
     let vertex_2_props = json!({
         "name": "Jane Doe",
@@ -123,7 +123,7 @@ fn test_database() {
         ]
     });
 
-    let vertex_2 = dummy_database.create_vertex(node_type.clone(), &vertex_1_props);
+    let vertex_2 = dummy_database.create_node(node_type.clone(), &vertex_1_props);
     dbg!(&vertex_1);
     dbg!(&vertex_2);
     dbg!(&dummy_database);

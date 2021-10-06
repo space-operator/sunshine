@@ -12,6 +12,7 @@ serde_json = "1.0"
 indradb-lib = "2.1.0"
 lazy_static = "1.4.0"
 derive_more = "0.99.16"
+uuid = "0.8.2"
 
 [dependencies.serde]
 version = "1.0.130"
