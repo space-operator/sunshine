@@ -1,0 +1,182 @@
+
+        if recv KeyDown/ButtonDown/TouchStart
+            if RecvEvent in MaybeMultiClick
+                emit     CurrentModifiers + RecvEvent down (num_clicks)
+                remember num_click
+                remove   RecvEvent from MaybeMultiClick
+            else
+                emit     CurrentModifiers + RecvEvent down
+            endif
+            add      RecvEvent to CurrentModifiers
+            remember time of the RecvEvent to MaybeLongPressed
+            add      RecvEvent to ClickCandidates
+            remember coords of the RecvEvent to MaybeClick
+            schedule LongPressedCheck for RecvEvent
+
+        if recv KeyUp/ButtonUp/TouchEnd
+            emit     CurrentModifiers + RecvEvent up (num_clicks)
+            clear    LongPressedCheck for RecvEvent
+            add      RecvEvent to MaybeMultiClick
+            schedule NotAMultiClick for RecvEvent
+            if       RecvEvent in ClickCandidates
+                emit    SavedModifiers + RecvEvent click or multiclick (num_clicks)
+
+        on LongPressedCheck
+            emit    SavedModifiers + RecvEvent long pressed
+            remove  RecvEvent from MaybeLongPressed
+
+        on NotAMultiClick
+            emit    SavedModifiers + NotAClick
+            remove  RecvEvent from MaybeMultiClick
+
+        if recv MouseWheel/Char
+            emit     CurrentModifiers + RecvEvent
+
+        if recv MouseMove/TouchMove
+            check coords of all the RecvEvent
+                remove  RecvEvent from MaybeClick
+
+
+
+
+
+
+
+
+        Can we make a state machine builder?
+            Allow user to select Low
+
+        ShiftDown -> ShiftDown
+        MoveMouse -> Shift+ MouseMove
+                            ShiftLongPressed
+        CtrlDown -> Shift+ CtrlDown
+        MoveMouse (not a click anymore)
+        LmbDown (x, y) -> Shift+Ctrl+ LmbDown -> Rotate3DSpace
+        MoveMouse
+        ShiftUp -> Ctrl+Lmb+ ShiftUp
+        LmbUp (x, y) -> Ctrl+ LmbUp -> about Rotate3DSpace
+                        Ctrl+ LmbClick
+
+                              LmbLongClick
+
+
+        Ctrl+ Lmb
+            a lot of movement
+        Ctrl+Lmb+ Shift
+            a little movement
+        Ctrl+Lmb+ -Shift
+            Click(Shift)
+        Ctrl+ -Lmb
+            !----(Lmb)
+
+
+        Modifiers
+            Shift, Lmb
+        ClickableModifiers
+            Shift((x, y), ()),
+
+
+        Click: HashSet[
+            Lmb(+Shift): 10123ms
+            Shift: 10190ms
+        ]
+
+
+    LongTouch
+
+
+
+
+    Lmb((x, y), [Shift]))
+
+
+        Ctrl+ Lmb
+            a little movement
+        Ctrl+Lmb+ Shift
+            a little movement
+        Ctrl+Lmb+ -Shift
+            Click(Shift)
+        Ctrl+ -Lmb
+            Click(Lmb)
+
+
+
+
+        Ctrl+ Lbm
+        Lmb+ Ctrl
+
+        Ctrl+Shift+Alt+ Touch  Rotate3DSpace
+
+
+        ShiftDown -> ShiftDown
+        TouchStart -> Shift+ TouchStart
+        TouchMove -> Shift+Touch+ TouchMove(little move)
+        TouchEnd -> Shift+ TouchEnd
+                    Shift+ TouchClick
+
+        CtrlDown -> Shift+ CtrlDown
+        TouchStart -> Shift+Ctrl+ TouchStart
+        TouchMove -> Shift+Ctrl+Touch+ TouchMove
+        TouchMove -> Shift+Ctrl+Touch+ TouchMove (too many)
+
+        AltDown -> Shift+Ctrl+Touch+ Alt
+        TouchEnd -> Shift+Ctrl+ TouchEnd
+                                TouchClick
+
+
+
+
+
+
+
+
+            setting
+        SelectNode                      LmbClick
+        AddNode                         Ctrl+LmbClick
+        RectangleSelectionStart/End         +Lbm
+        MoveScreenStart              +Rmb
+                          End
+
+        Ctrl+Lbm
+
+
+                        events
+        SelectNode      LmbClick
+        --------        LmbDblClick
+        AddNode         Ctrl+LmbClick
+
+
+
+                        states
+        RectSelect      Lmb
+        MoveScreen      Shift
+
+
+
+        Shift+Ctrl + Lmb
+        Shift+Ctrl + DbgLmb
+        Shift+Ctrl + TplLmb
+
+
+
+        Event: Click/DblClick/MouseMove/etc.
+        Event: ModifierChanged
+
+
+
+        LmbPress            ->     + LmbPress
+        LittleMouseMove     -> Lmb + MouseMove
+        LmbRelease          ->     + LmbRelease
+        LmbRelease          ->     + LmbClick
+
+        SpacePress          ->              + SpacePress
+        LmbPress            -> Space        + LmbPress
+        LittleMouseMove     -> Space + Lbm  + MouseMove
+        SpaceRelease        ->         Lbm  + SpaceClick
+        SpaceRelease        ->         Lbm  + SpaceRelease
+        LittleMouseMove     ->         Lbm  + MouseMove
+        SpaceRelease        ->              + LbmClick
+
+        LmbPress            ->     + LmbPress
+        LongMouseMove       -> Lmb + MouseMove
+        LmbRelease          ->     + LmbRelease

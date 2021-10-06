@@ -80,6 +80,50 @@ pub enum LowLevelUiEventKind {
 
 #[derive(Clone, Debug, Eq, From, PartialEq)]
 pub enum UiEventKind {
+    /*
+    if recv KeyDown/ButtonDown/TouchStart
+        if RecvEvent in MaybeMultiClick
+            emit     CurrentModifiers + RecvEvent down (num_clicks)
+            remember num_click
+            remove   RecvEvent from MaybeMultiClick
+        else
+            emit     CurrentModifiers + RecvEvent down
+        endif
+        add      RecvEvent to CurrentModifiers
+        remember time of the RecvEvent to MaybeLongPressed
+        add      RecvEvent to ClickCandidates
+        remember coords of the RecvEvent to MaybeClick
+        schedule LongPressedCheck for RecvEvent
+
+    if recv KeyUp/ButtonUp/TouchEnd
+        emit     CurrentModifiers + RecvEvent up (num_clicks)
+        clear    LongPressedCheck for RecvEvent
+        add      RecvEvent to MaybeMultiClick
+        schedule NotAMultiClick for RecvEvent
+        if       RecvEvent in ClickCandidates
+            emit    SavedModifiers + RecvEvent click or multiclick (num_clicks)
+
+    on LongPressedCheck
+        emit    SavedModifiers + RecvEvent long pressed
+        remove  RecvEvent from MaybeLongPressed
+
+    on NotAMultiClick
+        emit    SavedModifiers + NotAClick
+        remove  RecvEvent from MaybeMultiClick
+
+    if recv MouseWheel/Char
+        emit     CurrentModifiers + RecvEvent
+
+    if recv MouseMove/TouchMove
+        check coords of all the RecvEvent
+            remove  RecvEvent from MaybeClick
+
+
+
+
+
+
+     */
     MouseClick(UiMouseClickEvent),
     MouseClickExact(UiMouseClickExactEvent),
     MouseMove(UiMouseMoveEvent),
