@@ -1,20 +1,196 @@
 mod context;
 // mod mouse;
-mod mod2;
-mod touch;
+//mod mod2;
+//mod touch;
+
+use std::{collections::{HashMap, HashSet}, sync::Arc};
 
 use crate::ui_event::*;
 use context::*;
 // use mouse::*;
-use std::sync::Arc;
-use touch::*;
+//use std::sync::Arc;
+//use touch::*;
 
-pub trait UiMouseStateMachine: Sized {
-    fn with_timeout<'a, T: Context>(self, data: Data<'a, T>) -> () /*UiMouseState*/ {
-        panic!("state should not be called by timeout");
+#[derive(Clone, Debug)]
+pub enum ControlKind {
+    MouseButton(u32),
+    KeyboardKey(String),
+    Touch,
+}
+
+#[derive(Clone, Debug)]
+pub enum AxisKind {
+    MouseX,
+    MouseY,
+}
+
+#[derive(Clone, Debug)]
+pub struct MiddleLevelUiState {
+    pub controls: HashMap<Control, MiddleLevelUiControlState>,
+}
+
+#[derive(Clone, Debug)]
+pub enum MiddleLevelUiControlState {
+    Pressed(MiddleLevelUiControlPressed),
+    LongPressed(MiddleLevelUiControlLongPressed),
+    Clicked(MiddleLevelUiControlClicked),
+    LongClicked(MiddleLevelUiControlLongClicked),
+}
+
+#[derive(Clone, Debug)]
+pub struct MiddleLevelUiControlPressed {
+    timeout: ScheduledTimeout,
+    data:  MiddleLevelUiEventData,
+}
+
+#[derive(Clone, Debug)]
+pub struct MiddleLevelUiControlLongPressed {
+    data:  MiddleLevelUiEventData,
+}
+
+#[derive(Clone, Debug)]
+pub struct MiddleLevelUiControlClicked {
+    timeout: ScheduledTimeout,
+    data:  MiddleLevelUiEventData,
+}
+
+#[derive(Clone, Debug)]
+pub struct MiddleLevelUiControlLongClicked {
+    timeout: ScheduledTimeout,
+    data: MiddleLevelUiEventData,
+}
+
+#[derive(Clone, Debug)]
+pub struct MiddleLevelUiEventData {
+    modifiers: HashSet<ControlKind>,
+    axes: HashMap<AxisKind, u32>,
+    num_clicks: usize,
+}
+
+impl MiddleLevelUiEventData {
+    fn with_one_more_click(&self) -> Self {
+        Self {
+            modifiers: self.modifiers,
+            axes: self.axes,
+            num_clicks: self.num_clicks + 1,
+        }
     }
 }
 
+
+#[derive(Clone, Debug)]
+pub enum ControlStateEvent {
+    Press,
+    Release,
+    Timeout,
+}
+
+#[derive(Clone, Debug)]
+pub enum MiddleLevelUiEvent {
+    Press(MiddleLevelUiEventData),
+    LongPress(MiddleLevelUiEventData),
+    Click(MiddleLevelUiEventData),
+    ClickExact(MiddleLevelUiEventData),
+    LongClick(MiddleLevelUiEventData),
+}
+
+pub trait MiddleLevelUiContext {
+    fn schedule_after_long_click(&mut self) -> ScheduledTimeout;
+    fn schedule_after_multi_click(&mut self) -> ScheduledTimeout;
+
+    fn emit_event(&mut self, ev: MiddleLevelUiEvent);
+}
+
+impl MiddleLevelUiControlPressed {
+    pub fn new<T: MiddleLevelUiContext>(data: MiddleLevelUiEventData, ctx: &mut T) -> Self {
+        ctx.emit_event(MiddleLevelUiEvent::Press(data.clone()));
+        let timeout = ctx.schedule_after_long_click();
+        Self {
+            data: data.with_one_more_click(),
+            timeout
+        }
+    }
+}
+
+impl MiddleLevelUiControlLongPressed {
+    pub fn new<T: MiddleLevelUiContext>(data: MiddleLevelUiEventData, ctx: &mut T) -> Self {
+        ctx.emit_event(MiddleLevelUiEvent::Click(data.clone()));
+        Self {
+            data: data.with_one_more_click()
+        }
+    }
+}
+
+impl MiddleLevelUiControlClicked {
+    pub fn new<T: MiddleLevelUiContext>(data: MiddleLevelUiEventData, ctx: &mut T) -> Self {
+        ctx.emit_event(MiddleLevelUiEvent::Click(data.clone()));
+        let timeout = ctx.schedule_after_multi_click();
+        Self {
+            data: data.with_one_more_click(),
+            timeout
+        }
+    }
+}
+
+impl MiddleLevelUiControlLongClicked {
+    pub fn new<T: MiddleLevelUiContext>(data: MiddleLevelUiEventData, ctx: &mut T) -> Self {
+        ctx.emit_event(MiddleLevelUiEvent::Click(data.clone()));
+        let timeout = ctx.schedule_after_multi_click();
+        Self {
+            data: data.with_one_more_click(),
+            timeout
+        }
+    }
+}
+
+impl MiddleLevelUiControlState {
+    pub fn new<T: MiddleLevelUiContext>(ev: ControlStateEvent, ctx: &mut T) -> Self {
+        todo!();
+    }
+
+    pub fn on_event<T: MiddleLevelUiContext>(self, ev: ControlStateEvent, ctx: &mut T) -> Option<Self> {
+        match self {
+            MiddleLevelUiControlState::Pressed {
+                timeout,
+                data,
+            } => match ev {
+                ControlStateEvent::Press => panic!(),
+                ControlStateEvent::Release => 
+                    Some(MiddleLevelUiControlState::MiddleLevelUiControlClicked::new(ctx)),
+                ControlStateEvent::Timeout => 
+                    Some(MiddleLevelUiControlState::MiddleLevelUiControlLongPressed::new(ctx)),
+            },
+            MiddleLevelUiControlState::LongPressed {
+                data,
+            } => match ev {
+                ControlStateEvent::Press => panic!(),
+                ControlStateEvent::Release => Some(MiddleLevelUiControlState::MiddleLevelUiControlLongClicked::new(ctx)),
+                ControlStateEvent::Timeout => panic!(),
+            },
+            MiddleLevelUiControlState::Clicked {
+                timeout,
+                data,
+            } => match ev {
+                ControlStateEvent::Press => Some(MiddleLevelUiControlState::MiddleLevelUiPressed::new(ctx)),
+                ControlStateEvent::Release => panic!(),
+                ControlStateEvent::Timeout => {
+                    ctx.emit_event(MiddleLevelUiEvent::ClickExact(data))
+                    None
+                },
+            },
+            MiddleLevelUiControlState::LongClicked {
+                timeout,
+                data,
+            } => match ev {
+                ControlStateEvent::Press => Some(MiddleLevelUiControlState::MiddleLevelUiPressed::new(ctx)),
+                ControlStateEvent::Release => panic!(),
+                ControlStateEvent::Timeout => panic!(),
+            },
+        }
+    }
+}
+
+/*
 #[derive(Clone, Debug, Eq, PartialEq, Default)]
 pub struct UiState {
     // modifiers: Arc<UiModifiers>,
@@ -28,7 +204,7 @@ pub struct Data<'a, T: Context> {
     timestamp: UiEventTimeStampMs,
     modifiers: &'a UiModifiers,
 }
-
+*/
 // use crate::ui_event::*;
 // use core::panic;
 // use derive_more::From;

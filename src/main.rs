@@ -1,6 +1,7 @@
 mod app;
 mod database;
 
+mod exercise;
 mod state;
 mod ui_event;
 mod ui_state;
