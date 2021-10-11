@@ -1,0 +1,55 @@
+// to prevent compile with missing arguments
+
+pub struct Object {
+    number: u64,
+    string: String,
+}
+
+pub struct Builder<T1, T2> {
+    number: T1,
+    string: T2,
+}
+
+impl Builder<(), ()> {
+    fn new() -> Self {
+        Self {
+            number: (),
+            string: (),
+        }
+    }
+}
+
+impl<T2> Builder<(), T2> {
+    fn with_number(mut self, number: u64) -> Builder<u64, T2> {
+        Builder {
+            number,
+            string: self.string,
+        }
+    }
+}
+
+impl<T1> Builder<T1, ()> {
+    fn with_string(mut self, string: String) -> Builder<T1, String> {
+        Builder {
+            number: self.number,
+            string,
+        }
+    }
+}
+
+impl Builder<u64, String> {
+    fn finish(self) -> Object {
+        Object {
+            number: self.number,
+            string: self.string,
+        }
+    }
+}
+
+#[test]
+fn builder() {
+    let builder = Builder::new();
+    let builder = builder.with_string(String::from("wow"));
+    let builder = builder.with_number(2);
+    let object = builder.finish();
+}
