@@ -1,3 +1,5 @@
+use std::ops::{Range, RangeBounds};
+
 #[test]
 fn parallel() {
     use core::sync::atomic::{AtomicU32, Ordering};
@@ -109,6 +111,84 @@ fn iterator() {
             Hint: core::iter::once(), core::iter::repeat(),
             Hint: Iterator::rev(), Iterator::step_by(), Iterator::chain(), Iterator::flatten().
     */
+}
+
+#[test]
+fn exercise2b() {
+    #[derive(PartialEq, Debug, Copy, Clone)]
+    struct Data {
+        current_counter: i32,
+    }
+
+    impl Data {
+        fn new() -> Self {
+            Self { current_counter: 0 }
+        }
+
+        fn start_with(start_counter: i32) -> Self {
+            Self {
+                current_counter: start_counter,
+            }
+        }
+    }
+
+    trait DataFunctions {
+        fn increment_by_one(&mut self) -> &mut Self;
+        fn increment_by_two(&mut self) -> &mut Self;
+        fn oscillate(&mut self, upper_bound: i32, lower_bound: i32) -> &mut Self;
+        fn oscillate_range<T>(&mut self, range: Range<T>) -> &mut Self
+        where
+            i32: PartialEq<T>;
+    }
+
+    impl DataFunctions for Data {
+        fn increment_by_one(&mut self) -> &mut Self {
+            self.current_counter += 1;
+            self
+        }
+
+        fn increment_by_two(&mut self) -> &mut Self {
+            self.current_counter += 2;
+            self
+        }
+        fn oscillate(&mut self, upper_bound: i32, lower_bound: i32) -> &mut Self {
+            if self.current_counter == lower_bound {
+                self.current_counter = upper_bound;
+            } else {
+                self.current_counter = lower_bound;
+            }
+            self
+        }
+        fn oscillate_range<T>(&mut self, range: Range<T>) -> &mut Self
+        where
+            i32: PartialEq<T>,
+        {
+            if self.current_counter == range.start {
+                self.current_counter = range.start;
+            } else {
+                self.current_counter = range.end;
+            }
+            self
+        }
+    }
+
+    // Test
+    let mut data = Data::new();
+
+    data.increment_by_one();
+    assert_eq!(data.current_counter, 1);
+    data.increment_by_one();
+    data.increment_by_two();
+    assert_eq!(data.current_counter, 4);
+
+    dbg! {data};
+
+    let mut data2 = Data::start_with(5);
+    assert_eq!(data2.current_counter, 5);
+    dbg! {data2};
+    data2.oscillate(5, 6).oscillate(5, 6);
+
+    assert_eq!(data2.current_counter, 5);
 }
 
 /*
