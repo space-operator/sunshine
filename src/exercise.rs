@@ -136,9 +136,9 @@ fn exercise2b() {
         fn increment_by_one(&mut self) -> &mut Self;
         fn increment_by_two(&mut self) -> &mut Self;
         fn oscillate(&mut self, upper_bound: i32, lower_bound: i32) -> &mut Self;
-        fn oscillate_range<T>(&mut self, range: Range<T>) -> &mut Self
-        where
-            i32: PartialEq<T>;
+        // fn oscillate_range<T>(&mut self, range: Range<T>) -> &mut Self
+        // where
+        //     i32: PartialEq<T>;
     }
 
     impl DataFunctions for Data {
@@ -159,17 +159,17 @@ fn exercise2b() {
             }
             self
         }
-        fn oscillate_range<T>(&mut self, range: Range<T>) -> &mut Self
-        where
-            i32: PartialEq<T>,
-        {
-            if self.current_counter == range.start {
-                self.current_counter = range.start;
-            } else {
-                self.current_counter = range.end;
-            }
-            self
-        }
+        // fn oscillate_range<T>(&mut self, range: Range<T>) -> &mut Self
+        // where
+        //     i32: PartialEq<T>,
+        // {
+        //     if self.current_counter == range.start {
+        //         self.current_counter = range.start;
+        //     } else {
+        //         self.current_counter = range.end;
+        //     }
+        //     self
+        // }
     }
 
     // Test
@@ -189,6 +189,68 @@ fn exercise2b() {
     data2.oscillate(5, 6).oscillate(5, 6);
 
     assert_eq!(data2.current_counter, 5);
+}
+
+#[test]
+fn exercise2b2() {
+    use core::iter::{once, repeat};
+
+    let iter = 0..;
+    check_first_n(iter, &[0, 1, 2, 3, 4, 5, 6, 7]);
+
+    let iter = (0..).step_by(2);
+
+    let iter = check_first_n(iter, &[0, 2, 4, 6, 8, 10, 12]);
+
+    let iter = (5..=6).cycle();
+    check_first_n(iter, &[5, 6, 5, 6, 5, 6, 5, 6]);
+
+    let iter = (0..=10).rev();
+    check_all(iter, &[10, 9, 8, 7, 6, 5, 4, 3, 2, 1, 0]);
+
+    let iter = (1..=4).chain((1..=3).rev());
+    check_all(iter, &[1, 2, 3, 4, 3, 2, 1]);
+
+    let iter = once(1)
+        .chain(100..=103)
+        .chain(once(1000))
+        .chain((1..=3).rev())
+        .chain(repeat(500).take(4))
+        .chain(repeat(1));
+
+    check_first_n(
+        iter,
+        &[
+            1, 100, 101, 102, 103, 1000, 3, 2, 1, 500, 500, 500, 500, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1,
+            1, 1, 1, 1, 1,
+        ],
+    );
+
+    let data: Vec<_> = (0..100).collect();
+
+    let mut iter = (100..120).zip('a'..'z');
+    assert_eq!(iter.next(), Some((100, 'a')));
+    assert_eq!(iter.next(), Some((101, 'b')));
+    assert_eq!(iter.next(), Some((102, 'c')));
+
+    /*
+    for i in 0..=10 {
+        println!("{}", i);
+    }
+
+    let iter = (0..=10).into_iter(); // 0..=10;
+    while Some(j) = iter.next() {
+        println!("{}", i);
+    }
+    */
+}
+
+fn check_first_n<T: Iterator<Item = i32>>(iter: T, expected: &[i32]) {
+    assert_eq!(iter.take(expected.len()).collect::<Vec<i32>>(), expected);
+}
+
+fn check_all<T: Iterator<Item = i32>>(iter: T, expected: &[i32]) {
+    assert_eq!(iter.collect::<Vec<i32>>(), expected);
 }
 
 /*
@@ -216,21 +278,25 @@ fn exercise2b() {
             1, 2, 3, 4, 3, 2, 1;
             1, 100, 101, 102, 103, 1000, 3, 2, 1, 1, 1, 1, 1, 1, ...;
         Hint: (a..b), (a..=b).
-        Hint: iter::once(), iter::repeat().
+        Hint: core::iter::once(), core::iter::repeat().
         Hint: Iterator::rev(), Iterator::step_by(), Iterator::chain(), Iterator::flatten().
 
     2.
     (a) Create a struct that stores u32 with a Vec but not expose it publically.
-    (b) Add functions new/is_empty/len/push/pop.
+    (b) Add function new.
+    (b) Add methods new/is_empty/len/push/pop.
     (c) Make struct generic to allow any values as items.
     (d) Add structure for quick lookup by value.
         Hint: we can use HashSet<(value, index)>.
-    (e) Add function contains_value.
-    (f) Add functions data, hash_set that return references to inner data.
-    (g) Use Interior Mutability, so we can change our struct by reference without it being mutable.
+    (e) Add methods contains_value.
+    (f) Add methods data, hash_set that return references to inner data.
+    (g) Manually implement Debug trait.
+    (h) Implement AsRef<[T]>, AsMut<[T]> traits.
+    (i) Implement Index trait.
+    (j) Implement IntoIterator trait.
+
+    3.
+    (k) Copy struct from exercise 2 and rename it.
+    (l) Use Interior Mutability, so we can change our struct by reference without it being mutable.
         Hint: use RwLock.
-    (h) Manually implement Debug trait.
-    (i) Implement AsRef<[T]>, AsMut<[T]>.
-    (j) Implement Index.
-    (k) Implement IntoIterator.
 */

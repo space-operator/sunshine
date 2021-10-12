@@ -61,7 +61,6 @@ fn test_1() {
     let data = r#" { "MouseMove": [123, 234] } "#;
 
     let ev: AppEvent = serde_json::from_str(data).unwrap();
-    panic!("{:?}", ev);
 }
 
 #[test]
