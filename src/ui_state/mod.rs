@@ -2,6 +2,7 @@
 
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
+    marker::PhantomData,
     sync::{Arc, Weak},
 };
 
@@ -111,20 +112,21 @@ pub struct Modifiers {
     axes: HashMap<AxisKind, AxisValue>,
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct UiRawInputState {
+#[derive(Clone, Debug)]
+pub struct UiRawInputState<T: UiRawInputContext> {
     modifiers: Arc<Modifiers>,
+    context: T,
 }
 
-pub struct UiRawInputStateUpdater<'a, T: UiRawInputContext> {
-    ctx: &'a mut T,
-    kinds: Vec<UiModifiedInputEventKind>,
+pub struct UiRawInputStateUpdater<T: UiRawInputContext> {
     modifiers: Modifiers,
+    context: T,
+    kinds: Vec<UiModifiedInputEventKind>,
     timestamp: UiEventTimeStampMs,
 }
 
-pub trait UiRawInputContext {
-    fn emit_event(&mut self, ev: UiModifiedInputEvent);
+pub trait UiRawInputContext: Sized {
+    fn emit_event(self, ev: UiModifiedInputEvent) -> Self;
 }
 
 impl UiRawInputEvent {
@@ -133,17 +135,16 @@ impl UiRawInputEvent {
     }
 }
 
-impl<'a, T: UiRawInputContext> UiRawInputStateUpdater<'a, T> {
+impl<T: UiRawInputContext> UiRawInputStateUpdater<T> {
     pub fn new(
-        state: UiRawInputState,
-        ctx: &'a mut T,
+        state: UiRawInputState<T>,
         timestamp: UiEventTimeStampMs,
-    ) -> UiRawInputStateUpdater<'a, T> {
+    ) -> UiRawInputStateUpdater<T> {
         Self {
-            ctx,
+            modifiers: state.modifiers.as_ref().to_owned(),
+            context: state.context,
             timestamp,
             kinds: Vec::new(),
-            modifiers: state.modifiers.as_ref().to_owned(),
         }
     }
 
@@ -183,31 +184,34 @@ impl<'a, T: UiRawInputContext> UiRawInputStateUpdater<'a, T> {
         self
     }
 
-    pub fn apply(mut self) -> UiRawInputState {
+    pub fn apply(self) -> UiRawInputState<T> {
         assert!(!self.kinds.is_empty());
         let modifiers = Arc::new(self.modifiers);
-        self.ctx.emit_event(UiModifiedInputEvent {
+        let context = self.context.emit_event(UiModifiedInputEvent {
             kinds: self.kinds,
             modifiers: Arc::clone(&modifiers),
             timestamp: self.timestamp,
         });
-        UiRawInputState { modifiers }
+        UiRawInputState { modifiers, context }
     }
 }
 
-impl UiRawInputState {
-    pub fn make_event<'a, T: UiRawInputContext>(
-        self,
-        ctx: &'a mut T,
-        timestamp: UiEventTimeStampMs,
-    ) -> UiRawInputStateUpdater<'a, T> {
-        UiRawInputStateUpdater::new(self, ctx, timestamp)
+impl<T: UiRawInputContext> UiRawInputState<T> {
+    pub fn new(context: T) -> Self {
+        Self {
+            modifiers: Arc::default(),
+            context,
+        }
     }
 
-    pub fn with_event<T: UiRawInputContext>(self, ev: UiRawInputEvent, mut ctx: &mut T) -> Self {
+    pub fn make_event(self, timestamp: UiEventTimeStampMs) -> UiRawInputStateUpdater<T> {
+        UiRawInputStateUpdater::new(self, timestamp)
+    }
+
+    pub fn with_event(self, ev: UiRawInputEvent) -> Self {
         use UiRawInputEventKind::*;
 
-        let event = self.make_event(ctx, ev.timestamp);
+        let event = self.make_event(ev.timestamp);
         let updater = match ev.kind {
             KeyDown { key } => event.with_button_pressed(ButtonKind::KeyboardKey(key)),
             KeyUp { key } => event.with_button_released(ButtonKind::KeyboardKey(key)),
@@ -266,9 +270,10 @@ pub struct ScheduledTimeout {
     button: ButtonKind,
 }
 
-#[derive(Clone, Debug, Default)]
-pub struct UiTimedInputState {
+#[derive(Clone, Debug)]
+pub struct UiTimedInputState<T: UiTimedInputContext> {
     buttons: HashMap<ButtonKind, ButtonTimedState>,
+    context: T,
 }
 
 #[derive(Clone, Debug)]
@@ -306,22 +311,22 @@ pub enum UiTimedInputMultiClickDuration {
     Touch,
 }
 
-pub trait UiTimedInputContext {
+pub trait UiTimedInputContext: Sized {
     fn schedule(
-        &mut self,
+        self,
         button: ButtonKind,
         delay: UiTimedInputDuration,
-    ) -> Arc<ScheduledTimeout>;
-    fn emit_event(&mut self, ev: UiTimedInputEvent);
+    ) -> (Self, Arc<ScheduledTimeout>);
+    fn emit_event(self, ev: UiTimedInputEvent) -> Self;
 }
 
 #[derive(Clone, Debug)]
 pub struct UiTimedInputEvent {
-    pub kinds: UiTimedInputEventKind,
-    pub modifiers: Arc<Modifiers>,
-    pub timestamp: UiEventTimeStampMs,
-    pub button: ButtonKind,
-    pub num_clicks: NumClicks,
+    kinds: UiTimedInputEventKind,
+    modifiers: Arc<Modifiers>,
+    timestamp: UiEventTimeStampMs,
+    button: ButtonKind,
+    num_clicks: NumClicks,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -333,75 +338,80 @@ pub enum UiTimedInputEventKind {
     LongClickExact,
 }
 
-impl UiTimedInputState {
-    pub fn with_event<T: UiTimedInputContext>(
-        mut self,
-        ev: UiModifiedInputEvent,
-        ctx: &mut T,
-    ) -> Self {
+impl<T: UiTimedInputContext> UiTimedInputState<T> {
+    pub fn new(context: T) -> Self {
+        Self {
+            buttons: HashMap::default(),
+            context,
+        }
+    }
+
+    pub fn with_event(mut self, ev: UiModifiedInputEvent) -> Self {
         let modifiers = ev.modifiers;
         let timestamp = ev.timestamp;
         for kind in ev.kinds {
-            self = self.with_event_kind(kind, &modifiers, timestamp, ctx);
+            self = self.with_event_kind(kind, &modifiers, timestamp);
         }
         self
     }
 
-    pub fn with_event_kind<T: UiTimedInputContext>(
-        mut self,
+    pub fn with_event_kind(
+        self,
         kind: UiModifiedInputEventKind,
         modifiers: &Arc<Modifiers>,
         timestamp: UiEventTimeStampMs,
-        ctx: &mut T,
     ) -> Self {
         use std::collections::hash_map::Entry;
         use UiModifiedInputEventKind::*;
 
-        match kind {
+        let mut buttons = self.buttons;
+        let context = self.context;
+        let context = match kind {
             Press(button) => {
-                let entry = self.buttons.entry(button.clone());
+                let entry = buttons.entry(button.clone());
                 match entry {
                     Entry::Occupied(entry) => {
                         let state = entry.remove();
-                        let state = state.with_press_event(button.clone(), timestamp, ctx);
-                        self.buttons.insert(button.clone(), state);
+                        let (state, context) = state.with_press_event(button.clone(), context);
+                        buttons.insert(button.clone(), state);
+                        context
                     }
                     Entry::Vacant(entry) => {
-                        let state = ButtonTimedState::from_pressed(button, modifiers, ctx);
+                        let (state, context) =
+                            ButtonTimedState::from_pressed(button, modifiers, context);
                         entry.insert(state);
+                        context
                     }
                 }
             }
             Release(button) => {
-                let entry = self.buttons.entry(button.clone());
+                let entry = buttons.entry(button.clone());
                 match entry {
                     Entry::Occupied(entry) => {
                         let state = entry.remove();
-                        let state = state.with_release_event(button.clone(), timestamp, ctx);
-                        self.buttons.insert(button, state);
+                        let (state, context) =
+                            state.with_release_event(button.clone(), timestamp, context);
+                        buttons.insert(button, state);
+                        context
                     }
-                    Entry::Vacant(entry) => {}
+                    Entry::Vacant(_) => context,
                 }
             }
-            Repeat(_) => {}
-            Change(_) => {}
-            Trigger(_) => {}
-        }
-        self
+            Repeat(_) => context,
+            Change(_) => context,
+            Trigger(_) => context,
+        };
+        Self { buttons, context }
     }
 
-    pub fn with_timeout_event<T: UiTimedInputContext>(
-        mut self,
-        button: ButtonKind,
-        timestamp: UiEventTimeStampMs,
-        ctx: &mut T,
-    ) -> Self {
+    pub fn with_timeout_event(mut self, button: ButtonKind, timestamp: UiEventTimeStampMs) -> Self {
         let state = self.buttons.remove(&button).unwrap();
-        let state = state.with_timeout_event(button.clone(), timestamp, ctx);
+        let mut buttons = self.buttons;
+        let (state, context) = state.with_timeout_event(button.clone(), timestamp, self.context);
         if let Some(state) = state {
-            self.buttons.insert(button, state);
+            buttons.insert(button, state);
         }
-        self
+        Self { buttons, context }
     }
 }
 
@@ -409,51 +419,55 @@ impl ButtonTimedState {
     fn from_pressed<T: UiTimedInputContext>(
         button: ButtonKind,
         modifiers: &Arc<Modifiers>,
-        ctx: &mut T,
-    ) -> Self {
+        mut context: T,
+    ) -> (Self, T) {
         let delay = UiTimedInputDuration::LongClick(button.long_click_duration());
-        let timeout = ctx.schedule(button, delay);
+        let (context, timeout) = context.schedule(button, delay);
         let kind = ButtonTimedStateKind::Pressed { timeout };
         let modifiers = Arc::clone(modifiers);
-        ButtonTimedState {
-            kind,
-            modifiers,
-            num_clicks: 0,
-        }
+        (
+            ButtonTimedState {
+                kind,
+                modifiers,
+                num_clicks: 0,
+            },
+            context,
+        )
     }
 
-    fn with_press_event<T: UiTimedInputContext>(
-        self,
-        button: ButtonKind,
-        timestamp: UiEventTimeStampMs,
-        ctx: &mut T,
-    ) -> Self {
+    fn with_press_event<T: UiTimedInputContext>(self, button: ButtonKind, context: T) -> (Self, T) {
         use ButtonTimedStateKind::*;
 
         match self.kind {
-            Pressed { timeout } => {
+            Pressed { timeout: _ } => {
                 panic!(); // TODO: warn
             }
             LongPressed {} => {
                 panic!(); // TODO: warn
             }
-            Released { timeout } => {
+            Released { timeout: _ } => {
                 let delay = UiTimedInputDuration::LongClick(button.long_click_duration());
-                let timeout = ctx.schedule(button, delay);
-                ButtonTimedState {
-                    kind: ButtonTimedStateKind::Pressed { timeout },
-                    modifiers: self.modifiers,
-                    num_clicks: self.num_clicks,
-                }
+                let (context, timeout) = context.schedule(button, delay);
+                (
+                    ButtonTimedState {
+                        kind: ButtonTimedStateKind::Pressed { timeout },
+                        modifiers: self.modifiers,
+                        num_clicks: self.num_clicks,
+                    },
+                    context,
+                )
             }
-            LongReleased { timeout } => {
+            LongReleased { timeout: _ } => {
                 let delay = UiTimedInputDuration::LongClick(button.long_click_duration());
-                let timeout = ctx.schedule(button, delay);
-                ButtonTimedState {
-                    kind: ButtonTimedStateKind::Pressed { timeout },
-                    modifiers: self.modifiers,
-                    num_clicks: self.num_clicks,
-                }
+                let (context, timeout) = context.schedule(button, delay);
+                (
+                    ButtonTimedState {
+                        kind: ButtonTimedStateKind::Pressed { timeout },
+                        modifiers: self.modifiers,
+                        num_clicks: self.num_clicks,
+                    },
+                    context,
+                )
             }
         }
     }
@@ -462,13 +476,13 @@ impl ButtonTimedState {
         self,
         button: ButtonKind,
         timestamp: UiEventTimeStampMs,
-        ctx: &mut T,
-    ) -> Self {
+        context: T,
+    ) -> (Self, T) {
         use ButtonTimedStateKind::*;
 
         match self.kind {
-            Pressed { timeout } => {
-                ctx.emit_event(UiTimedInputEvent::new(
+            Pressed { timeout: _ } => {
+                let context = context.emit_event(UiTimedInputEvent::new(
                     UiTimedInputEventKind::Click,
                     Arc::clone(&self.modifiers),
                     timestamp,
@@ -476,15 +490,18 @@ impl ButtonTimedState {
                     self.num_clicks + 1,
                 ));
                 let delay = UiTimedInputDuration::MultiClick(button.multi_click_duration());
-                let timeout = ctx.schedule(button, delay);
-                ButtonTimedState {
-                    kind: ButtonTimedStateKind::Pressed { timeout },
-                    modifiers: self.modifiers,
-                    num_clicks: self.num_clicks + 1,
-                }
+                let (context, timeout) = context.schedule(button, delay);
+                (
+                    ButtonTimedState {
+                        kind: ButtonTimedStateKind::Released { timeout },
+                        modifiers: self.modifiers,
+                        num_clicks: self.num_clicks + 1,
+                    },
+                    context,
+                )
             }
             LongPressed => {
-                ctx.emit_event(UiTimedInputEvent::new(
+                let context = context.emit_event(UiTimedInputEvent::new(
                     UiTimedInputEventKind::LongClick,
                     Arc::clone(&self.modifiers),
                     timestamp,
@@ -492,17 +509,20 @@ impl ButtonTimedState {
                     self.num_clicks + 1,
                 ));
                 let delay = UiTimedInputDuration::MultiClick(button.multi_click_duration());
-                let timeout = ctx.schedule(button, delay);
-                ButtonTimedState {
-                    kind: ButtonTimedStateKind::Pressed { timeout },
-                    modifiers: self.modifiers,
-                    num_clicks: self.num_clicks + 1,
-                }
+                let (context, timeout) = context.schedule(button, delay);
+                (
+                    ButtonTimedState {
+                        kind: ButtonTimedStateKind::Released { timeout },
+                        modifiers: self.modifiers,
+                        num_clicks: self.num_clicks + 1,
+                    },
+                    context,
+                )
             }
-            Released { timeout } => {
+            Released { timeout: _ } => {
                 panic!(); // TODO: warn
             }
-            LongReleased { timeout } => {
+            LongReleased { timeout: _ } => {
                 panic!(); // TODO: warn
             }
         }
@@ -512,47 +532,50 @@ impl ButtonTimedState {
         self,
         button: ButtonKind,
         timestamp: UiEventTimeStampMs,
-        ctx: &mut T,
-    ) -> Option<Self> {
+        mut context: T,
+    ) -> (Option<Self>, T) {
         use ButtonTimedStateKind::*;
 
         match self.kind {
-            Pressed { timeout } => {
-                ctx.emit_event(UiTimedInputEvent::new(
+            Pressed { timeout: _ } => {
+                let context = context.emit_event(UiTimedInputEvent::new(
                     UiTimedInputEventKind::LongPress,
                     Arc::clone(&self.modifiers),
                     timestamp,
                     button,
                     self.num_clicks,
                 ));
-                Some(ButtonTimedState {
-                    kind: ButtonTimedStateKind::LongPressed,
-                    modifiers: self.modifiers,
-                    num_clicks: self.num_clicks,
-                })
+                (
+                    Some(ButtonTimedState {
+                        kind: ButtonTimedStateKind::LongPressed,
+                        modifiers: self.modifiers,
+                        num_clicks: self.num_clicks,
+                    }),
+                    context,
+                )
             }
             LongPressed => {
                 panic!("timeout event has been received but timeout is not stored in button state");
             }
-            Released { timeout } => {
-                ctx.emit_event(UiTimedInputEvent::new(
+            Released { timeout: _ } => {
+                let context = context.emit_event(UiTimedInputEvent::new(
                     UiTimedInputEventKind::ClickExact,
                     Arc::clone(&self.modifiers),
                     timestamp,
                     button,
                     self.num_clicks,
                 ));
-                None
+                (None, context)
             }
-            LongReleased { timeout } => {
-                ctx.emit_event(UiTimedInputEvent::new(
+            LongReleased { timeout: _ } => {
+                let context = context.emit_event(UiTimedInputEvent::new(
                     UiTimedInputEventKind::LongClickExact,
                     Arc::clone(&self.modifiers),
                     timestamp,
                     button,
                     self.num_clicks,
                 ));
-                None
+                (None, context)
             }
         }
     }
@@ -589,50 +612,42 @@ pub enum UiInputEvent {
 #[test]
 fn ui_raw_input_to_input() {
     #[derive(Clone, Debug)]
-    struct UiRawInputProcessor {
-        state: Option<UiRawInputState>,
-        context: UiRawInputSimpleContext,
-    }
-
-    #[derive(Clone, Debug)]
     struct UiRawInputSimpleContext {
         time: UiEventTimeStampMs,
-        processor: UiTimedInputProcessor,
+        state: UiTimedInputState<UiTimedInputSimpleContext>,
     }
 
-    impl UiRawInputProcessor {
-        fn on_event(&mut self, ev: UiRawInputEvent) {
+    impl UiRawInputState<UiRawInputSimpleContext> {
+        fn with_context_event(mut self, ev: UiRawInputEvent) -> Self {
             // TODO: Remove
             println!("{:?}", ev);
 
             assert!(self.context.time < ev.timestamp);
-            let timestamp = ev.timestamp;
-            self.state = Some(self.state.take().unwrap().with_event(ev, &mut self.context));
-            self.context.time = timestamp;
+            self.context.time = ev.timestamp;
+            self = self.with_event(ev);
 
             // TODO: Remove
-            println!("{:?}", self.state);
-            println!("{:?}", self.context.processor.state);
-            println!("{:?}", self.context.processor.context.events);
-            self.context.processor.context.events.clear();
+            println!("{:?}", self);
+            for event in &self.context.state.context.events {
+                println!("{:?}", event);
+            }
             println!();
+            self.context.state.context.events.clear();
+            self
         }
     }
 
     impl UiRawInputContext for UiRawInputSimpleContext {
-        fn emit_event(&mut self, ev: UiModifiedInputEvent) {
-            self.processor
+        fn emit_event(mut self, ev: UiModifiedInputEvent) -> Self {
+            self.state
                 .context
                 .events
                 .push(UiInputEvent::Modified(ev.clone()));
-            self.processor.on_event(ev);
+            Self {
+                time: self.time,
+                state: self.state.with_context_event(ev),
+            }
         }
-    }
-
-    #[derive(Clone, Debug)]
-    struct UiTimedInputProcessor {
-        state: Option<UiTimedInputState>,
-        context: UiTimedInputSimpleContext,
     }
 
     #[derive(Clone, Debug)]
@@ -642,34 +657,30 @@ fn ui_raw_input_to_input() {
         events: Vec<UiInputEvent>,
     }
 
-    impl UiTimedInputProcessor {
-        fn on_event(&mut self, ev: UiModifiedInputEvent) {
+    impl UiTimedInputState<UiTimedInputSimpleContext> {
+        fn with_context_event(mut self, ev: UiModifiedInputEvent) -> Self {
             assert!(self.context.time < ev.timestamp);
+            self.context.time = ev.timestamp;
             while let Some(entry) = self.context.timeouts.first_entry() {
                 if *entry.key() > ev.timestamp {
                     break;
                 }
                 let (timestamp, timeout) = entry.remove_entry();
                 if let Some(timeout) = timeout.upgrade() {
-                    self.state = Some(self.state.take().unwrap().with_timeout_event(
-                        timeout.button.clone(),
-                        timestamp,
-                        &mut self.context,
-                    ))
+                    self = self.with_timeout_event(timeout.button.clone(), timestamp)
                 }
             }
-            let timestamp = ev.timestamp;
-            self.state = Some(self.state.take().unwrap().with_event(ev, &mut self.context));
-            self.context.time = timestamp;
+            self = self.with_event(ev);
+            self
         }
     }
 
     impl UiTimedInputContext for UiTimedInputSimpleContext {
         fn schedule(
-            &mut self,
+            mut self,
             button: ButtonKind,
             delay: UiTimedInputDuration,
-        ) -> Arc<ScheduledTimeout> {
+        ) -> (Self, Arc<ScheduledTimeout>) {
             let timeout = Arc::new(ScheduledTimeout { button });
             let delay = match delay {
                 UiTimedInputDuration::LongClick(_) => 1000,
@@ -677,11 +688,12 @@ fn ui_raw_input_to_input() {
             };
             self.timeouts
                 .insert(self.time + delay, Arc::downgrade(&timeout));
-            timeout
+            (self, timeout)
         }
 
-        fn emit_event(&mut self, ev: UiTimedInputEvent) {
+        fn emit_event(mut self, ev: UiTimedInputEvent) -> Self {
             self.events.push(UiInputEvent::Timed(ev));
+            self
         }
     }
 
@@ -690,35 +702,36 @@ fn ui_raw_input_to_input() {
 
     let ctrl = || "ctrl".to_owned();
 
-    let mut processor = UiRawInputProcessor {
-        state: Some(UiRawInputState::default()),
-        context: UiRawInputSimpleContext {
-            time: 0,
-            processor: UiTimedInputProcessor {
-                state: Some(UiTimedInputState::default()),
-                context: UiTimedInputSimpleContext {
-                    time: 0,
-                    timeouts: BTreeMap::new(),
-                    events: vec![],
-                },
-            },
-        },
+    let timed_context = UiTimedInputSimpleContext {
+        time: 0,
+        timeouts: BTreeMap::new(),
+        events: vec![],
     };
-    processor.on_event(Ev::new(KeyDown { key: ctrl() }, 10000));
-    processor.on_event(Ev::new(KeyUp { key: ctrl() }, 10500));
-    processor.on_event(Ev::new(KeyDown { key: ctrl() }, 11000));
-    processor.on_event(Ev::new(KeyUp { key: ctrl() }, 13000));
-    processor.on_event(Ev::new(KeyDown { key: ctrl() }, 11000));
-    processor.on_event(Ev::new(MouseDown { button: 0 }, 11100));
-    processor.on_event(Ev::new(MouseUp { button: 0 }, 11200));
-    processor.on_event(Ev::new(MouseDown { button: 0 }, 11300));
-    processor.on_event(Ev::new(MouseUp { button: 0 }, 11400));
-    processor.on_event(Ev::new(KeyUp { key: ctrl() }, 13000));
+    let timed_state = UiTimedInputState::new(timed_context);
+    let context = UiRawInputSimpleContext {
+        time: 0,
+        state: timed_state,
+    };
+    let state = UiRawInputState::new(context);
+
+    let state = state.with_context_event(Ev::new(KeyDown { key: ctrl() }, 10000));
+    let state = state.with_context_event(Ev::new(KeyUp { key: ctrl() }, 10500));
+    let state = state.with_context_event(Ev::new(KeyDown { key: ctrl() }, 11000));
+    let state = state.with_context_event(Ev::new(KeyUp { key: ctrl() }, 13000));
+
+    let state = state.with_context_event(Ev::new(KeyDown { key: ctrl() }, 15000));
+    let state = state.with_context_event(Ev::new(MouseDown { button: 0 }, 15100));
+    let state = state.with_context_event(Ev::new(MouseUp { button: 0 }, 15200));
+    let state = state.with_context_event(Ev::new(MouseDown { button: 0 }, 15300));
+    let state = state.with_context_event(Ev::new(MouseUp { button: 0 }, 15400));
+
+    let state = state.with_context_event(Ev::new(KeyUp { key: ctrl() }, 18000));
 
     panic!();
 }
 
 /*
+
     UiTimedInputState: button => ButtonTimedState
     ButtonTimedState: timeout, num_clicks
 
