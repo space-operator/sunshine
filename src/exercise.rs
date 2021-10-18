@@ -1,4 +1,7 @@
-use std::ops::{Range, RangeBounds};
+use std::{
+    collections::{HashMap, HashSet},
+    ops::{Range, RangeBounds},
+};
 
 #[test]
 fn parallel() {
@@ -114,7 +117,7 @@ fn iterator() {
 }
 
 #[test]
-fn exercise2b() {
+fn exercise1b() {
     #[derive(PartialEq, Debug, Copy, Clone)]
     struct Data {
         current_counter: i32,
@@ -192,7 +195,7 @@ fn exercise2b() {
 }
 
 #[test]
-fn exercise2b2() {
+fn exercise1b2() {
     use core::iter::{once, repeat};
 
     let iter = 0..;
@@ -286,12 +289,13 @@ fn check_all<T: Iterator<Item = i32>>(iter: T, expected: &[i32]) {
     (b) Add function new.
     (b) Add methods new/is_empty/len/push/pop.
     (c) Make struct generic to allow any values as items.
-    (d) Add structure for quick lookup by value.
-        Hint: we can use HashSet<(value, index)>.
-    (e) Add methods contains_value.
-    (f) Add methods data, hash_set that return references to inner data.
+    (d) Add member for quick lookup by value.
+        Hint: we can use HashMap<value, index>.
+    (e) Add method contains_value.
+    (f) Add methods items, ids that return references to inner data.
+
     (g) Manually implement Debug trait.
-    (h) Implement AsRef<[T]>, AsMut<[T]> traits.
+    (h) Implement AsRef<[T]>, AsMut<[T]>, Into<Vec<T>> traits.
     (i) Implement Index trait.
     (j) Implement IntoIterator trait.
 
@@ -300,3 +304,107 @@ fn check_all<T: Iterator<Item = i32>>(iter: T, expected: &[i32]) {
     (l) Use Interior Mutability, so we can change our struct by reference without it being mutable.
         Hint: use RwLock.
 */
+
+#[test]
+fn exercise2() {
+    mod module {
+        use std::collections::BTreeSet;
+        use std::fmt::Debug;
+        use std::hash::Hash;
+        use std::ops::Add;
+
+        #[derive(Clone, Debug)]
+        pub struct DataStore<T> {
+            ids: BTreeSet<(T, usize)>,
+            items: Vec<T>,
+        }
+
+        impl<T: Eq + Hash + Clone + Ord + Debug> DataStore<T> {
+            pub fn new() -> Self {
+                Self {
+                    ids: BTreeSet::new(),
+                    items: vec![],
+                }
+            }
+
+            pub fn is_empty(&self) -> bool {
+                self.items.is_empty()
+            }
+
+            pub fn len(&self) -> usize {
+                self.items.len()
+            }
+
+            pub fn push(&mut self, value: T) {
+                let index = self.items.len();
+                self.items.push(value.clone());
+                let is_added = self.ids.insert((value, index));
+                assert!(is_added);
+            }
+
+            pub fn pop(&mut self) -> Option<T> {
+                let pop = self.items.pop();
+                pop.map(|value| {
+                    let index = self.items.len();
+                    let pair = (value, index);
+                    let is_removed = self.ids.remove(&pair);
+                    assert!(is_removed);
+                    pair.0
+                })
+            }
+
+            pub fn lookup(&self, value: T) -> Vec<usize> {
+                self.ids
+                    .range((value.clone(), 0)..=(value, usize::MAX))
+                    .map(|(_, index)| *index)
+                    .collect()
+            }
+
+            pub fn contains_value(&self, value: T) -> bool {
+                self.ids
+                    .range((value.clone(), 0)..=(value, usize::MAX))
+                    .next()
+                    .is_some()
+            }
+
+            pub fn ids(&self) -> &BTreeSet<(T, usize)> {
+                &self.ids
+            }
+
+            pub fn items(&self) -> &Vec<T> {
+                &self.items
+            }
+
+            pub fn into_raw(self) -> (BTreeSet<(T, usize)>, Vec<T>) {
+                (self.ids, self.items)
+            }
+
+            pub fn into_ids(self) -> BTreeSet<(T, usize)> {
+                self.ids
+            }
+
+            pub fn into_items(self) -> Vec<T> {
+                self.items
+            }
+        }
+    }
+
+    use module::DataStore;
+    let mut datastore = DataStore::new();
+    datastore.push(1);
+    datastore.push(3);
+    datastore.push(2);
+    datastore.push(4);
+    datastore.push(2);
+    datastore.push(5);
+    datastore.push(4);
+
+    // .items = [1, 3, 2, 4, 2, 5, 4]
+    // .ids = [(1, 0), (2, 2), (2, 4), (3, 1), (4, 3), (4, 6), (5, 5)]
+
+    assert_eq!(datastore.lookup(1), vec![0]);
+    assert_eq!(datastore.lookup(2), vec![2, 4]);
+    assert_eq!(datastore.lookup(3), vec![1]);
+    assert_eq!(datastore.lookup(4), vec![3, 6]);
+    assert_eq!(datastore.lookup(5), vec![5]);
+}

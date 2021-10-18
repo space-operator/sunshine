@@ -10,7 +10,7 @@ pub type UiEventTimeStampMs = u64;
 pub type UiEventCoords = (i32, i32);
 pub type MouseButton = u32;
 pub type KeyboardKey = String;
-pub type AxisValue = f64;
+pub type AxisValue = i32;
 pub type MouseScrollDelta = i32;
 pub type TouchId = u32;
 
@@ -73,13 +73,13 @@ pub enum AxisKind {
     TouchY(TouchId),
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub struct Axis {
     kind: AxisKind,
     value: Option<AxisValue>,
 }
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TriggerKind {
     MouseWheelUp,
     MouseWheelDown,
@@ -91,13 +91,15 @@ pub enum TriggerKind {
 }
 
 #[derive(Clone, Debug)]
-pub struct UiModifiedInputEvent {
-    pub kinds: Vec<UiModifiedInputEventKind>,
+pub struct UiInputEventWithModifiers<T> {
+    pub kind: T,
     pub modifiers: Arc<Modifiers>,
     pub timestamp: UiEventTimeStampMs,
 }
 
-#[derive(Clone, Debug, PartialEq)]
+pub type UiModifiedInputEvent = UiInputEventWithModifiers<UiModifiedInputEventKind>;
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum UiModifiedInputEventKind {
     Press(ButtonKind),
     Release(ButtonKind),
@@ -187,11 +189,14 @@ impl<T: UiRawInputContext> UiRawInputStateUpdater<T> {
     pub fn apply(self) -> UiRawInputState<T> {
         assert!(!self.kinds.is_empty());
         let modifiers = Arc::new(self.modifiers);
-        let context = self.context.emit_event(UiModifiedInputEvent {
-            kinds: self.kinds,
-            modifiers: Arc::clone(&modifiers),
-            timestamp: self.timestamp,
-        });
+        let mut context = self.context;
+        for kind in self.kinds {
+            context = context.emit_event(UiModifiedInputEvent {
+                kind,
+                modifiers: Arc::clone(&modifiers),
+                timestamp: self.timestamp,
+            });
+        }
         UiRawInputState { modifiers, context }
     }
 }
@@ -218,18 +223,18 @@ impl<T: UiRawInputContext> UiRawInputState<T> {
             MouseDown { button } => event.with_button_pressed(ButtonKind::MouseButton(button)),
             MouseUp { button } => event.with_button_released(ButtonKind::MouseButton(button)),
             MouseMove { coords } => event
-                .with_axis_changed(Axis::new(AxisKind::MouseX, Some(coords.0 as f64)))
-                .with_axis_changed(Axis::new(AxisKind::MouseY, Some(coords.1 as f64))),
+                .with_axis_changed(Axis::new(AxisKind::MouseX, Some(coords.0)))
+                .with_axis_changed(Axis::new(AxisKind::MouseY, Some(coords.1))),
             MouseWheelDown => event.with_trigger(TriggerKind::MouseWheelDown),
             MouseWheelUp => event.with_trigger(TriggerKind::MouseWheelUp),
             MouseScroll { delta } => event.with_trigger(TriggerKind::MouseScroll(delta)),
             TouchStart { touch_id, coords } => event
                 .with_button_pressed(ButtonKind::Touch(touch_id))
-                .with_axis_changed(Axis::new(AxisKind::TouchX(touch_id), Some(coords.0 as f64)))
-                .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), Some(coords.1 as f64))),
+                .with_axis_changed(Axis::new(AxisKind::TouchX(touch_id), Some(coords.0)))
+                .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), Some(coords.1))),
             TouchMove { touch_id, coords } => event
-                .with_axis_changed(Axis::new(AxisKind::TouchX(touch_id), Some(coords.0 as f64)))
-                .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), Some(coords.1 as f64))),
+                .with_axis_changed(Axis::new(AxisKind::TouchX(touch_id), Some(coords.0)))
+                .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), Some(coords.1))),
             TouchEnd { touch_id } => event.with_button_released(ButtonKind::Touch(touch_id)),
             Char { ch } => event.with_trigger(TriggerKind::Char(ch)),
         };
@@ -320,22 +325,30 @@ pub trait UiTimedInputContext: Sized {
     fn emit_event(self, ev: UiTimedInputEvent) -> Self;
 }
 
-#[derive(Clone, Debug)]
-pub struct UiTimedInputEvent {
-    kinds: UiTimedInputEventKind,
-    modifiers: Arc<Modifiers>,
-    timestamp: UiEventTimeStampMs,
-    button: ButtonKind,
-    num_clicks: NumClicks,
-}
+pub type UiTimedInputEvent = UiInputEventWithModifiers<UiTimedInputEventKind>;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum UiTimedInputEventKind {
-    LongPress,
-    Click,
-    LongClick,
-    ClickExact,
-    LongClickExact,
+    LongPress {
+        button: ButtonKind,
+        num_clicks: NumClicks,
+    },
+    Click {
+        button: ButtonKind,
+        num_clicks: NumClicks,
+    },
+    LongClick {
+        button: ButtonKind,
+        num_clicks: NumClicks,
+    },
+    ClickExact {
+        button: ButtonKind,
+        num_clicks: NumClicks,
+    },
+    LongClickExact {
+        button: ButtonKind,
+        num_clicks: NumClicks,
+    },
 }
 
 impl<T: UiTimedInputContext> UiTimedInputState<T> {
@@ -346,27 +359,15 @@ impl<T: UiTimedInputContext> UiTimedInputState<T> {
         }
     }
 
-    pub fn with_event(mut self, ev: UiModifiedInputEvent) -> Self {
-        let modifiers = ev.modifiers;
-        let timestamp = ev.timestamp;
-        for kind in ev.kinds {
-            self = self.with_event_kind(kind, &modifiers, timestamp);
-        }
-        self
-    }
-
-    pub fn with_event_kind(
-        self,
-        kind: UiModifiedInputEventKind,
-        modifiers: &Arc<Modifiers>,
-        timestamp: UiEventTimeStampMs,
-    ) -> Self {
+    pub fn with_event(self, ev: UiModifiedInputEvent) -> Self {
         use std::collections::hash_map::Entry;
         use UiModifiedInputEventKind::*;
 
+        let modifiers = ev.modifiers;
+        let timestamp = ev.timestamp;
         let mut buttons = self.buttons;
         let context = self.context;
-        let context = match kind {
+        let context = match ev.kind {
             Press(button) => {
                 let entry = buttons.entry(button.clone());
                 match entry {
@@ -378,7 +379,7 @@ impl<T: UiTimedInputContext> UiTimedInputState<T> {
                     }
                     Entry::Vacant(entry) => {
                         let (state, context) =
-                            ButtonTimedState::from_pressed(button, modifiers, context);
+                            ButtonTimedState::from_pressed(button, &modifiers, context);
                         entry.insert(state);
                         context
                     }
@@ -483,11 +484,12 @@ impl ButtonTimedState {
         match self.kind {
             Pressed { timeout: _ } => {
                 let context = context.emit_event(UiTimedInputEvent::new(
-                    UiTimedInputEventKind::Click,
+                    UiTimedInputEventKind::Click {
+                        button: button.clone(),
+                        num_clicks: self.num_clicks + 1,
+                    },
                     Arc::clone(&self.modifiers),
                     timestamp,
-                    button.clone(),
-                    self.num_clicks + 1,
                 ));
                 let delay = UiTimedInputDuration::MultiClick(button.multi_click_duration());
                 let (context, timeout) = context.schedule(button, delay);
@@ -502,11 +504,12 @@ impl ButtonTimedState {
             }
             LongPressed => {
                 let context = context.emit_event(UiTimedInputEvent::new(
-                    UiTimedInputEventKind::LongClick,
+                    UiTimedInputEventKind::LongClick {
+                        button: button.clone(),
+                        num_clicks: self.num_clicks + 1,
+                    },
                     Arc::clone(&self.modifiers),
                     timestamp,
-                    button.clone(),
-                    self.num_clicks + 1,
                 ));
                 let delay = UiTimedInputDuration::MultiClick(button.multi_click_duration());
                 let (context, timeout) = context.schedule(button, delay);
@@ -538,12 +541,13 @@ impl ButtonTimedState {
 
         match self.kind {
             Pressed { timeout: _ } => {
-                let context = context.emit_event(UiTimedInputEvent::new(
-                    UiTimedInputEventKind::LongPress,
+                let context = context.emit_event(UiInputEventWithModifiers::new(
+                    UiTimedInputEventKind::LongPress {
+                        button,
+                        num_clicks: self.num_clicks,
+                    },
                     Arc::clone(&self.modifiers),
                     timestamp,
-                    button,
-                    self.num_clicks,
                 ));
                 (
                     Some(ButtonTimedState {
@@ -558,22 +562,24 @@ impl ButtonTimedState {
                 panic!("timeout event has been received but timeout is not stored in button state");
             }
             Released { timeout: _ } => {
-                let context = context.emit_event(UiTimedInputEvent::new(
-                    UiTimedInputEventKind::ClickExact,
+                let context = context.emit_event(UiInputEventWithModifiers::new(
+                    UiTimedInputEventKind::ClickExact {
+                        button,
+                        num_clicks: self.num_clicks,
+                    },
                     Arc::clone(&self.modifiers),
                     timestamp,
-                    button,
-                    self.num_clicks,
                 ));
                 (None, context)
             }
             LongReleased { timeout: _ } => {
-                let context = context.emit_event(UiTimedInputEvent::new(
-                    UiTimedInputEventKind::LongClickExact,
+                let context = context.emit_event(UiInputEventWithModifiers::new(
+                    UiTimedInputEventKind::LongClickExact {
+                        button,
+                        num_clicks: self.num_clicks,
+                    },
                     Arc::clone(&self.modifiers),
                     timestamp,
-                    button,
-                    self.num_clicks,
                 ));
                 (None, context)
             }
@@ -581,36 +587,95 @@ impl ButtonTimedState {
     }
 }
 
-impl UiTimedInputEvent {
+impl UiInputEventWithModifiers<UiTimedInputEventKind> {
     pub fn new(
-        kinds: UiTimedInputEventKind,
+        kind: UiTimedInputEventKind,
         modifiers: Arc<Modifiers>,
         timestamp: UiEventTimeStampMs,
-        button: ButtonKind,
-        num_clicks: NumClicks,
     ) -> Self {
         Self {
-            kinds,
+            kind,
             modifiers,
             timestamp,
-            button,
-            num_clicks,
         }
     }
+}
+
+// ====
+
+pub type UiInputEvent = UiInputEventWithModifiers<UiInputEventKind>;
+
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+pub enum UiInputEventKind {
+    Modified(UiModifiedInputEventKind),
+    Timed(UiTimedInputEventKind),
 }
 
 // ====
 
 #[derive(Clone, Debug)]
-pub enum UiInputEvent {
-    Modified(UiModifiedInputEvent),
-    Timed(UiTimedInputEvent),
+pub struct UiAppEvent {
+    kind: UiAppEventKind,
+    timestamp: UiEventTimeStampMs,
 }
 
-// ====
+#[derive(Clone, Debug)]
+pub enum UiAppEventKind {
+    AppEvent1,
+    AppEvent2,
+    AppEvent3,
+    AppEvent4,
+}
+
+#[derive(Clone, Debug)]
+pub struct UiInputBindings(HashMap<UiInputEventKind, Vec<(Modifiers, UiAppEventKind)>>);
+
+impl UiInputBindings {
+    fn process<F: FnMut(UiAppEvent)>(&self, ev: UiInputEvent, mut emit_fn: F) {
+        let empty_vec = Vec::new();
+        let bindings = self.0.get(&ev.kind).unwrap_or(&empty_vec);
+        let mut bindings: Vec<_> = bindings
+            .into_iter()
+            .filter(|(modifiers, _)| {
+                ev.modifiers.buttons.is_superset(&modifiers.buttons)
+                /* TODO: for axes */
+            })
+            .map(Option::Some)
+            .collect();
+        for j1 in 0..bindings.len() {
+            for j2 in 0..bindings.len() {
+                if j1 != j2 {
+                    match (bindings[j1], bindings[j2]) {
+                        (Some(binding1), Some(binding2)) => {
+                            if binding1.0.buttons.is_superset(&binding2.0.buttons) {
+                                bindings[j2] = None;
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                /* TODO: for axes */
+            }
+        }
+
+        let bindings_buttons: HashSet<_> = bindings
+            .iter()
+            .filter_map(|binding| *binding)
+            .map(|binding| -> Vec<_> { binding.0.buttons.iter().collect() })
+            .collect();
+        if bindings_buttons.len() == 1 {
+            for binding in bindings.into_iter().filter_map(|binding| binding) {
+                emit_fn(UiAppEvent {
+                    kind: binding.1.clone(),
+                    timestamp: ev.timestamp,
+                })
+            }
+        }
+    }
+}
 
 #[test]
-fn ui_raw_input_to_input() {
+fn ui_raw_input_to_input_test() {
     #[derive(Clone, Debug)]
     struct UiRawInputSimpleContext {
         time: UiEventTimeStampMs,
@@ -638,11 +703,12 @@ fn ui_raw_input_to_input() {
     }
 
     impl UiRawInputContext for UiRawInputSimpleContext {
-        fn emit_event(mut self, ev: UiModifiedInputEvent) -> Self {
-            self.state
-                .context
-                .events
-                .push(UiInputEvent::Modified(ev.clone()));
+        fn emit_event(mut self, ev: UiInputEventWithModifiers<UiModifiedInputEventKind>) -> Self {
+            self.state.context.events.push(UiInputEvent {
+                kind: UiInputEventKind::Modified(ev.kind.clone()),
+                modifiers: ev.modifiers.clone(),
+                timestamp: ev.timestamp,
+            });
             Self {
                 time: self.time,
                 state: self.state.with_context_event(ev),
@@ -658,7 +724,10 @@ fn ui_raw_input_to_input() {
     }
 
     impl UiTimedInputState<UiTimedInputSimpleContext> {
-        fn with_context_event(mut self, ev: UiModifiedInputEvent) -> Self {
+        fn with_context_event(
+            mut self,
+            ev: UiInputEventWithModifiers<UiModifiedInputEventKind>,
+        ) -> Self {
             assert!(self.context.time < ev.timestamp);
             self.context.time = ev.timestamp;
             while let Some(entry) = self.context.timeouts.first_entry() {
@@ -691,8 +760,12 @@ fn ui_raw_input_to_input() {
             (self, timeout)
         }
 
-        fn emit_event(mut self, ev: UiTimedInputEvent) -> Self {
-            self.events.push(UiInputEvent::Timed(ev));
+        fn emit_event(mut self, ev: UiInputEventWithModifiers<UiTimedInputEventKind>) -> Self {
+            self.events.push(UiInputEvent {
+                kind: UiInputEventKind::Timed(ev.kind),
+                modifiers: ev.modifiers,
+                timestamp: ev.timestamp,
+            });
             self
         }
     }
@@ -727,6 +800,191 @@ fn ui_raw_input_to_input() {
 
     let state = state.with_context_event(Ev::new(KeyUp { key: ctrl() }, 18000));
 
+    // TODO: check states
+}
+
+#[test]
+fn ui_input_binding_test() {
+    let lmb = UiInputEventKind::Timed(UiTimedInputEventKind::Click {
+        button: ButtonKind::MouseButton(0),
+        num_clicks: 1,
+    });
+    let rmb = UiInputEventKind::Timed(UiTimedInputEventKind::Click {
+        button: ButtonKind::MouseButton(1),
+        num_clicks: 1,
+    });
+    let bindings = UiInputBindings(
+        [
+            (
+                lmb,
+                vec![
+                    (
+                        Modifiers {
+                            buttons: [ButtonKind::KeyboardKey("Ctrl".to_owned())]
+                                .into_iter()
+                                .collect(),
+                            axes: HashMap::new(),
+                        },
+                        UiAppEventKind::AppEvent1,
+                    ),
+                    (
+                        Modifiers {
+                            buttons: [ButtonKind::KeyboardKey("Shift".to_owned())]
+                                .into_iter()
+                                .collect(),
+                            axes: HashMap::new(),
+                        },
+                        UiAppEventKind::AppEvent2,
+                    ),
+                    (
+                        Modifiers {
+                            buttons: [
+                                ButtonKind::KeyboardKey("Ctrl".to_owned()),
+                                ButtonKind::KeyboardKey("Alt".to_owned()),
+                            ]
+                            .into_iter()
+                            .collect(),
+                            axes: HashMap::new(),
+                        },
+                        UiAppEventKind::AppEvent3,
+                    ),
+                ],
+            ),
+            (
+                rmb,
+                vec![(
+                    Modifiers {
+                        buttons: [ButtonKind::KeyboardKey("Ctrl".to_owned())]
+                            .into_iter()
+                            .collect(),
+                        axes: HashMap::new(),
+                    },
+                    UiAppEventKind::AppEvent4,
+                )],
+            ),
+        ]
+        .into_iter()
+        .collect(),
+    );
+
+    let mut events = vec![];
+
+    bindings.process(
+        UiInputEvent {
+            timestamp: 1000,
+            modifiers: Arc::new(Modifiers {
+                buttons: HashSet::new(),
+                axes: HashMap::new(),
+            }),
+            kind: UiInputEventKind::Timed(UiTimedInputEventKind::Click {
+                button: ButtonKind::MouseButton(0),
+                num_clicks: 1,
+            }),
+        },
+        |ev| events.push(ev),
+    );
+    dbg!(&events);
+    events.clear();
+
+    bindings.process(
+        UiInputEvent {
+            timestamp: 1000,
+            modifiers: Arc::new(Modifiers {
+                buttons: HashSet::new(),
+                axes: HashMap::new(),
+            }),
+            kind: UiInputEventKind::Timed(UiTimedInputEventKind::Click {
+                button: ButtonKind::MouseButton(1),
+                num_clicks: 1,
+            }),
+        },
+        |ev| events.push(ev),
+    );
+    dbg!(&events);
+    events.clear();
+
+    bindings.process(
+        UiInputEvent {
+            timestamp: 1000,
+            modifiers: Arc::new(Modifiers {
+                buttons: [ButtonKind::KeyboardKey("Ctrl".to_owned())]
+                    .into_iter()
+                    .collect(),
+                axes: HashMap::new(),
+            }),
+            kind: UiInputEventKind::Timed(UiTimedInputEventKind::Click {
+                button: ButtonKind::MouseButton(0),
+                num_clicks: 1,
+            }),
+        },
+        |ev| events.push(ev),
+    );
+    dbg!(&events);
+    events.clear();
+
+    bindings.process(
+        UiInputEvent {
+            timestamp: 1000,
+            modifiers: Arc::new(Modifiers {
+                buttons: [
+                    ButtonKind::KeyboardKey("Ctrl".to_owned()),
+                    ButtonKind::KeyboardKey("Alt".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+                axes: HashMap::new(),
+            }),
+            kind: UiInputEventKind::Timed(UiTimedInputEventKind::Click {
+                button: ButtonKind::MouseButton(0),
+                num_clicks: 1,
+            }),
+        },
+        |ev| events.push(ev),
+    );
+    dbg!(&events);
+    events.clear();
+
+    bindings.process(
+        UiInputEvent {
+            timestamp: 1000,
+            modifiers: Arc::new(Modifiers {
+                buttons: [
+                    ButtonKind::KeyboardKey("Ctrl".to_owned()),
+                    ButtonKind::KeyboardKey("Shift".to_owned()),
+                ]
+                .into_iter()
+                .collect(),
+                axes: HashMap::new(),
+            }),
+            kind: UiInputEventKind::Timed(UiTimedInputEventKind::Click {
+                button: ButtonKind::MouseButton(0),
+                num_clicks: 1,
+            }),
+        },
+        |ev| events.push(ev),
+    );
+    dbg!(&events);
+    events.clear();
+
+    bindings.process(
+        UiInputEvent {
+            timestamp: 1000,
+            modifiers: Arc::new(Modifiers {
+                buttons: [ButtonKind::KeyboardKey("Shift".to_owned())]
+                    .into_iter()
+                    .collect(),
+                axes: HashMap::new(),
+            }),
+            kind: UiInputEventKind::Timed(UiTimedInputEventKind::Click {
+                button: ButtonKind::MouseButton(0),
+                num_clicks: 1,
+            }),
+        },
+        |ev| events.push(ev),
+    );
+    dbg!(&events);
+    events.clear();
+
     panic!();
 }
 
@@ -736,14 +994,14 @@ fn ui_raw_input_to_input() {
     ButtonTimedState: timeout, num_clicks
 
 
-    UiModifiedInputEvent | UiTimedInputState -> UiTimedInputEvent
+    UiInputEventWithModifiers<UiModifiedInputEventKind> | UiTimedInputState -> UiInputEventWithModifiers<UiTimedInputEventKind>
 
 
 
     UiRawInputEvent
         KeyUp, MouseMove, TouchStart, etc., KeyRepeat,
 
-    UiModifiedInputEvent
+    UiInputEventWithModifiers<UiModifiedInputEventKind>
         Press (modifiers on press)
         Repeat (modifiers on repeat)
         Release (modifiers on release)
@@ -756,14 +1014,23 @@ fn ui_raw_input_to_input() {
             Char (modifiers)
             CharRepeat (modifiers)
 
-    UiTimedInputEvent
+    UiInputEventWithModifiers<UiTimedInputEventKind>
         LongPress (modifiers on first press)
         Click (modifiers on first press)
         LongClick (modifiers on first press)
 
-    UiRawInputEvent | UiRawInputState -> UiModifiedInputEvent
-    UiModifiedInputEvent | UiTimedInputState -> UiTimedInputEvent
-    UiModifiedInputEvent + UiTimedInputEvent -> UiInputEvent
-    UiInputEvent | UiInputState -> UiAppEvent
+    UiRawInputEvent | UiRawInputState -> UiInputEventWithModifiers<UiModifiedInputEventKind>
+    UiInputEventWithModifiers<UiModifiedInputEventKind> | UiTimedInputState -> UiInputEventWithModifiers<UiTimedInputEventKind>
+    UiInputEventWithModifiers<UiModifiedInputEventKind> + UiInputEventWithModifiers<UiTimedInputEventKind> -> UiInputEvent
+    UiInputEvent | BindingProcessor -> UiAppEvent  //todo axes
+                    ^ disabled events
     UiAppEvent | UiAppState -> ...
+
+    event override
+        override event with short modifiers (Ctrl+Lmb)
+        by an event with longer modifiers (Ctrl+Shift+Lmb)
+    event override rejection
+        do no override shorter one by longer one
+        if longer one is disabled by AppState
+        therefore can not be handled.
 */

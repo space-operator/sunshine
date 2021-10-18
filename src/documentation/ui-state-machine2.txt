@@ -180,3 +180,65 @@
         LmbPress            ->     + LmbPress
         LongMouseMove       -> Lmb + MouseMove
         LmbRelease          ->     + LmbRelease
+
+
+
+
+
+
+Ctrl+A +Shift
+
+Ctrl+A | Ctrl+Shift+A
+Ctrl+Shift+A
+
+Ctrl+Shift+A
+
+
+binding Ctrl+A => AppEvent1
+binding Ctrl+Shift+A => AppEvent1
+binding Shift+Alt+A => AppEvent3
+
+Ctrl+Shift+Alt+A => ????
+    1.
+        binding Ctrl+A => AppEvent1
+        binding Ctrl+Shift+A => AppEvent1
+        binding Shift+Alt+A => AppEvent3
+    2. filter Ctrl+Shift+Alt
+        binding Ctrl+A => AppEvent1
+        binding Ctrl+Shift+A => AppEvent1
+        binding Shift+Alt+A => AppEvent3
+    3. extract modifiers
+        Ctrl+
+        Ctrl+Shift+
+        Shift+Alt+
+    4. remove overriden
+        Ctrl+Shift+
+        Shift+Alt+
+    5. if we have all the same, emit app events, otherwise do nothing
+
+
+Ctrl+Shift+Alt+A => ????
+    1.
+        binding Ctrl+A => AppEvent1
+        binding Ctrl+Shift+A => AppEvent2
+        binding Ctrl+Shift+Alt+A => AppEvent2
+        binding Shift+Alt+A => AppEvent3
+        binding Ctrl+Shift+Alt+A => AppEvent3
+    2. filter Ctrl+Shift+Alt
+        binding Ctrl+A => AppEvent1
+        binding Ctrl+Shift+A => AppEvent2
+        binding Ctrl+Shift+Alt+A => AppEvent2
+        binding Shift+Alt+A => AppEvent3
+        binding Ctrl+Shift+Alt+A => AppEvent3
+    3. extract modifiers
+        Ctrl+
+        Ctrl+Shift+
+        Ctrl+Shift+Alt+
+        Shift+Alt+
+        Ctrl+Shift+Alt+
+    4. remove overriden
+        Ctrl+Shift+Alt+ => AppEvent2
+        Ctrl+Shift+Alt+ => AppEvent3
+    5. if we have all the same, emit app events, otherwise do nothing
+
+Ctrl+Shift+Alt+Space+A
