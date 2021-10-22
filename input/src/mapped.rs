@@ -1,19 +1,34 @@
 use std::collections::HashSet;
 
-use crate::{CombinedEvent, CombinedInput, Event, Modifiers};
+use crate::{CombinedEvent, CombinedInput, Event, ModifiersFilter};
 
 pub trait MappedContext: Sized {
-    type Event: Clone + core::fmt::Debug;
+    type CustomEvent;
+    type MappedEvent: Clone;
 
-    fn events(&self, input: &CombinedInput) -> Vec<(Self::Event, Modifiers)>;
+    fn events(
+        &self,
+        input: &CombinedInput<Self::CustomEvent>,
+    ) -> Vec<(Self::MappedEvent, ModifiersFilter)>;
 
-    fn process<F: FnMut(Event<Self::Event>)>(&self, ev: CombinedEvent, mut emit_fn: F) {
+    // TODO: emit()
+
+    fn process<F>(&self, ev: CombinedEvent<Self::CustomEvent>, mut emit_fn: F)
+    where
+        F: FnMut(Event<Self::MappedEvent>),
+    {
         let mappings = self.events(&ev.input);
         let mut mappings: Vec<_> = mappings
             .into_iter()
             .filter(|(_, modifiers)| {
                 ev.modifiers.buttons.is_superset(&modifiers.buttons)
-                /* TODO: for axes */
+                    && modifiers.axes_ranges.iter().all(|(kind, range)| {
+                        ev.modifiers
+                            .axes
+                            .get(kind)
+                            .map(|axis| range.contains(axis))
+                            .unwrap_or(false)
+                    })
             })
             .map(Option::Some)
             .collect();
@@ -30,7 +45,6 @@ pub trait MappedContext: Sized {
                         _ => {}
                     }
                 }
-                /* TODO: for axes */
             }
         }
 
@@ -53,7 +67,9 @@ pub trait MappedContext: Sized {
 
 #[test]
 fn input_mapping_test() {
-    use crate::{ButtonKind, KeyboardKey, MouseButton, TimedInput};
+    use crate::{
+        ButtonKind, KeyboardKey, ModifiedInput, Modifiers, MouseButton, TimedInput, TriggerKind,
+    };
     use std::collections::HashMap;
     use std::sync::Arc;
 
@@ -63,17 +79,29 @@ fn input_mapping_test() {
         B,
         C,
         D,
+        E,
+        F,
+    }
+
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    pub enum CustomEvent {
+        CoolGesture,
+        SmartGesture,
     }
 
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     struct InputMapping {
         event: AppEvent,
-        input: CombinedInput,
+        input: CombinedInput<CustomEvent>,
         buttons: Vec<ButtonKind>,
     }
 
     impl InputMapping {
-        pub fn new(event: AppEvent, input: CombinedInput, buttons: Vec<ButtonKind>) -> Self {
+        pub fn new(
+            event: AppEvent,
+            input: CombinedInput<CustomEvent>,
+            buttons: Vec<ButtonKind>,
+        ) -> Self {
             Self {
                 event,
                 input,
@@ -84,9 +112,6 @@ fn input_mapping_test() {
 
     #[derive(Clone, Debug)]
     struct InputMappings(HashSet<InputMapping>);
-
-    #[derive(Clone, Debug)]
-    struct InputMappings2(HashMap<CombinedInput, Vec<(Modifiers, AppEvent)>>);
 
     let lmb = || {
         CombinedInput::Timed(TimedInput::Click {
@@ -100,6 +125,18 @@ fn input_mapping_test() {
             num_clicks: 1,
         })
     };
+    let cool_gesture = || {
+        CombinedInput::Modified(ModifiedInput::Trigger(TriggerKind::Custom(
+            CustomEvent::CoolGesture,
+        )))
+    };
+
+    let smart_gesture = || {
+        CombinedInput::Modified(ModifiedInput::Trigger(TriggerKind::Custom(
+            CustomEvent::SmartGesture,
+        )))
+    };
+
     let ctrl = || ButtonKind::KeyboardKey(KeyboardKey::LeftCtrl);
     let shift = || ButtonKind::KeyboardKey(KeyboardKey::LeftShift);
     let alt = || ButtonKind::KeyboardKey(KeyboardKey::LeftAlt);
@@ -111,24 +148,30 @@ fn input_mapping_test() {
             InputMapping::new(AppEvent::C, lmb(), vec![ctrl(), alt()]),
             InputMapping::new(AppEvent::A, lmb(), vec![ctrl()]),
             InputMapping::new(AppEvent::D, rmb(), vec![ctrl()]),
+            InputMapping::new(AppEvent::E, cool_gesture(), vec![]),
+            InputMapping::new(AppEvent::F, smart_gesture(), vec![]),
         ]
         .into_iter()
         .collect(),
     );
 
     impl MappedContext for InputMappings {
-        type Event = AppEvent;
+        type CustomEvent = CustomEvent;
+        type MappedEvent = AppEvent;
 
-        fn events(&self, input: &CombinedInput) -> Vec<(Self::Event, Modifiers)> {
+        fn events(
+            &self,
+            input: &CombinedInput<Self::CustomEvent>,
+        ) -> Vec<(Self::MappedEvent, ModifiersFilter)> {
             self.0
                 .iter()
                 .filter(|mapping| mapping.input == *input)
                 .map(|mapping| {
                     (
                         mapping.event.clone(),
-                        Modifiers {
+                        ModifiersFilter {
                             buttons: mapping.buttons.iter().cloned().collect(),
-                            axes: HashMap::new(),
+                            axes_ranges: HashMap::new(),
                         },
                     )
                 })
@@ -230,5 +273,33 @@ fn input_mapping_test() {
     dbg!(&events);
     events.clear();
 
-    panic!();
+    mappings.process(
+        CombinedEvent {
+            timestamp: 1000,
+            modifiers: Arc::new(Modifiers {
+                buttons: HashSet::new(),
+                axes: HashMap::new(),
+            }),
+            input: cool_gesture(),
+        },
+        |ev| events.push(ev),
+    );
+    dbg!(&events);
+    events.clear();
+
+    mappings.process(
+        CombinedEvent {
+            timestamp: 1000,
+            modifiers: Arc::new(Modifiers {
+                buttons: HashSet::new(),
+                axes: HashMap::new(),
+            }),
+            input: smart_gesture(),
+        },
+        |ev| events.push(ev),
+    );
+    dbg!(&events);
+    events.clear();
+
+    // TODO: check states
 }

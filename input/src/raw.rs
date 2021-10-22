@@ -1,10 +1,10 @@
-use crate::{Event, KeyboardKey, MouseButton, MouseScrollDelta, TouchId};
+use crate::{Event, KeyboardKey, MouseButton, MouseScrollDelta, TimestampMs, TouchId};
 
 pub type EventCoords = (i32, i32);
-pub type RawEvent = Event<RawInput>;
+pub type RawEvent<T> = Event<RawInput<T>>;
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum RawInput {
+pub enum RawInput<T> {
     KeyDown(KeyboardKey),
     KeyUp(KeyboardKey),
     MouseDown(MouseButton),
@@ -25,4 +25,14 @@ pub enum RawInput {
         coords: EventCoords,
     },
     Char(String),
+    Custom(T),
+}
+
+impl<T> RawEvent<T> {
+    pub fn new(kind: RawInput<T>, timestamp: TimestampMs) -> Self {
+        Self {
+            input: kind,
+            timestamp,
+        }
+    }
 }

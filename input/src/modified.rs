@@ -5,19 +5,19 @@ use crate::{
     RawInput, TimestampMs,
 };
 
-pub type ModifiedEvent = EventWithModifiers<ModifiedInput>;
+pub type ModifiedEvent<T> = EventWithModifiers<ModifiedInput<T>>;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum ModifiedInput {
+pub enum ModifiedInput<T> {
     Press(ButtonKind),
     Release(ButtonKind),
     Repeat(ButtonKind),
     Change(Axis),
-    Trigger(TriggerKind),
+    Trigger(TriggerKind<T>),
 }
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-pub enum TriggerKind {
+pub enum TriggerKind<T> {
     MouseWheelUp,
     MouseWheelDown,
     MouseScroll(MouseScrollDelta),
@@ -25,40 +25,74 @@ pub enum TriggerKind {
     CharRepeat(String),
     MouseMove,
     TouchMove,
+    Custom(T),
 }
 
 #[derive(Clone, Debug)]
-pub struct ModifiedState<T: RawContext> {
+pub struct ModifiedState<T: ModifiedContext> {
     modifiers: Arc<Modifiers>,
     context: T,
 }
 
-pub struct ModifiedStateUpdater<T: RawContext> {
+pub struct ModifiedStateUpdater<T: ModifiedContext> {
     modifiers: Modifiers,
     context: T,
-    kinds: Vec<ModifiedInput>,
+    kinds: Vec<ModifiedInput<T::CustomEvent>>,
     timestamp: TimestampMs,
 }
 
-pub trait RawContext: Sized {
-    fn emit_event(self, ev: ModifiedEvent) -> Self;
+pub trait ModifiedContext: Sized {
+    type CustomEvent;
+    fn emit_event(self, ev: ModifiedEvent<Self::CustomEvent>) -> Self;
 }
 
-impl RawEvent {
-    pub fn new(kind: RawInput, timestamp: TimestampMs) -> Self {
-        Self {
-            input: kind,
-            timestamp,
+impl<T> ModifiedEvent<T> {
+    pub fn clone_without_custom(&self) -> ModifiedEvent<()> {
+        ModifiedEvent {
+            input: self.input.clone_without_custom(),
+            modifiers: self.modifiers.clone(),
+            timestamp: self.timestamp,
         }
     }
 }
 
-impl<T: RawContext> ModifiedState<T> {
+impl<T> ModifiedInput<T> {
+    pub fn clone_without_custom(&self) -> ModifiedInput<()> {
+        match self {
+            Self::Press(kind) => ModifiedInput::Press(kind.clone()),
+            Self::Release(kind) => ModifiedInput::Release(kind.clone()),
+            Self::Repeat(kind) => ModifiedInput::Repeat(kind.clone()),
+            Self::Change(axis) => ModifiedInput::Change(axis.clone()),
+            Self::Trigger(kind) => ModifiedInput::Trigger(kind.clone_without_custom()),
+        }
+    }
+}
+
+impl<T> TriggerKind<T> {
+    pub fn clone_without_custom(&self) -> TriggerKind<()> {
+        match self {
+            Self::MouseWheelUp => TriggerKind::MouseWheelUp,
+            Self::MouseWheelDown => TriggerKind::MouseWheelDown,
+            Self::MouseScroll(scroll) => TriggerKind::MouseScroll(*scroll),
+            Self::Char(ch) => TriggerKind::Char(ch.clone()),
+            Self::CharRepeat(ch) => TriggerKind::CharRepeat(ch.clone()),
+            Self::MouseMove => TriggerKind::MouseMove,
+            Self::TouchMove => TriggerKind::TouchMove,
+            Self::Custom(_) => TriggerKind::Custom(()),
+        }
+    }
+}
+
+impl<T: ModifiedContext> ModifiedState<T> {
     pub fn new(context: T) -> Self {
         Self {
             modifiers: Arc::default(),
             context,
         }
+    }
+
+    pub fn from_parts(modifiers: Arc<Modifiers>, context: T) -> Self {
+        Self { modifiers, context }
     }
 
     pub fn modifiers(&self) -> &Arc<Modifiers> {
@@ -69,15 +103,15 @@ impl<T: RawContext> ModifiedState<T> {
         &self.context
     }
 
-    pub fn context_mut(&mut self) -> &mut T {
-        &mut self.context
+    pub fn split(self) -> (Arc<Modifiers>, T) {
+        (self.modifiers, self.context)
     }
 
     pub fn make_event(self, timestamp: TimestampMs) -> ModifiedStateUpdater<T> {
         ModifiedStateUpdater::new(self, timestamp)
     }
 
-    pub fn with_event(self, ev: RawEvent) -> Self {
+    pub fn with_event(self, ev: RawEvent<T::CustomEvent>) -> Self {
         use RawInput::*;
 
         let event = self.make_event(ev.timestamp);
@@ -99,14 +133,18 @@ impl<T: RawContext> ModifiedState<T> {
             TouchMove { touch_id, coords } => event
                 .with_axis_changed(Axis::new(AxisKind::TouchX(touch_id), Some(coords.0)))
                 .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), Some(coords.1))),
-            TouchEnd { touch_id } => event.with_button_released(ButtonKind::Touch(touch_id)),
+            TouchEnd { touch_id } => event
+                .with_axis_changed(Axis::new(AxisKind::TouchX(touch_id), None))
+                .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), None))
+                .with_button_released(ButtonKind::Touch(touch_id)),
             Char(ch) => event.with_trigger(TriggerKind::Char(ch)),
+            Custom(_) => todo!(), //TODO
         };
         updater.apply()
     }
 }
 
-impl<T: RawContext> ModifiedStateUpdater<T> {
+impl<T: ModifiedContext> ModifiedStateUpdater<T> {
     pub fn new(state: ModifiedState<T>, timestamp: TimestampMs) -> ModifiedStateUpdater<T> {
         Self {
             modifiers: state.modifiers.as_ref().to_owned(),
@@ -116,7 +154,7 @@ impl<T: RawContext> ModifiedStateUpdater<T> {
         }
     }
 
-    fn with_trigger(mut self, trigger: TriggerKind) -> Self {
+    fn with_trigger(mut self, trigger: TriggerKind<T::CustomEvent>) -> Self {
         self.kinds.push(ModifiedInput::Trigger(trigger));
         self
     }

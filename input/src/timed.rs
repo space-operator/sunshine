@@ -85,7 +85,22 @@ impl<T: TimedContext> TimedState<T> {
         }
     }
 
-    pub fn with_event(self, ev: ModifiedEvent) -> Self {
+    pub fn from_parts(
+        buttons: HashMap<ButtonKind, ButtonTimedState<T::Timeout>>,
+        context: T,
+    ) -> Self {
+        Self { buttons, context }
+    }
+
+    pub fn context(&self) -> &T {
+        &self.context
+    }
+
+    pub fn split(self) -> (HashMap<ButtonKind, ButtonTimedState<T::Timeout>>, T) {
+        (self.buttons, self.context)
+    }
+
+    pub fn with_event<U>(self, ev: ModifiedEvent<U>) -> Self {
         use std::collections::hash_map::Entry;
         use ModifiedInput::*;
 
@@ -331,7 +346,7 @@ impl TimedEvent {
 fn raw_input_to_input_test() {
     use std::{collections::BTreeMap, sync::Arc, sync::Weak};
 
-    use crate::RawContext;
+    use crate::ModifiedContext;
     use crate::{
         ButtonKind, CombinedEvent, CombinedInput, KeyboardKey, ModifiedEvent, ModifiedState,
         MouseButton, RawEvent, RawInput, TimestampMs,
@@ -349,12 +364,14 @@ fn raw_input_to_input_test() {
     }
 
     impl ModifiedState<RawSimpleContext> {
-        fn with_context_event(mut self, ev: RawEvent) -> Self {
+        fn with_context_event(mut self, ev: RawEvent<()>) -> Self {
             // TODO: Remove
             println!("{:?}", ev);
 
             assert!(self.context().time < ev.timestamp);
-            self.context_mut().time = ev.timestamp;
+            let (modifiers, mut context) = self.split();
+            context.time = ev.timestamp;
+            self = Self::from_parts(modifiers, context);
             self = self.with_event(ev);
 
             // TODO: Remove
@@ -363,13 +380,16 @@ fn raw_input_to_input_test() {
                 println!("{:?}", event);
             }
             println!();
-            self.context_mut().state.context.events.clear();
-            self
+            let (modifiers, mut context) = self.split();
+            context.state.context.events.clear();
+            Self::from_parts(modifiers, context)
         }
     }
 
-    impl RawContext for RawSimpleContext {
-        fn emit_event(mut self, ev: ModifiedEvent) -> Self {
+    impl ModifiedContext for RawSimpleContext {
+        type CustomEvent = ();
+
+        fn emit_event(mut self, ev: ModifiedEvent<Self::CustomEvent>) -> Self {
             self.state.context.events.push(CombinedEvent {
                 input: CombinedInput::Modified(ev.input.clone()),
                 modifiers: ev.modifiers.clone(),
@@ -386,11 +406,11 @@ fn raw_input_to_input_test() {
     struct TimedSimpleContext {
         time: TimestampMs,
         timeouts: BTreeMap<TimestampMs, Weak<ScheduledTimeout>>,
-        events: Vec<CombinedEvent>,
+        events: Vec<CombinedEvent<()>>,
     }
 
     impl TimedState<TimedSimpleContext> {
-        fn with_context_event(mut self, ev: ModifiedEvent) -> Self {
+        fn with_context_event(mut self, ev: ModifiedEvent<()>) -> Self {
             assert!(self.context.time < ev.timestamp);
             self.context.time = ev.timestamp;
             while let Some(entry) = self.context.timeouts.first_entry() {

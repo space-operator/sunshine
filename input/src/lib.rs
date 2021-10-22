@@ -9,6 +9,7 @@ mod mapped;
 mod modified;
 mod modifiers;
 mod mouse;
+mod processor;
 mod raw;
 mod timed;
 mod touch;
@@ -22,6 +23,7 @@ pub use mapped::*;
 pub use modified::*;
 pub use modifiers::*;
 pub use mouse::*;
+pub use processor::*;
 pub use raw::*;
 pub use timed::*;
 pub use touch::*;
@@ -65,15 +67,17 @@ pub use touch::*;
         timestamp
         modifiers
 
-    RawEvent | ModifiedState -> ModifiedEvent
-    ModifiedEvent | TimedState -> TimedEvent
+    RawEvent | ModifiedState + ModifiedContext -> ModifiedEvent
+    ModifiedEvent | TimedState + TimedContext -> TimedEvent
     ModifiedEvent + TimedEvent -> CombinedEvent
-    CombinedEvent | Mapping -> AppEvent  //todo axes
-                    ^ disabled events
+    CombinedEvent | MappedContext -> AppEvent
     AppEvent | AppState -> ...
 
-
-
+    one context
+    json input mapping
+    MappedContext emit_fn
+    better test for processor
+    Modifier/ModifiedState/with_event/Custom(_)
 
     event override
         override event with short modifiers (Ctrl+Lmb)
