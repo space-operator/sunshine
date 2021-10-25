@@ -121,8 +121,13 @@ where
 }
 
 impl<C: ProcessorContext> MappedContext for C {
-    type CustomEvent = C::CustomEven    timed/with_timeout_event/state line 159
-    fiersFilter)> {
+    type CustomEvent = C::CustomEvent;
+    type MappedEvent = C::MappedEvent;
+
+    fn events(
+        &self,
+        input: &CombinedInput<Self::CustomEvent>,
+    ) -> Vec<(Self::MappedEvent, ModifiersFilter)> {
         C::events(self, input)
     }
 
