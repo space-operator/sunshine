@@ -1,11 +1,5 @@
-use std::{
-    collections::{HashMap, HashSet},
-    ops::{Range, RangeBounds},
-};
-
 #[test]
 fn parallel() {
-    use core::sync::atomic::{AtomicU32, Ordering};
     use core::time::Duration;
     use std::sync::{Arc, Barrier, Mutex};
     use std::thread;
@@ -40,11 +34,11 @@ fn iterator() {
         current_max: i32,
     }
 
-    impl Data {
-        fn new() -> Self {
-            Self::default()
-        }
-    }
+    // impl Data {
+    //     fn new() -> Self {
+    //         Self::default()
+    //     }
+    // }
 
     impl Default for Data {
         fn default() -> Self {
@@ -202,8 +196,7 @@ fn exercise1b2() {
     check_first_n(iter, &[0, 1, 2, 3, 4, 5, 6, 7]);
 
     let iter = (0..).step_by(2);
-
-    let iter = check_first_n(iter, &[0, 2, 4, 6, 8, 10, 12]);
+    check_first_n(iter, &[0, 2, 4, 6, 8, 10, 12]);
 
     let iter = (5..=6).cycle();
     check_first_n(iter, &[5, 6, 5, 6, 5, 6, 5, 6]);
@@ -229,7 +222,7 @@ fn exercise1b2() {
         ],
     );
 
-    let data: Vec<_> = (0..100).collect();
+    let _: Vec<_> = (0..100).collect();
 
     let mut iter = (100..120).zip('a'..'z');
     assert_eq!(iter.next(), Some((100, 'a')));
@@ -248,10 +241,12 @@ fn exercise1b2() {
     */
 }
 
+#[allow(dead_code)]
 fn check_first_n<T: Iterator<Item = i32>>(iter: T, expected: &[i32]) {
     assert_eq!(iter.take(expected.len()).collect::<Vec<i32>>(), expected);
 }
 
+#[allow(dead_code)]
 fn check_all<T: Iterator<Item = i32>>(iter: T, expected: &[i32]) {
     assert_eq!(iter.collect::<Vec<i32>>(), expected);
 }
@@ -295,9 +290,12 @@ fn check_all<T: Iterator<Item = i32>>(iter: T, expected: &[i32]) {
     (f) Add methods items, ids that return references to inner data.
 
     (g) Manually implement Debug trait.
-    (h) Implement AsRef<[T]>, AsMut<[T]>, Into<Vec<T>> traits.
+    (h) Implement AsRef<[T]>, Into<Vec<T>> traits.
+        impl From<DataStore<T>> for Vec<T>
+        impl Into<Vec<T>> for DataStore<T>
+
     (i) Implement Index trait.
-    (j) Implement IntoIterator trait.
+    (j) Implement IntoIterator, FromIterator trait.
 
     3.
     (k) Copy struct from exercise 2 and rename it.
@@ -308,18 +306,74 @@ fn check_all<T: Iterator<Item = i32>>(iter: T, expected: &[i32]) {
 #[test]
 fn exercise2() {
     mod module {
+        use core::fmt;
         use std::collections::BTreeSet;
-        use std::fmt::Debug;
         use std::hash::Hash;
-        use std::ops::Add;
 
-        #[derive(Clone, Debug)]
+        impl<T: fmt::Debug> fmt::Debug for DataStore<T> {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                f.debug_struct("DataStore")
+                    .field("ids", &self.ids)
+                    .field("items", &self.items)
+                    .finish()
+            }
+        }
+
+        // &str -> &[u8]
+        // &Vec<T> == &[T]
+
+        // pub trait AsRef<T>
+
+        #[derive(Clone)]
         pub struct DataStore<T> {
             ids: BTreeSet<(T, usize)>,
             items: Vec<T>,
         }
 
-        impl<T: Eq + Hash + Clone + Ord + Debug> DataStore<T> {
+        impl<T> AsRef<[T]> for DataStore<T> {
+            fn as_ref(&self) -> &[T] {
+                &self.items
+            }
+        }
+
+        impl<T> AsRef<Vec<T>> for DataStore<T> {
+            fn as_ref(&self) -> &Vec<T> {
+                &self.items
+            }
+        }
+
+        impl<T> From<DataStore<T>> for Vec<T> {
+            fn from(datastore: DataStore<T>) -> Vec<T> {
+                datastore.items
+            }
+        }
+        //vec = datastore.into()
+        //vec = Vec::from(datastore)
+
+        impl<T: Clone + Ord> From<Vec<T>> for DataStore<T> {
+            fn from(vec: Vec<T>) -> DataStore<T> {
+                //let mut ids = BTreeSet::new();
+                //for (j, value) in vec.iter().enumerate() {
+                //    ids.insert((value.clone(), j));
+                //}
+                let ids = vec
+                    .iter()
+                    .enumerate()
+                    .map(|(j, value)| (value.clone(), j))
+                    .collect();
+
+                DataStore { ids, items: vec }
+            }
+        }
+
+        /*impl AsRef<[u8]> for String {
+            #[inline]
+            fn as_ref(&self) -> &[u8] {
+                self.as_bytes()
+            }
+        }*/
+
+        impl<T: Eq + Hash + Clone + Ord> DataStore<T> {
             pub fn new() -> Self {
                 Self {
                     ids: BTreeSet::new(),
@@ -407,4 +461,7 @@ fn exercise2() {
     assert_eq!(datastore.lookup(3), vec![1]);
     assert_eq!(datastore.lookup(4), vec![3, 6]);
     assert_eq!(datastore.lookup(5), vec![5]);
+
+    // let formatter = fmt::Formatter::new();
+    // println!("{}", datastore.manual_fmt());
 }

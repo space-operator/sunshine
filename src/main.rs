@@ -1,47 +1,40 @@
-mod app;
-mod database;
+#![feature(map_first_last)]
 
+#[cfg(test)]
 mod exercise;
-mod state;
-mod ui_event;
-mod ui_state;
 
-use app::App;
-use app::AppEvent;
-use indradb::Type;
-use serde_json::json;
-use std::io::{self, Read};
+pub fn main() {}
 
-use crate::database::Database;
+// use serde_json::json;
+// use std::io::{self, Read};
+// pub fn main() -> io::Result<()> {
+//     let stdin = io::stdin();
+//     let mut app = App::default();
 
-pub fn main() -> io::Result<()> {
-    let stdin = io::stdin();
-    let mut app = App::default();
+//     loop {
+//         let mut buffer = String::new();
+//         stdin.read_line(&mut buffer)?;
+//         if buffer == "exit\n" {
+//             break;
+//         }
 
-    loop {
-        let mut buffer = String::new();
-        stdin.read_line(&mut buffer)?;
-        if buffer == "exit\n" {
-            break;
-        }
+//         app.push(&buffer.as_str());
 
-        app.push(&buffer.as_str());
+//         // let ev = serde_json::from_str(&buffer);
+//         // match ev {
+//         //     Err(err) => {
+//         //         // parse as en error
+//         //         app.events.push(Event::Error(err.to_string()));
+//         //     }
+//         //     Ok(ev) => {
+//         //         app.events.push(ev);
+//         //     }
+//         // }
 
-        // let ev = serde_json::from_str(&buffer);
-        // match ev {
-        //     Err(err) => {
-        //         // parse as en error
-        //         app.events.push(Event::Error(err.to_string()));
-        //     }
-        //     Ok(ev) => {
-        //         app.events.push(ev);
-        //     }
-        // }
+//         //app.push(buffer.trim());
 
-        //app.push(buffer.trim());
+//         println!("{:?}", app);
+//     }
 
-        println!("{:?}", app);
-    }
-
-    Ok(())
-}
+//     Ok(())
+// }
