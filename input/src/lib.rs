@@ -73,11 +73,13 @@ pub use touch::*;
     CombinedEvent | MappedContext -> AppEvent
     AppEvent | AppState -> ...
 
-    one context
-    json input mapping
-    MappedContext emit_fn
-    better test for processor
-    Modifier/ModifiedState/with_event/Custom(_)
+
+    TODOs
+        ButtonTimedStateWithContext
+        Fix unwrap in processor
+        Decide tuple with data and err or Error with data
+        Better test for processor
+        Add more keys
 
     event override
         override event with short modifiers (Ctrl+Lmb)

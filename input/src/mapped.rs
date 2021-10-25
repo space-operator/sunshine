@@ -11,12 +11,9 @@ pub trait MappedContext: Sized {
         input: &CombinedInput<Self::CustomEvent>,
     ) -> Vec<(Self::MappedEvent, ModifiersFilter)>;
 
-    // TODO: emit()
+    fn emit(self, ev: Event<Self::MappedEvent>) -> Self;
 
-    fn process<F>(&self, ev: CombinedEvent<Self::CustomEvent>, mut emit_fn: F)
-    where
-        F: FnMut(Event<Self::MappedEvent>),
-    {
+    fn process(mut self, ev: CombinedEvent<Self::CustomEvent>) -> Self {
         let mappings = self.events(&ev.input);
         let mut mappings: Vec<_> = mappings
             .into_iter()
@@ -56,12 +53,13 @@ pub trait MappedContext: Sized {
 
         if buttons.len() == 1 {
             for binding in mappings.into_iter().filter_map(|binding| binding) {
-                emit_fn(Event {
+                self = self.emit(Event {
                     input: binding.0.clone(),
                     timestamp: ev.timestamp,
                 })
             }
         }
+        self
     }
 }
 
@@ -111,7 +109,10 @@ fn input_mapping_test() {
     }
 
     #[derive(Clone, Debug)]
-    struct InputMappings(HashSet<InputMapping>);
+    struct Context {
+        mappings: HashSet<InputMapping>,
+        events: Vec<Event<AppEvent>>,
+    }
 
     let lmb = || {
         CombinedInput::Timed(TimedInput::Click {
@@ -141,8 +142,8 @@ fn input_mapping_test() {
     let shift = || ButtonKind::KeyboardKey(KeyboardKey::LeftShift);
     let alt = || ButtonKind::KeyboardKey(KeyboardKey::LeftAlt);
 
-    let mappings = InputMappings(
-        [
+    let context = Context {
+        mappings: [
             InputMapping::new(AppEvent::A, lmb(), vec![ctrl()]),
             InputMapping::new(AppEvent::B, lmb(), vec![shift()]),
             InputMapping::new(AppEvent::C, lmb(), vec![ctrl(), alt()]),
@@ -153,9 +154,10 @@ fn input_mapping_test() {
         ]
         .into_iter()
         .collect(),
-    );
+        events: Vec::new(),
+    };
 
-    impl MappedContext for InputMappings {
+    impl MappedContext for Context {
         type CustomEvent = CustomEvent;
         type MappedEvent = AppEvent;
 
@@ -163,7 +165,7 @@ fn input_mapping_test() {
             &self,
             input: &CombinedInput<Self::CustomEvent>,
         ) -> Vec<(Self::MappedEvent, ModifiersFilter)> {
-            self.0
+            self.mappings
                 .iter()
                 .filter(|mapping| mapping.input == *input)
                 .map(|mapping| {
@@ -177,129 +179,106 @@ fn input_mapping_test() {
                 })
                 .collect()
         }
+
+        fn emit(mut self, ev: Event<Self::MappedEvent>) -> Self {
+            self.events.push(ev);
+            self
+        }
     }
 
-    let mut events = vec![];
+    let mut context = context.process(CombinedEvent {
+        timestamp: 1000,
+        modifiers: Arc::new(Modifiers::default()),
+        input: lmb(),
+    });
+    dbg!(&context.events);
+    context.events.clear();
 
-    mappings.process(
-        CombinedEvent {
-            timestamp: 1000,
-            modifiers: Arc::new(Modifiers::default()),
-            input: lmb(),
-        },
-        |ev| events.push(ev),
-    );
-    dbg!(&events);
-    events.clear();
+    let mut context = context.process(CombinedEvent {
+        timestamp: 1000,
+        modifiers: Arc::new(Modifiers::default()),
+        input: rmb(),
+    });
+    dbg!(&context.events);
+    context.events.clear();
 
-    mappings.process(
-        CombinedEvent {
-            timestamp: 1000,
-            modifiers: Arc::new(Modifiers::default()),
-            input: rmb(),
-        },
-        |ev| events.push(ev),
-    );
-    dbg!(&events);
-    events.clear();
-
-    mappings.process(
-        CombinedEvent {
-            timestamp: 1000,
-            modifiers: Arc::new(Modifiers {
-                buttons: [ButtonKind::KeyboardKey(KeyboardKey::LeftCtrl)]
-                    .into_iter()
-                    .collect(),
-                axes: HashMap::new(),
-            }),
-            input: lmb(),
-        },
-        |ev| events.push(ev),
-    );
-    dbg!(&events);
-    events.clear();
-
-    mappings.process(
-        CombinedEvent {
-            timestamp: 1000,
-            modifiers: Arc::new(Modifiers {
-                buttons: [
-                    ButtonKind::KeyboardKey(KeyboardKey::LeftCtrl),
-                    ButtonKind::KeyboardKey(KeyboardKey::LeftAlt),
-                ]
+    let mut context = context.process(CombinedEvent {
+        timestamp: 1000,
+        modifiers: Arc::new(Modifiers {
+            buttons: [ButtonKind::KeyboardKey(KeyboardKey::LeftCtrl)]
                 .into_iter()
                 .collect(),
-                axes: HashMap::new(),
-            }),
-            input: lmb(),
-        },
-        |ev| events.push(ev),
-    );
-    dbg!(&events);
-    events.clear();
+            axes: HashMap::new(),
+        }),
+        input: lmb(),
+    });
+    dbg!(&context.events);
+    context.events.clear();
 
-    mappings.process(
-        CombinedEvent {
-            timestamp: 1000,
-            modifiers: Arc::new(Modifiers {
-                buttons: [
-                    ButtonKind::KeyboardKey(KeyboardKey::LeftCtrl),
-                    ButtonKind::KeyboardKey(KeyboardKey::LeftShift),
-                ]
+    let mut context = context.process(CombinedEvent {
+        timestamp: 1000,
+        modifiers: Arc::new(Modifiers {
+            buttons: [
+                ButtonKind::KeyboardKey(KeyboardKey::LeftCtrl),
+                ButtonKind::KeyboardKey(KeyboardKey::LeftAlt),
+            ]
+            .into_iter()
+            .collect(),
+            axes: HashMap::new(),
+        }),
+        input: lmb(),
+    });
+    dbg!(&context.events);
+    context.events.clear();
+
+    let mut context = context.process(CombinedEvent {
+        timestamp: 1000,
+        modifiers: Arc::new(Modifiers {
+            buttons: [
+                ButtonKind::KeyboardKey(KeyboardKey::LeftCtrl),
+                ButtonKind::KeyboardKey(KeyboardKey::LeftShift),
+            ]
+            .into_iter()
+            .collect(),
+            axes: HashMap::new(),
+        }),
+        input: lmb(),
+    });
+    dbg!(&context.events);
+    context.events.clear();
+
+    let mut context = context.process(CombinedEvent {
+        timestamp: 1000,
+        modifiers: Arc::new(Modifiers {
+            buttons: [ButtonKind::KeyboardKey(KeyboardKey::LeftShift)]
                 .into_iter()
                 .collect(),
-                axes: HashMap::new(),
-            }),
-            input: lmb(),
-        },
-        |ev| events.push(ev),
-    );
-    dbg!(&events);
-    events.clear();
+            axes: HashMap::new(),
+        }),
+        input: lmb(),
+    });
+    dbg!(&context.events);
+    context.events.clear();
 
-    mappings.process(
-        CombinedEvent {
-            timestamp: 1000,
-            modifiers: Arc::new(Modifiers {
-                buttons: [ButtonKind::KeyboardKey(KeyboardKey::LeftShift)]
-                    .into_iter()
-                    .collect(),
-                axes: HashMap::new(),
-            }),
-            input: lmb(),
-        },
-        |ev| events.push(ev),
-    );
-    dbg!(&events);
-    events.clear();
+    let mut context = context.process(CombinedEvent {
+        timestamp: 1000,
+        modifiers: Arc::new(Modifiers {
+            buttons: HashSet::new(),
+            axes: HashMap::new(),
+        }),
+        input: cool_gesture(),
+    });
+    dbg!(&context.events);
+    context.events.clear();
 
-    mappings.process(
-        CombinedEvent {
-            timestamp: 1000,
-            modifiers: Arc::new(Modifiers {
-                buttons: HashSet::new(),
-                axes: HashMap::new(),
-            }),
-            input: cool_gesture(),
-        },
-        |ev| events.push(ev),
-    );
-    dbg!(&events);
-    events.clear();
-
-    mappings.process(
-        CombinedEvent {
-            timestamp: 1000,
-            modifiers: Arc::new(Modifiers {
-                buttons: HashSet::new(),
-                axes: HashMap::new(),
-            }),
-            input: smart_gesture(),
-        },
-        |ev| events.push(ev),
-    );
-    dbg!(&events);
-    events.clear();
-
-    // TODO: check states
+    let mut context = context.process(CombinedEvent {
+        timestamp: 1000,
+        modifiers: Arc::new(Modifiers {
+            buttons: HashSet::new(),
+            axes: HashMap::new(),
+        }),
+        input: smart_gesture(),
+    });
+    dbg!(&context.events);
+    context.events.clear();
 }

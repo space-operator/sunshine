@@ -18,7 +18,7 @@ pub trait ProcessorContext: Sized {
         input: &CombinedInput<Self::CustomEvent>,
     ) -> Vec<(Self::MappedEvent, ModifiersFilter)>;
 
-    fn emit(ev: Event<Self::MappedEvent>);
+    fn emit(self, ev: Event<Self::MappedEvent>) -> Self;
 }
 
 #[derive(Clone, Debug)]
@@ -60,7 +60,8 @@ impl<C: ProcessorContext> ProcessorState<C> {
             processor: self.processor,
         };
         let state = TimedState::from_parts(self.buttons, context);
-        let state = state.with_timeout_event(button, timestamp);
+        let (state, err) = state.with_timeout_event(button, timestamp);
+        err.unwrap();
         let (buttons, context) = state.split();
         Self {
             processor: context.processor,
@@ -83,12 +84,11 @@ where
             modifiers: ev.modifiers.clone(),
             timestamp: ev.timestamp,
         };
-        self.processor.process(event, C::emit);
-        let context = ProcessorTimedContext {
-            processor: self.processor,
-        };
+        let processor = self.processor.process(event);
+        let context = ProcessorTimedContext { processor };
         let state = TimedState::from_parts(self.buttons, context);
-        let state = state.with_event(ev_without_custom);
+        let (state, err) = state.with_event(ev_without_custom);
+        err.unwrap();
         let (buttons, context) = state.split();
         Self {
             processor: context.processor,
@@ -115,22 +115,19 @@ where
             modifiers: ev.modifiers.clone(),
             timestamp: ev.timestamp,
         };
-        self.processor.process(event, C::emit);
-        Self {
-            processor: self.processor,
-        }
+        let processor = self.processor.process(event);
+        Self { processor }
     }
 }
 
 impl<C: ProcessorContext> MappedContext for C {
-    type CustomEvent = C::CustomEvent;
-    type MappedEvent = C::MappedEvent;
-
-    fn events(
-        &self,
-        input: &CombinedInput<Self::CustomEvent>,
-    ) -> Vec<(Self::MappedEvent, ModifiersFilter)> {
+    type CustomEvent = C::CustomEven    timed/with_timeout_event/state line 159
+    fiersFilter)> {
         C::events(self, input)
+    }
+
+    fn emit(self, ev: Event<Self::MappedEvent>) -> Self {
+        ProcessorContext::emit(self, ev)
     }
 }
 
@@ -158,8 +155,9 @@ fn test() {
             vec![("SpaceDblClick", ModifiersFilter::default())]
         }
 
-        fn emit(ev: Event<Self::MappedEvent>) {
+        fn emit(self, ev: Event<Self::MappedEvent>) -> Self {
             dbg!(ev);
+            self
         }
     }
 
@@ -174,6 +172,4 @@ fn test() {
     let state = state.with_event(RawEvent::new(RawInput::KeyUp(KeyboardKey::Space), 1300));
 
     let _ = state;
-
-    panic!();
 }

@@ -138,7 +138,7 @@ impl<T: ModifiedContext> ModifiedState<T> {
                 .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), None))
                 .with_button_released(ButtonKind::Touch(touch_id)),
             Char(ch) => event.with_trigger(TriggerKind::Char(ch)),
-            Custom(_) => todo!(), //TODO
+            Custom(ev) => event.with_trigger(TriggerKind::Custom(ev)),
         };
         updater.apply()
     }
@@ -196,8 +196,4 @@ impl<T: ModifiedContext> ModifiedStateUpdater<T> {
                 input: kind,
                 modifiers: Arc::clone(&modifiers),
                 timestamp: self.timestamp,
-            });
-        }
-        ModifiedState { modifiers, context }
-    }
-}
+            });    timed/with_timeout_event/state line 159
