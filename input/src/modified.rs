@@ -196,4 +196,8 @@ impl<T: ModifiedContext> ModifiedStateUpdater<T> {
                 input: kind,
                 modifiers: Arc::clone(&modifiers),
                 timestamp: self.timestamp,
-            });    timed/with_timeout_event/state line 159
+            });
+        }
+        ModifiedState { modifiers, context }
+    }
+}
