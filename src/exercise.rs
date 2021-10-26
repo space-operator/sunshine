@@ -295,7 +295,9 @@ fn check_all<T: Iterator<Item = i32>>(iter: T, expected: &[i32]) {
         impl Into<Vec<T>> for DataStore<T>
 
     (i) Implement Index trait.
+        Hint: See Index trait implemetation for slice.
     (j) Implement IntoIterator, FromIterator trait.
+        Hint: See Index trait implemetation for Vec.
 
     3.
     (k) Copy struct from exercise 2 and rename it.

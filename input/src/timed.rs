@@ -7,15 +7,30 @@ pub type NumClicks = u32;
 
 #[derive(Clone, Debug)]
 pub struct TimedState<T: TimedContext> {
-    buttons: HashMap<ButtonKind, ButtonTimedState<T::Timeout>>,
+    buttons: TimedStateButtons<T::Timeout>,
     context: T,
 }
 
 #[derive(Clone, Debug)]
-pub struct ButtonTimedState<T> {
+pub struct TimedStateButtons<T>(HashMap<ButtonKind, ButtonTimedState<T>>);
+
+#[derive(Clone, Debug)]
+struct ButtonTimedState<T> {
     input: ButtonTimedInput<T>,
     modifiers: Arc<Modifiers>,
     num_clicks: NumClicks,
+}
+
+struct ButtonTimedStateWithContext<T: TimedContext> {
+    context: T,
+    input: ButtonTimedInput<T::Timeout>,
+    modifiers: Arc<Modifiers>,
+    num_clicks: NumClicks,
+}
+
+enum TimedEventResult<T: TimedContext> {
+    StateWithContext(ButtonTimedStateWithContext<T>),
+    Context(T),
 }
 
 #[derive(Clone, Debug)]
@@ -81,15 +96,12 @@ pub enum TimedInput {
 impl<T: TimedContext> TimedState<T> {
     pub fn new(context: T) -> Self {
         Self {
-            buttons: HashMap::default(),
+            buttons: TimedStateButtons::default(),
             context,
         }
     }
 
-    pub fn from_parts(
-        buttons: HashMap<ButtonKind, ButtonTimedState<T::Timeout>>,
-        context: T,
-    ) -> Self {
+    pub fn from_parts(buttons: TimedStateButtons<T::Timeout>, context: T) -> Self {
         Self { buttons, context }
     }
 
@@ -97,7 +109,7 @@ impl<T: TimedContext> TimedState<T> {
         &self.context
     }
 
-    pub fn split(self) -> (HashMap<ButtonKind, ButtonTimedState<T::Timeout>>, T) {
+    pub fn split(self) -> (TimedStateButtons<T::Timeout>, T) {
         (self.buttons, self.context)
     }
 
@@ -114,32 +126,36 @@ impl<T: TimedContext> TimedState<T> {
         let context = self.context;
         let (context, err) = match ev.input {
             Press(button) => {
-                let entry = buttons.entry(button.clone());
+                let entry = buttons.0.entry(button.clone());
                 match entry {
                     Entry::Occupied(entry) => {
                         let state = entry.remove();
-                        let ((state, context), err) =
-                            state.with_press_event(button.clone(), context);
-                        buttons.insert(button.clone(), state);
-                        (context, err)
+                        let (result, err) =
+                            state.with_context(context).with_press_event(button.clone());
+                        let (state, context) = result.split();
+                        buttons.0.insert(button.clone(), state);
+                        (context, err.map_err(Into::into))
                     }
                     Entry::Vacant(entry) => {
                         let (state, context) =
-                            ButtonTimedState::from_pressed(button, &modifiers, context);
+                            ButtonTimedStateWithContext::from_pressed(button, &modifiers, context)
+                                .split();
                         entry.insert(state);
                         (context, Ok(()))
                     }
                 }
             }
             Release(button) => {
-                let entry = buttons.entry(button.clone());
+                let entry = buttons.0.entry(button.clone());
                 match entry {
                     Entry::Occupied(entry) => {
                         let state = entry.remove();
-                        let ((state, context), err) =
-                            state.with_release_event(button.clone(), timestamp, context);
-                        buttons.insert(button, state);
-                        (context, err)
+                        let (result, err) = state
+                            .with_context(context)
+                            .with_release_event(button.clone(), timestamp);
+                        let (state, context) = result.split();
+                        buttons.0.insert(button, state);
+                        (context, err.map_err(Into::into))
                     }
                     Entry::Vacant(_) => (context, Ok(())),
                 }
@@ -155,105 +171,124 @@ impl<T: TimedContext> TimedState<T> {
         mut self,
         button: ButtonKind,
         timestamp: TimestampMs,
-    ) -> (Self, Result<(), TimedInputWithEventError>) {
-        match self.buttons.remove(&button) {
+    ) -> (Self, Result<(), TimedInputWithTimeoutEventError>) {
+        match self.buttons.0.remove(&button) {
             Some(state) => {
                 let mut buttons = self.buttons;
-                let ((state, context), err) =
-                    state.with_timeout_event(button.clone(), timestamp, self.context);
-                if let Some(state) = state {
-                    buttons.insert(button, state);
-                }
+                let (result, err) = state
+                    .with_context(self.context)
+                    .with_timeout_event(button.clone(), timestamp);
+                let context = match result {
+                    TimedEventResult::StateWithContext(result) => {
+                        let (state, context) = result.split();
+                        buttons.0.insert(button, state);
+                        context
+                    }
+                    TimedEventResult::Context(context) => context,
+                };
                 (Self { buttons, context }, err)
             }
             None => (
                 self,
-                Err(TimedInputWithEventError::TimeoutForDefaultButtonState { button, timestamp }),
+                Err(TimedInputWithTimeoutEventError::DefaultButtonState { button, timestamp }),
             ),
         }
     }
 }
 
 impl<U> ButtonTimedState<U> {
-    fn from_pressed<T: TimedContext<Timeout = U>>(
-        button: ButtonKind,
-        modifiers: &Arc<Modifiers>,
+    fn with_context<T: TimedContext<Timeout = U>>(
+        self,
         context: T,
-    ) -> (Self, T) {
+    ) -> ButtonTimedStateWithContext<T> {
+        ButtonTimedStateWithContext {
+            context,
+            input: self.input,
+            modifiers: self.modifiers,
+            num_clicks: self.num_clicks,
+        }
+    }
+}
+
+impl<T: TimedContext> ButtonTimedStateWithContext<T> {
+    fn split(self) -> (ButtonTimedState<T::Timeout>, T) {
+        (
+            ButtonTimedState {
+                input: self.input,
+                modifiers: self.modifiers,
+                num_clicks: self.num_clicks,
+            },
+            self.context,
+        )
+    }
+
+    fn from_pressed(button: ButtonKind, modifiers: &Arc<Modifiers>, context: T) -> Self {
         let delay = Duration::LongClick(button.long_click_duration());
         let (context, timeout) = context.schedule(button, delay);
         let kind = ButtonTimedInput::Pressed { timeout };
         let modifiers = Arc::clone(modifiers);
-        (
-            ButtonTimedState {
-                input: kind,
-                modifiers,
-                num_clicks: 0,
-            },
+        Self {
             context,
-        )
+            input: kind,
+            modifiers,
+            num_clicks: 0,
+        }
     }
 
-    fn with_press_event<T: TimedContext<Timeout = U>>(
+    fn with_press_event(
         self,
         button: ButtonKind,
-        context: T,
-    ) -> ((Self, T), Result<(), TimedInputWithEventError>) {
+    ) -> (Self, Result<(), TimedInputWithPressEventError>) {
         use ButtonTimedInput::*;
 
         match self.input {
             Pressed { timeout: _ } => (
-                (self, context),
-                Err(TimedInputWithEventError::PressedWhilePressed { button }),
+                self,
+                Err(TimedInputWithPressEventError::AlreadyPressed { button }),
             ),
             LongPressed {} => (
-                (self, context),
-                Err(TimedInputWithEventError::PressedWhileLongPressed { button }),
+                self,
+                Err(TimedInputWithPressEventError::AlreadyLongPressed { button }),
             ),
             Released { timeout: _ } => {
                 let delay = Duration::LongClick(button.long_click_duration());
-                let (context, timeout) = context.schedule(button, delay);
+                let (context, timeout) = self.context.schedule(button, delay);
                 (
-                    (
-                        ButtonTimedState {
-                            input: ButtonTimedInput::Pressed { timeout },
-                            modifiers: self.modifiers,
-                            num_clicks: self.num_clicks,
-                        },
+                    Self {
                         context,
-                    ),
+                        input: ButtonTimedInput::Pressed { timeout },
+                        modifiers: self.modifiers,
+                        num_clicks: self.num_clicks,
+                    },
                     Ok(()),
                 )
             }
             LongReleased { timeout: _ } => {
                 let delay = Duration::LongClick(button.long_click_duration());
-                let (context, timeout) = context.schedule(button, delay);
+                let (context, timeout) = self.context.schedule(button, delay);
                 (
-                    (
-                        ButtonTimedState {
-                            input: ButtonTimedInput::Pressed { timeout },
-                            modifiers: self.modifiers,
-                            num_clicks: self.num_clicks,
-                        },
+                    Self {
                         context,
-                    ),
+                        input: ButtonTimedInput::Pressed { timeout },
+                        modifiers: self.modifiers,
+                        num_clicks: self.num_clicks,
+                    },
                     Ok(()),
                 )
             }
         }
     }
 
-    fn with_release_event<T: TimedContext<Timeout = U>>(
+    fn with_release_event(
         self,
         button: ButtonKind,
         timestamp: TimestampMs,
-        context: T,
-    ) -> ((Self, T), Result<(), TimedInputWithEventError>) {
+    ) -> (Self, Result<(), TimedInputWithReleaseEventError>) {
         use ButtonTimedInput::*;
 
         match self.input {
             Pressed { timeout: _ } => {
-                let context = context.emit_event(TimedEvent::new(
+                let context = self.context.emit_event(TimedEvent::new(
                     TimedInput::Click {
                         button: button.clone(),
                         num_clicks: self.num_clicks + 1,
@@ -264,19 +299,17 @@ impl<U> ButtonTimedState<U> {
                 let delay = Duration::MultiClick(button.multi_click_duration());
                 let (context, timeout) = context.schedule(button, delay);
                 (
-                    (
-                        ButtonTimedState {
-                            input: ButtonTimedInput::Released { timeout },
-                            modifiers: self.modifiers,
-                            num_clicks: self.num_clicks + 1,
-                        },
+                    Self {
                         context,
-                    ),
+                        input: ButtonTimedInput::Released { timeout },
+                        modifiers: self.modifiers,
+                        num_clicks: self.num_clicks + 1,
+                    },
                     Ok(()),
                 )
             }
             LongPressed => {
-                let context = context.emit_event(TimedEvent::new(
+                let context = self.context.emit_event(TimedEvent::new(
                     TimedInput::LongClick {
                         button: button.clone(),
                         num_clicks: self.num_clicks + 1,
@@ -287,40 +320,40 @@ impl<U> ButtonTimedState<U> {
                 let delay = Duration::MultiClick(button.multi_click_duration());
                 let (context, timeout) = context.schedule(button, delay);
                 (
-                    (
-                        ButtonTimedState {
-                            input: ButtonTimedInput::Released { timeout },
-                            modifiers: self.modifiers,
-                            num_clicks: self.num_clicks + 1,
-                        },
+                    Self {
                         context,
-                    ),
+                        input: ButtonTimedInput::Released { timeout },
+                        modifiers: self.modifiers,
+                        num_clicks: self.num_clicks + 1,
+                    },
                     Ok(()),
                 )
             }
             Released { timeout: _ } => (
-                (self, context),
-                Err(TimedInputWithEventError::ReleasedWhileReleased { button, timestamp }),
+                self,
+                Err(TimedInputWithReleaseEventError::AlreadyReleased { button, timestamp }),
             ),
 
             LongReleased { timeout: _ } => (
-                (self, context),
-                Err(TimedInputWithEventError::ReleasedWhileLongPressed { button, timestamp }),
+                self,
+                Err(TimedInputWithReleaseEventError::AlreadyLongPressed { button, timestamp }),
             ),
         }
     }
 
-    pub fn with_timeout_event<T: TimedContext<Timeout = U>>(
+    fn with_timeout_event(
         self,
         button: ButtonKind,
         timestamp: TimestampMs,
-        context: T,
-    ) -> ((Option<Self>, T), Result<(), TimedInputWithEventError>) {
+    ) -> (
+        TimedEventResult<T>,
+        Result<(), TimedInputWithTimeoutEventError>,
+    ) {
         use ButtonTimedInput::*;
 
         match self.input {
             Pressed { timeout: _ } => {
-                let context = context.emit_event(EventWithModifiers::new(
+                let context = self.context.emit_event(EventWithModifiers::new(
                     TimedInput::LongPress {
                         button,
                         num_clicks: self.num_clicks,
@@ -329,23 +362,21 @@ impl<U> ButtonTimedState<U> {
                     timestamp,
                 ));
                 (
-                    (
-                        Some(ButtonTimedState {
-                            input: ButtonTimedInput::LongPressed,
-                            modifiers: self.modifiers,
-                            num_clicks: self.num_clicks,
-                        }),
+                    TimedEventResult::StateWithContext(Self {
                         context,
-                    ),
+                        input: ButtonTimedInput::LongPressed,
+                        modifiers: self.modifiers,
+                        num_clicks: self.num_clicks,
+                    }),
                     Ok(()),
                 )
             }
             LongPressed => (
-                (Some(self), context),
-                Err(TimedInputWithEventError::TimeoutWhileLongPressed { button, timestamp }),
+                (TimedEventResult::StateWithContext(self)),
+                Err(TimedInputWithTimeoutEventError::LongPressed { button, timestamp }),
             ),
             Released { timeout: _ } => {
-                let context = context.emit_event(EventWithModifiers::new(
+                let context = self.context.emit_event(EventWithModifiers::new(
                     TimedInput::ClickExact {
                         button,
                         num_clicks: self.num_clicks,
@@ -353,10 +384,10 @@ impl<U> ButtonTimedState<U> {
                     Arc::clone(&self.modifiers),
                     timestamp,
                 ));
-                ((None, context), Ok(()))
+                (TimedEventResult::Context(context), Ok(()))
             }
             LongReleased { timeout: _ } => {
-                let context = context.emit_event(EventWithModifiers::new(
+                let context = self.context.emit_event(EventWithModifiers::new(
                     TimedInput::LongClickExact {
                         button,
                         num_clicks: self.num_clicks,
@@ -364,7 +395,7 @@ impl<U> ButtonTimedState<U> {
                     Arc::clone(&self.modifiers),
                     timestamp,
                 ));
-                ((None, context), Ok(()))
+                (TimedEventResult::Context(context), Ok(()))
             }
         }
     }
@@ -377,6 +408,12 @@ impl TimedEvent {
             modifiers,
             timestamp,
         }
+    }
+}
+
+impl<T> Default for TimedStateButtons<T> {
+    fn default() -> Self {
+        Self(HashMap::default())
     }
 }
 
@@ -559,32 +596,48 @@ pub struct TimedInputWithEventErrorWithData<T> {
 
 #[derive(Clone, Debug, Error)]
 pub enum TimedInputWithEventError {
+    #[error(transparent)]
+    Pressed(#[from] TimedInputWithPressEventError),
+    #[error(transparent)]
+    Released(#[from] TimedInputWithReleaseEventError),
+}
+
+#[derive(Clone, Debug, Error)]
+pub enum TimedInputWithPressEventError {
     #[error("Button {button:?} is pressed while in Pressed state")]
-    PressedWhilePressed { button: ButtonKind },
+    AlreadyPressed { button: ButtonKind },
 
     #[error("Button {button:?} is pressed while in LongPressed state")]
-    PressedWhileLongPressed { button: ButtonKind },
+    AlreadyLongPressed { button: ButtonKind },
+}
 
+#[derive(Clone, Debug, Error)]
+pub enum TimedInputWithReleaseEventError {
     #[error("Button {button:?} is released on {timestamp:?}ms while in Released state")]
-    ReleasedWhileReleased {
+    AlreadyReleased {
         button: ButtonKind,
         timestamp: TimestampMs,
     },
 
     #[error("Button {button:?} is released on {timestamp:?}ms while in LongPressed state")]
-    ReleasedWhileLongPressed {
+    AlreadyLongPressed {
+        button: ButtonKind,
+        timestamp: TimestampMs,
+    },
+}
+
+#[derive(Clone, Debug, Error)]
+pub enum TimedInputWithTimeoutEventError {
+    #[error("Timeout handler for button {button:?} called on {timestamp:?}ms while in LongPressed state that do not schedule any timeouts")]
+    LongPressed {
         button: ButtonKind,
         timestamp: TimestampMs,
     },
 
-    #[error("Timeout handler for button {button:?} called on {timestamp:?}ms while in LongPressed state that do not schedule any timeouts")]
-    TimeoutWhileLongPressed {
-        button: ButtonKind,
-        timestamp: TimestampMs,
-    },
-
-    #[error("Timeout handler for button {button:?} called on {timestamp:?}ms while in LongPressed state that do not schedule any timeouts")]
-    TimeoutForDefaultButtonState {
+    #[error(
+        "Timeout handler for button {button:?} called on {timestamp:?}ms for default button state"
+    )]
+    DefaultButtonState {
         button: ButtonKind,
         timestamp: TimestampMs,
     },
