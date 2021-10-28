@@ -1,4 +1,28 @@
 #![feature(map_first_last)]
+#![warn(
+    clippy::all,
+    clippy::pedantic,
+    clippy::nursery,
+    meta_variable_misuse,
+    missing_abi,
+    missing_copy_implementations,
+    missing_debug_implementations,
+    non_ascii_idents,
+    pointer_structural_match,
+    rust_2018_idioms,
+    rust_2021_compatibility,
+    single_use_lifetimes,
+    trivial_casts,
+    trivial_numeric_casts,
+    unused_crate_dependencies,
+    unused_extern_crates,
+    unused_import_braces,
+    unused_lifetimes,
+    unused_qualifications,
+    unused_results,
+    variant_size_differences
+)]
+#![allow(clippy::module_name_repetitions)]
 
 mod axis;
 mod button;
@@ -75,15 +99,17 @@ pub use touch::*;
 
 
     TODOs
-        + ButtonTimedStateWithContext
-        + Decide tuple with data and err or Error with data
-        + Fix unwrap in processor
-
-    Later
+        Make TimestampMs genetic
+        MouseScroll X and Y
         KeyboardKey::Other deserialization
         Better test for processor
         Add more keys
         ProcessorModifiedContext::result?
+
+    Done
+        ButtonTimedStateWithContext
+        Decide tuple with data and err or Error with data
+        Fix unwrap in processor
 
 
     event override

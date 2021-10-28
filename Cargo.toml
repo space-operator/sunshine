@@ -16,7 +16,7 @@ serde_json = "1.0"
 lazy_static = "1.4.0"
 derive_more = "0.99.16"
 
-[dependencies.input]
+[dependencies.input-processor]
 path = "./input"
 
 [dependencies.serde]

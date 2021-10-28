@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 
 // TODO: Add more keys
+
+#[allow(missing_copy_implementations)] // TODO
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
 pub enum KeyboardKey {
     // first row

@@ -34,7 +34,7 @@ pub struct ModifiedState<T: ModifiedContext> {
     context: T,
 }
 
-pub struct ModifiedStateUpdater<T: ModifiedContext> {
+struct ModifiedStateUpdater<T: ModifiedContext> {
     modifiers: Modifiers,
     context: T,
     kinds: Vec<ModifiedInput<T::CustomEvent>>,
@@ -107,12 +107,15 @@ impl<T: ModifiedContext> ModifiedState<T> {
         (self.modifiers, self.context)
     }
 
-    pub fn make_event(self, timestamp: TimestampMs) -> ModifiedStateUpdater<T> {
+    fn make_event(self, timestamp: TimestampMs) -> ModifiedStateUpdater<T> {
         ModifiedStateUpdater::new(self, timestamp)
     }
 
     pub fn with_event(self, ev: RawEvent<T::CustomEvent>) -> Self {
-        use RawInput::*;
+        use RawInput::{
+            Char, Custom, KeyDown, KeyUp, MouseDown, MouseMove, MouseScroll, MouseUp,
+            MouseWheelDown, MouseWheelUp, TouchEnd, TouchMove, TouchStart,
+        };
 
         let event = self.make_event(ev.timestamp);
         let updater = match ev.input {
@@ -145,9 +148,9 @@ impl<T: ModifiedContext> ModifiedState<T> {
 }
 
 impl<T: ModifiedContext> ModifiedStateUpdater<T> {
-    pub fn new(state: ModifiedState<T>, timestamp: TimestampMs) -> ModifiedStateUpdater<T> {
+    pub fn new(state: ModifiedState<T>, timestamp: TimestampMs) -> Self {
         Self {
-            modifiers: state.modifiers.as_ref().to_owned(),
+            modifiers: state.modifiers.as_ref().clone(),
             context: state.context,
             timestamp,
             kinds: Vec::new(),
@@ -167,9 +170,9 @@ impl<T: ModifiedContext> ModifiedStateUpdater<T> {
     }
 
     fn with_button_released(mut self, button: ButtonKind) -> Self {
-        self.kinds.push(ModifiedInput::Release(button.clone()));
         let is_removed = self.modifiers.buttons.remove(&button);
         assert!(is_removed);
+        self.kinds.push(ModifiedInput::Release(button));
         self
     }
 

@@ -25,30 +25,62 @@ pub trait ProcessorContext: Sized {
 
 #[derive(Clone, Debug)]
 pub struct ProcessorState<C: ProcessorContext> {
-    processor: C,
+    context: C,
     modifiers: Arc<Modifiers>,
     buttons: TimedStateButtons<C::Timeout>,
 }
 
 #[derive(Clone, Debug)]
+pub struct ProcessorStateData<T> {
+    modifiers: Arc<Modifiers>,
+    buttons: TimedStateButtons<T>,
+}
+
+#[derive(Clone, Debug)]
 pub struct ProcessorModifiedContext<C: ProcessorContext> {
-    processor: C,
+    context: C,
     buttons: TimedStateButtons<C::Timeout>,
     result: Result<(), ProcessorWithEventError>,
 }
 
 #[derive(Clone, Debug)]
 pub struct ProcessorTimedContext<C: ProcessorContext> {
-    processor: C,
+    context: C,
 }
 
 impl<C: ProcessorContext> ProcessorState<C> {
+    pub fn new(context: C) -> Self {
+        Self {
+            context,
+            modifiers: Arc::default(),
+            buttons: TimedStateButtons::default(),
+        }
+    }
+
+    pub fn from_parts(data: ProcessorStateData<C::Timeout>, context: C) -> Self {
+        Self {
+            context,
+            modifiers: data.modifiers,
+            buttons: data.buttons,
+        }
+    }
+
+    pub fn split(self) -> (ProcessorStateData<C::Timeout>, C) {
+        (
+            ProcessorStateData {
+                modifiers: self.modifiers,
+                buttons: self.buttons,
+            },
+            self.context,
+        )
+    }
+
     pub fn with_event(
         self,
         ev: RawEvent<C::CustomEvent>,
     ) -> (Self, Result<(), ProcessorWithEventError>) {
         let context: ProcessorModifiedContext<C> = ProcessorModifiedContext {
-            processor: self.processor,
+            context: self.context,
             buttons: self.buttons,
             result: Ok(()),
         };
@@ -58,7 +90,7 @@ impl<C: ProcessorContext> ProcessorState<C> {
         let (modifiers, context) = state.split();
         (
             Self {
-                processor: context.processor,
+                context: context.context,
                 modifiers,
                 buttons: context.buttons,
             },
@@ -72,16 +104,16 @@ impl<C: ProcessorContext> ProcessorState<C> {
         timestamp: TimestampMs,
     ) -> (Self, Result<(), ProcessorWithTimeoutEventError>) {
         let context: ProcessorTimedContext<C> = ProcessorTimedContext {
-            processor: self.processor,
+            context: self.context,
         };
         let state = TimedState::from_parts(self.buttons, context);
         let (state, result) = state.with_timeout_event(button, timestamp);
         let (buttons, context) = state.split();
         (
             Self {
-                processor: context.processor,
+                context: context.context,
                 modifiers: self.modifiers,
-                buttons: buttons,
+                buttons,
             },
             result.map_err(Into::into),
         )
@@ -101,13 +133,13 @@ where
             modifiers: ev.modifiers.clone(),
             timestamp: ev.timestamp,
         };
-        let processor = self.processor.process(event);
-        let context = ProcessorTimedContext { processor };
+        let context = self.context.process(event);
+        let context = ProcessorTimedContext { context };
         let state = TimedState::from_parts(self.buttons, context);
         let (state, result) = state.with_event(ev_without_custom);
         let (buttons, context) = state.split();
         Self {
-            processor: context.processor,
+            context: context.context,
             buttons,
             result: result.map_err(Into::into),
         }
@@ -121,8 +153,8 @@ where
     type Timeout = C::Timeout;
 
     fn schedule(mut self, button: ButtonKind, delay: Duration) -> (Self, Arc<Self::Timeout>) {
-        let (processor, timeout) = C::schedule(self.processor, button, delay);
-        self = Self { processor };
+        let (context, timeout) = C::schedule(self.context, button, delay);
+        self = Self { context };
         (self, timeout)
     }
 
@@ -132,8 +164,8 @@ where
             modifiers: ev.modifiers.clone(),
             timestamp: ev.timestamp,
         };
-        let processor = self.processor.process(event);
-        Self { processor }
+        let context = self.context.process(event);
+        Self { context }
     }
 }
 
@@ -150,6 +182,15 @@ impl<C: ProcessorContext> MappedContext for C {
 
     fn emit(self, ev: Event<Self::MappedEvent>) -> Self {
         ProcessorContext::emit(self, ev)
+    }
+}
+
+impl<T> Default for ProcessorStateData<T> {
+    fn default() -> Self {
+        Self {
+            modifiers: Arc::new(Modifiers::default()),
+            buttons: TimedStateButtons::default(),
+        }
     }
 }
 
@@ -196,7 +237,7 @@ fn test() {
     }
 
     let state = ProcessorState {
-        processor: Processor,
+        context: Processor,
         modifiers: Arc::new(Modifiers::default()),
         buttons: TimedStateButtons::default(),
     };
@@ -214,5 +255,5 @@ fn test() {
 
     let ev = RawEvent::<()>::new(RawInput::KeyDown(KeyboardKey::Space), 1000);
     println!("{:?}", serde_json::to_string(&ev));
-    panic!();
+    //panic!();
 }

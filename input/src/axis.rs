@@ -2,6 +2,7 @@ use crate::TouchId;
 
 pub type AxisValue = i32;
 
+#[allow(missing_copy_implementations)] // TODO
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum AxisKind {
     MouseX,
@@ -17,7 +18,8 @@ pub struct Axis {
 }
 
 impl Axis {
-    pub fn new(kind: AxisKind, value: Option<AxisValue>) -> Self {
+    #[must_use]
+    pub const fn new(kind: AxisKind, value: Option<AxisValue>) -> Self {
         Self { kind, value }
     }
 }

@@ -23,23 +23,19 @@ pub trait MappedContext: Sized {
                         ev.modifiers
                             .axes
                             .get(kind)
-                            .map(|axis| range.contains(axis))
-                            .unwrap_or(false)
+                            .map_or(false, |axis| range.contains(axis))
                     })
             })
-            .map(Option::Some)
+            .map(Some)
             .collect();
 
         for j1 in 0..mappings.len() {
             for j2 in 0..mappings.len() {
                 if j1 != j2 {
-                    match (&mappings[j1], &mappings[j2]) {
-                        (Some(binding1), Some(binding2)) => {
-                            if binding1.1.buttons.is_superset(&binding2.1.buttons) {
-                                mappings[j2] = None;
-                            }
+                    if let (Some(binding1), Some(binding2)) = (&mappings[j1], &mappings[j2]) {
+                        if binding1.1.buttons.is_superset(&binding2.1.buttons) {
+                            mappings[j2] = None;
                         }
-                        _ => {}
                     }
                 }
             }
@@ -47,16 +43,16 @@ pub trait MappedContext: Sized {
 
         let buttons: HashSet<_> = mappings
             .iter()
-            .filter_map(|binding| binding.clone())
+            .filter_map(Clone::clone)
             .map(|binding| -> Vec<_> { binding.1.buttons.iter().cloned().collect() })
             .collect();
 
         if buttons.len() == 1 {
-            for binding in mappings.into_iter().filter_map(|binding| binding) {
+            for binding in mappings.into_iter().flatten() {
                 self = self.emit(Event {
                     input: binding.0.clone(),
                     timestamp: ev.timestamp,
-                })
+                });
             }
         }
         self

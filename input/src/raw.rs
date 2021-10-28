@@ -31,7 +31,7 @@ pub enum RawInput<T> {
 }
 
 impl<T> RawEvent<T> {
-    pub fn new(kind: RawInput<T>, timestamp: TimestampMs) -> Self {
+    pub const fn new(kind: RawInput<T>, timestamp: TimestampMs) -> Self {
         Self {
             input: kind,
             timestamp,

@@ -1,5 +1,3 @@
-#![feature(map_first_last)]
-
 #[cfg(test)]
 mod exercise;
 

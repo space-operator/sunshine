@@ -8,7 +8,8 @@ pub enum ButtonKind {
 }
 
 impl ButtonKind {
-    pub fn long_click_duration(&self) -> LongClickDuration {
+    #[must_use]
+    pub const fn long_click_duration(&self) -> LongClickDuration {
         match self {
             ButtonKind::KeyboardKey(_) => LongClickDuration::Key,
             ButtonKind::MouseButton(_) => LongClickDuration::Mouse,
@@ -16,7 +17,8 @@ impl ButtonKind {
         }
     }
 
-    pub fn multi_click_duration(&self) -> MultiClickDuration {
+    #[must_use]
+    pub const fn multi_click_duration(&self) -> MultiClickDuration {
         match self {
             ButtonKind::KeyboardKey(_) => MultiClickDuration::Key,
             ButtonKind::MouseButton(_) => MultiClickDuration::Mouse,
