@@ -1,7 +1,7 @@
 use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
-use crate::{ButtonKind, EventWithModifiers, ModifiedEvent, ModifiedInput, Modifiers, TimestampMs};
+use crate::{ButtonKind, EventWithModifiers, ModifiedEvent, ModifiedInput, Modifiers};
 
 pub type NumClicks = u32;
 
@@ -109,6 +109,10 @@ impl<T: TimedContext> TimedState<T> {
         &self.context
     }
 
+    pub fn context_mut(&mut self) -> &mut T {
+        &mut self.context
+    }
+
     pub fn split(self) -> (TimedStateButtons<T::Timeout>, T) {
         (self.buttons, self.context)
     }
@@ -122,7 +126,6 @@ impl<T: TimedContext> TimedState<T> {
         use ModifiedInput::{Change, Press, Release, Repeat, Trigger};
 
         let modifiers = ev.modifiers;
-        let timestamp = ev.timestamp;
         let mut buttons = self.buttons;
         let context = self.context;
         let (context, err) = match ev.input {
@@ -154,7 +157,7 @@ impl<T: TimedContext> TimedState<T> {
                         let state = entry.remove();
                         let (result, err) = state
                             .with_context(context)
-                            .with_release_event(button.clone(), timestamp);
+                            .with_release_event(button.clone());
                         let (state, context) = result.split();
                         let prev = buttons.0.insert(button, state);
                         assert!(prev.is_none());
@@ -172,14 +175,13 @@ impl<T: TimedContext> TimedState<T> {
     pub fn with_timeout_event(
         mut self,
         button: ButtonKind,
-        timestamp: TimestampMs,
     ) -> (Self, Result<(), TimedInputWithTimeoutEventError>) {
         match self.buttons.0.remove(&button) {
             Some(state) => {
                 let mut buttons = self.buttons;
                 let (result, err) = state
                     .with_context(self.context)
-                    .with_timeout_event(button.clone(), timestamp);
+                    .with_timeout_event(button.clone());
                 let context = match result {
                     TimedEventResult::StateWithContext(result) => {
                         let (state, context) = result.split();
@@ -193,7 +195,7 @@ impl<T: TimedContext> TimedState<T> {
             }
             None => (
                 self,
-                Err(TimedInputWithTimeoutEventError::DefaultButtonState { button, timestamp }),
+                Err(TimedInputWithTimeoutEventError::DefaultButtonState { button }),
             ),
         }
     }
@@ -272,7 +274,6 @@ impl<T: TimedContext> ButtonTimedStateWithContext<T> {
     fn with_release_event(
         self,
         button: ButtonKind,
-        timestamp: TimestampMs,
     ) -> (Self, Result<(), TimedInputWithReleaseEventError>) {
         use ButtonTimedInput::{LongPressed, LongReleased, Pressed, Released};
 
@@ -284,7 +285,6 @@ impl<T: TimedContext> ButtonTimedStateWithContext<T> {
                         num_clicks: self.num_clicks + 1,
                     },
                     Arc::clone(&self.modifiers),
-                    timestamp,
                 ));
                 let delay = Duration::MultiClick(button.multi_click_duration());
                 let (context, timeout) = context.schedule(button, delay);
@@ -305,7 +305,6 @@ impl<T: TimedContext> ButtonTimedStateWithContext<T> {
                         num_clicks: self.num_clicks + 1,
                     },
                     Arc::clone(&self.modifiers),
-                    timestamp,
                 ));
                 let delay = Duration::MultiClick(button.multi_click_duration());
                 let (context, timeout) = context.schedule(button, delay);
@@ -321,12 +320,12 @@ impl<T: TimedContext> ButtonTimedStateWithContext<T> {
             }
             Released { timeout: _ } => (
                 self,
-                Err(TimedInputWithReleaseEventError::AlreadyReleased { button, timestamp }),
+                Err(TimedInputWithReleaseEventError::AlreadyReleased { button }),
             ),
 
             LongReleased { timeout: _ } => (
                 self,
-                Err(TimedInputWithReleaseEventError::AlreadyLongPressed { button, timestamp }),
+                Err(TimedInputWithReleaseEventError::AlreadyLongPressed { button }),
             ),
         }
     }
@@ -334,7 +333,6 @@ impl<T: TimedContext> ButtonTimedStateWithContext<T> {
     fn with_timeout_event(
         self,
         button: ButtonKind,
-        timestamp: TimestampMs,
     ) -> (
         TimedEventResult<T>,
         Result<(), TimedInputWithTimeoutEventError>,
@@ -349,7 +347,6 @@ impl<T: TimedContext> ButtonTimedStateWithContext<T> {
                         num_clicks: self.num_clicks,
                     },
                     Arc::clone(&self.modifiers),
-                    timestamp,
                 ));
                 (
                     TimedEventResult::StateWithContext(Self {
@@ -363,7 +360,7 @@ impl<T: TimedContext> ButtonTimedStateWithContext<T> {
             }
             LongPressed => (
                 (TimedEventResult::StateWithContext(self)),
-                Err(TimedInputWithTimeoutEventError::LongPressed { button, timestamp }),
+                Err(TimedInputWithTimeoutEventError::LongPressed { button }),
             ),
             Released { timeout: _ } => {
                 let context = self.context.emit_event(EventWithModifiers::new(
@@ -372,7 +369,6 @@ impl<T: TimedContext> ButtonTimedStateWithContext<T> {
                         num_clicks: self.num_clicks,
                     },
                     Arc::clone(&self.modifiers),
-                    timestamp,
                 ));
                 (TimedEventResult::Context(context), Ok(()))
             }
@@ -383,7 +379,6 @@ impl<T: TimedContext> ButtonTimedStateWithContext<T> {
                         num_clicks: self.num_clicks,
                     },
                     Arc::clone(&self.modifiers),
-                    timestamp,
                 ));
                 (TimedEventResult::Context(context), Ok(()))
             }
@@ -393,11 +388,10 @@ impl<T: TimedContext> ButtonTimedStateWithContext<T> {
 
 impl TimedEvent {
     #[must_use]
-    pub fn new(kind: TimedInput, modifiers: Arc<Modifiers>, timestamp: TimestampMs) -> Self {
+    pub fn new(kind: TimedInput, modifiers: Arc<Modifiers>) -> Self {
         Self {
             input: kind,
             modifiers,
-            timestamp,
         }
     }
 }
@@ -415,8 +409,10 @@ fn raw_input_to_input_test() {
     use crate::ModifiedContext;
     use crate::{
         ButtonKind, CombinedEvent, CombinedInput, KeyboardKey, ModifiedEvent, ModifiedState,
-        MouseButton, RawEvent, RawInput, TimestampMs,
+        MouseButton, RawInput,
     };
+
+    type TimestampMs = u64;
 
     #[derive(Clone, Debug)]
     struct ScheduledTimeout {
@@ -425,17 +421,17 @@ fn raw_input_to_input_test() {
 
     #[derive(Clone, Debug)]
     struct RawSimpleContext {
-        time: TimestampMs,
         state: TimedState<TimedSimpleContext>,
     }
 
     impl ModifiedState<RawSimpleContext> {
-        fn with_context_event(mut self, ev: RawEvent<()>) -> Self {
+        fn with_context_event(mut self, ev: RawInput<()>, timestamp: TimestampMs) -> Self {
             println!("{:?}", ev);
 
-            assert!(self.context().time < ev.timestamp);
-            let (modifiers, mut context) = self.split();
-            context.time = ev.timestamp;
+            assert!(self.context().state.context.time < timestamp);
+            self.context_mut().state.context.time = timestamp;
+
+            let (modifiers, context) = self.split();
             self = Self::from_parts(modifiers, context);
             self = self.with_event(ev);
 
@@ -457,10 +453,8 @@ fn raw_input_to_input_test() {
             self.state.context.events.push(CombinedEvent {
                 input: CombinedInput::Modified(ev.input.clone()),
                 modifiers: ev.modifiers.clone(),
-                timestamp: ev.timestamp,
             });
             Self {
-                time: self.time,
                 state: self.state.with_context_event(ev),
             }
         }
@@ -475,15 +469,15 @@ fn raw_input_to_input_test() {
 
     impl TimedState<TimedSimpleContext> {
         fn with_context_event(mut self, ev: ModifiedEvent<()>) -> Self {
-            assert!(self.context.time < ev.timestamp);
-            self.context.time = ev.timestamp;
+            //assert!(self.context.time < ev.timestamp);
+            //self.context.time = ev.timestamp;
             while let Some(entry) = self.context.timeouts.first_entry() {
-                if *entry.key() > ev.timestamp {
+                if *entry.key() > self.context.time {
                     break;
                 }
-                let (timestamp, timeout) = entry.remove_entry();
+                let (_timestamp, timeout) = entry.remove_entry(); // TODO: timestamp?
                 if let Some(timeout) = timeout.upgrade() {
-                    let (state, err) = self.with_timeout_event(timeout.button.clone(), timestamp);
+                    let (state, err) = self.with_timeout_event(timeout.button.clone());
                     err.unwrap();
                     self = state;
                 }
@@ -507,6 +501,7 @@ fn raw_input_to_input_test() {
                 Duration::LongClick(_) => 1000,
                 Duration::MultiClick(_) => 300,
             };
+            dbg!(&self.timeouts, self.time + delay);
             let prev = self
                 .timeouts
                 .insert(self.time + delay, Arc::downgrade(&timeout));
@@ -518,7 +513,6 @@ fn raw_input_to_input_test() {
             self.events.push(CombinedEvent {
                 input: CombinedInput::Timed(ev.input),
                 modifiers: ev.modifiers,
-                timestamp: ev.timestamp,
             });
             self
         }
@@ -530,48 +524,21 @@ fn raw_input_to_input_test() {
         events: vec![],
     };
     let timed_state = TimedState::new(timed_context);
-    let context = RawSimpleContext {
-        time: 0,
-        state: timed_state,
-    };
+    let context = RawSimpleContext { state: timed_state };
     let state = ModifiedState::new(context);
 
-    let state = state.with_context_event(RawEvent::new(
-        RawInput::KeyDown(KeyboardKey::LeftCtrl),
-        10000,
-    ));
-    let state =
-        state.with_context_event(RawEvent::new(RawInput::KeyUp(KeyboardKey::LeftCtrl), 10500));
-    let state = state.with_context_event(RawEvent::new(
-        RawInput::KeyDown(KeyboardKey::LeftCtrl),
-        11000,
-    ));
-    let state =
-        state.with_context_event(RawEvent::new(RawInput::KeyUp(KeyboardKey::LeftCtrl), 13000));
+    let state = state.with_context_event(RawInput::KeyDown(KeyboardKey::LeftCtrl), 10000);
+    let state = state.with_context_event(RawInput::KeyUp(KeyboardKey::LeftCtrl), 10500);
+    let state = state.with_context_event(RawInput::KeyDown(KeyboardKey::LeftCtrl), 11000);
+    let state = state.with_context_event(RawInput::KeyUp(KeyboardKey::LeftCtrl), 13000);
 
-    let state = state.with_context_event(RawEvent::new(
-        RawInput::KeyDown(KeyboardKey::LeftCtrl),
-        15000,
-    ));
-    let state = state.with_context_event(RawEvent::new(
-        RawInput::MouseDown(MouseButton::Primary),
-        15100,
-    ));
-    let state = state.with_context_event(RawEvent::new(
-        RawInput::MouseUp(MouseButton::Primary),
-        15200,
-    ));
-    let state = state.with_context_event(RawEvent::new(
-        RawInput::MouseDown(MouseButton::Primary),
-        15300,
-    ));
-    let state = state.with_context_event(RawEvent::new(
-        RawInput::MouseUp(MouseButton::Primary),
-        15400,
-    ));
+    let state = state.with_context_event(RawInput::KeyDown(KeyboardKey::LeftCtrl), 15000);
+    let state = state.with_context_event(RawInput::MouseDown(MouseButton::Primary), 15100);
+    let state = state.with_context_event(RawInput::MouseUp(MouseButton::Primary), 15200);
+    let state = state.with_context_event(RawInput::MouseDown(MouseButton::Primary), 15300);
+    let state = state.with_context_event(RawInput::MouseUp(MouseButton::Primary), 15400);
 
-    let state =
-        state.with_context_event(RawEvent::new(RawInput::KeyUp(KeyboardKey::LeftCtrl), 18000));
+    let state = state.with_context_event(RawInput::KeyUp(KeyboardKey::LeftCtrl), 18000);
 
     let _ = state;
 }
@@ -606,34 +573,20 @@ pub enum TimedInputWithPressEventError {
 
 #[derive(Clone, Debug, Error)]
 pub enum TimedInputWithReleaseEventError {
-    #[error("Button {button:?} is released on {timestamp:?}ms while in Released state")]
-    AlreadyReleased {
-        button: ButtonKind,
-        timestamp: TimestampMs,
-    },
+    #[error("Button {button:?} is released while in Released state")]
+    AlreadyReleased { button: ButtonKind },
 
-    #[error("Button {button:?} is released on {timestamp:?}ms while in LongPressed state")]
-    AlreadyLongPressed {
-        button: ButtonKind,
-        timestamp: TimestampMs,
-    },
+    #[error("Button {button:?} is released while in LongPressed state")]
+    AlreadyLongPressed { button: ButtonKind },
 }
 
 #[derive(Clone, Debug, Error)]
 pub enum TimedInputWithTimeoutEventError {
-    #[error("Timeout handler for button {button:?} called on {timestamp:?}ms while in LongPressed state that do not schedule any timeouts")]
-    LongPressed {
-        button: ButtonKind,
-        timestamp: TimestampMs,
-    },
+    #[error("Timeout handler for button {button:?} called while in LongPressed state that do not schedule any timeouts")]
+    LongPressed { button: ButtonKind },
 
-    #[error(
-        "Timeout handler for button {button:?} called on {timestamp:?}ms for default button state"
-    )]
-    DefaultButtonState {
-        button: ButtonKind,
-        timestamp: TimestampMs,
-    },
+    #[error("Timeout handler for button {button:?} called for default button state")]
+    DefaultButtonState { button: ButtonKind },
 }
 
 /*

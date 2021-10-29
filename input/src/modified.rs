@@ -1,8 +1,7 @@
 use std::sync::Arc;
 
 use crate::{
-    Axis, AxisKind, ButtonKind, EventWithModifiers, Modifiers, MouseScrollDelta, RawEvent,
-    RawInput, TimestampMs,
+    Axis, AxisKind, ButtonKind, EventWithModifiers, Modifiers, MouseScrollDelta, RawInput,
 };
 
 pub type ModifiedEvent<T> = EventWithModifiers<ModifiedInput<T>>;
@@ -38,7 +37,6 @@ struct ModifiedStateUpdater<T: ModifiedContext> {
     modifiers: Modifiers,
     context: T,
     kinds: Vec<ModifiedInput<T::CustomEvent>>,
-    timestamp: TimestampMs,
 }
 
 pub trait ModifiedContext: Sized {
@@ -51,7 +49,6 @@ impl<T> ModifiedEvent<T> {
         ModifiedEvent {
             input: self.input.clone_without_custom(),
             modifiers: self.modifiers.clone(),
-            timestamp: self.timestamp,
         }
     }
 }
@@ -103,22 +100,26 @@ impl<T: ModifiedContext> ModifiedState<T> {
         &self.context
     }
 
+    pub fn context_mut(&mut self) -> &mut T {
+        &mut self.context
+    }
+
     pub fn split(self) -> (Arc<Modifiers>, T) {
         (self.modifiers, self.context)
     }
 
-    fn make_event(self, timestamp: TimestampMs) -> ModifiedStateUpdater<T> {
-        ModifiedStateUpdater::new(self, timestamp)
+    fn make_event(self) -> ModifiedStateUpdater<T> {
+        ModifiedStateUpdater::new(self)
     }
 
-    pub fn with_event(self, ev: RawEvent<T::CustomEvent>) -> Self {
+    pub fn with_event(self, ev: RawInput<T::CustomEvent>) -> Self {
         use RawInput::{
             Char, Custom, KeyDown, KeyUp, MouseDown, MouseMove, MouseScroll, MouseUp,
             MouseWheelDown, MouseWheelUp, TouchEnd, TouchMove, TouchStart,
         };
 
-        let event = self.make_event(ev.timestamp);
-        let updater = match ev.input {
+        let event = self.make_event();
+        let updater = match ev {
             KeyDown(key) => event.with_button_pressed(ButtonKind::KeyboardKey(key)),
             KeyUp(key) => event.with_button_released(ButtonKind::KeyboardKey(key)),
             MouseDown(button) => event.with_button_pressed(ButtonKind::MouseButton(button)),
@@ -148,11 +149,10 @@ impl<T: ModifiedContext> ModifiedState<T> {
 }
 
 impl<T: ModifiedContext> ModifiedStateUpdater<T> {
-    pub fn new(state: ModifiedState<T>, timestamp: TimestampMs) -> Self {
+    pub fn new(state: ModifiedState<T>) -> Self {
         Self {
             modifiers: state.modifiers.as_ref().clone(),
             context: state.context,
-            timestamp,
             kinds: Vec::new(),
         }
     }
@@ -198,7 +198,6 @@ impl<T: ModifiedContext> ModifiedStateUpdater<T> {
             context = context.emit_event(ModifiedEvent {
                 input: kind,
                 modifiers: Arc::clone(&modifiers),
-                timestamp: self.timestamp,
             });
         }
         ModifiedState { modifiers, context }

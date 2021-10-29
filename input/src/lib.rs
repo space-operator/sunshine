@@ -99,7 +99,6 @@ pub use touch::*;
 
 
     TODOs
-        Make TimestampMs genetic
         MouseScroll X and Y
         KeyboardKey::Other deserialization
         Better test for processor
@@ -107,6 +106,7 @@ pub use touch::*;
         ProcessorModifiedContext::result?
 
     Done
+        Make TimestampMs genetic, just removed
         ButtonTimedStateWithContext
         Decide tuple with data and err or Error with data
         Fix unwrap in processor

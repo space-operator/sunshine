@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::{CombinedEvent, CombinedInput, Event, ModifiersFilter};
+use crate::{CombinedEvent, CombinedInput, ModifiersFilter};
 
 pub trait MappedContext: Sized {
     type CustomEvent;
@@ -11,7 +11,7 @@ pub trait MappedContext: Sized {
         input: &CombinedInput<Self::CustomEvent>,
     ) -> Vec<(Self::MappedEvent, ModifiersFilter)>;
 
-    fn emit(self, ev: Event<Self::MappedEvent>) -> Self;
+    fn emit(self, ev: Self::MappedEvent) -> Self;
 
     fn process(mut self, ev: CombinedEvent<Self::CustomEvent>) -> Self {
         let mappings = self.events(&ev.input);
@@ -49,10 +49,7 @@ pub trait MappedContext: Sized {
 
         if buttons.len() == 1 {
             for binding in mappings.into_iter().flatten() {
-                self = self.emit(Event {
-                    input: binding.0.clone(),
-                    timestamp: ev.timestamp,
-                });
+                self = self.emit(binding.0.clone());
             }
         }
         self
@@ -107,7 +104,7 @@ fn input_mapping_test() {
     #[derive(Clone, Debug)]
     struct Context {
         mappings: HashSet<InputMapping>,
-        events: Vec<Event<AppEvent>>,
+        events: Vec<AppEvent>,
     }
 
     let lmb = || {
@@ -176,14 +173,13 @@ fn input_mapping_test() {
                 .collect()
         }
 
-        fn emit(mut self, ev: Event<Self::MappedEvent>) -> Self {
+        fn emit(mut self, ev: Self::MappedEvent) -> Self {
             self.events.push(ev);
             self
         }
     }
 
     let mut context = context.process(CombinedEvent {
-        timestamp: 1000,
         modifiers: Arc::new(Modifiers::default()),
         input: lmb(),
     });
@@ -191,7 +187,6 @@ fn input_mapping_test() {
     context.events.clear();
 
     let mut context = context.process(CombinedEvent {
-        timestamp: 1000,
         modifiers: Arc::new(Modifiers::default()),
         input: rmb(),
     });
@@ -199,7 +194,6 @@ fn input_mapping_test() {
     context.events.clear();
 
     let mut context = context.process(CombinedEvent {
-        timestamp: 1000,
         modifiers: Arc::new(Modifiers {
             buttons: [ButtonKind::KeyboardKey(KeyboardKey::LeftCtrl)]
                 .into_iter()
@@ -212,7 +206,6 @@ fn input_mapping_test() {
     context.events.clear();
 
     let mut context = context.process(CombinedEvent {
-        timestamp: 1000,
         modifiers: Arc::new(Modifiers {
             buttons: [
                 ButtonKind::KeyboardKey(KeyboardKey::LeftCtrl),
@@ -228,7 +221,6 @@ fn input_mapping_test() {
     context.events.clear();
 
     let mut context = context.process(CombinedEvent {
-        timestamp: 1000,
         modifiers: Arc::new(Modifiers {
             buttons: [
                 ButtonKind::KeyboardKey(KeyboardKey::LeftCtrl),
@@ -244,7 +236,6 @@ fn input_mapping_test() {
     context.events.clear();
 
     let mut context = context.process(CombinedEvent {
-        timestamp: 1000,
         modifiers: Arc::new(Modifiers {
             buttons: [ButtonKind::KeyboardKey(KeyboardKey::LeftShift)]
                 .into_iter()
@@ -257,7 +248,6 @@ fn input_mapping_test() {
     context.events.clear();
 
     let mut context = context.process(CombinedEvent {
-        timestamp: 1000,
         modifiers: Arc::new(Modifiers {
             buttons: HashSet::new(),
             axes: HashMap::new(),
@@ -268,7 +258,6 @@ fn input_mapping_test() {
     context.events.clear();
 
     let mut context = context.process(CombinedEvent {
-        timestamp: 1000,
         modifiers: Arc::new(Modifiers {
             buttons: HashSet::new(),
             axes: HashMap::new(),

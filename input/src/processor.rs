@@ -2,10 +2,9 @@ use std::sync::Arc;
 use thiserror::Error;
 
 use crate::{
-    ButtonKind, CombinedEvent, CombinedInput, Duration, Event, MappedContext, ModifiedContext,
-    ModifiedEvent, ModifiedState, Modifiers, ModifiersFilter, RawEvent, TimedContext, TimedEvent,
+    ButtonKind, CombinedEvent, CombinedInput, Duration, MappedContext, ModifiedContext,
+    ModifiedEvent, ModifiedState, Modifiers, ModifiersFilter, RawInput, TimedContext, TimedEvent,
     TimedInputWithEventError, TimedInputWithTimeoutEventError, TimedState, TimedStateButtons,
-    TimestampMs,
 };
 
 pub trait ProcessorContext: Sized {
@@ -20,7 +19,7 @@ pub trait ProcessorContext: Sized {
         input: &CombinedInput<Self::CustomEvent>,
     ) -> Vec<(Self::MappedEvent, ModifiersFilter)>;
 
-    fn emit(self, ev: Event<Self::MappedEvent>) -> Self;
+    fn emit(self, ev: Self::MappedEvent) -> Self;
 }
 
 #[derive(Clone, Debug)]
@@ -65,6 +64,14 @@ impl<C: ProcessorContext> ProcessorState<C> {
         }
     }
 
+    pub fn context(&self) -> &C {
+        &self.context
+    }
+
+    pub fn context_mut(&mut self) -> &mut C {
+        &mut self.context
+    }
+
     pub fn split(self) -> (ProcessorStateData<C::Timeout>, C) {
         (
             ProcessorStateData {
@@ -77,7 +84,7 @@ impl<C: ProcessorContext> ProcessorState<C> {
 
     pub fn with_event(
         self,
-        ev: RawEvent<C::CustomEvent>,
+        ev: RawInput<C::CustomEvent>,
     ) -> (Self, Result<(), ProcessorWithEventError>) {
         let context: ProcessorModifiedContext<C> = ProcessorModifiedContext {
             context: self.context,
@@ -101,13 +108,12 @@ impl<C: ProcessorContext> ProcessorState<C> {
     pub fn with_timeout_event(
         self,
         button: ButtonKind,
-        timestamp: TimestampMs,
     ) -> (Self, Result<(), ProcessorWithTimeoutEventError>) {
         let context: ProcessorTimedContext<C> = ProcessorTimedContext {
             context: self.context,
         };
         let state = TimedState::from_parts(self.buttons, context);
-        let (state, result) = state.with_timeout_event(button, timestamp);
+        let (state, result) = state.with_timeout_event(button);
         let (buttons, context) = state.split();
         (
             Self {
@@ -131,7 +137,6 @@ where
         let event = CombinedEvent {
             input: CombinedInput::Modified(ev.input),
             modifiers: ev.modifiers.clone(),
-            timestamp: ev.timestamp,
         };
         let context = self.context.process(event);
         let context = ProcessorTimedContext { context };
@@ -162,7 +167,6 @@ where
         let event = CombinedEvent {
             input: CombinedInput::Timed(ev.input),
             modifiers: ev.modifiers.clone(),
-            timestamp: ev.timestamp,
         };
         let context = self.context.process(event);
         Self { context }
@@ -180,7 +184,7 @@ impl<C: ProcessorContext> MappedContext for C {
         C::events(self, input)
     }
 
-    fn emit(self, ev: Event<Self::MappedEvent>) -> Self {
+    fn emit(self, ev: Self::MappedEvent) -> Self {
         ProcessorContext::emit(self, ev)
     }
 }
@@ -208,9 +212,11 @@ pub enum ProcessorWithTimeoutEventError {
 
 #[test]
 fn test() {
-    use crate::{KeyboardKey, RawInput};
+    use crate::KeyboardKey;
 
     struct Processor;
+
+    type RawInput = crate::RawInput<()>;
 
     impl ProcessorContext for Processor {
         type Timeout = ();
@@ -230,7 +236,7 @@ fn test() {
             vec![("SpaceDblClick", ModifiersFilter::default())]
         }
 
-        fn emit(self, ev: Event<Self::MappedEvent>) -> Self {
+        fn emit(self, ev: Self::MappedEvent) -> Self {
             dbg!(ev);
             self
         }
@@ -242,18 +248,18 @@ fn test() {
         buttons: TimedStateButtons::default(),
     };
 
-    let (state, err) = state.with_event(RawEvent::new(RawInput::KeyDown(KeyboardKey::Space), 1000));
+    let (state, err) = state.with_event(RawInput::KeyDown(KeyboardKey::Space));
     err.unwrap();
-    let (state, err) = state.with_event(RawEvent::new(RawInput::KeyUp(KeyboardKey::Space), 1150));
+    let (state, err) = state.with_event(RawInput::KeyUp(KeyboardKey::Space));
     err.unwrap();
-    let (state, err) = state.with_event(RawEvent::new(RawInput::KeyDown(KeyboardKey::Space), 1200));
+    let (state, err) = state.with_event(RawInput::KeyDown(KeyboardKey::Space));
     err.unwrap();
-    let (state, err) = state.with_event(RawEvent::new(RawInput::KeyUp(KeyboardKey::Space), 1300));
+    let (state, err) = state.with_event(RawInput::KeyUp(KeyboardKey::Space));
     err.unwrap();
 
     let _ = state;
 
-    let ev = RawEvent::<()>::new(RawInput::KeyDown(KeyboardKey::Space), 1000);
+    let ev = RawInput::KeyDown(KeyboardKey::Space);
     println!("{:?}", serde_json::to_string(&ev));
     //panic!();
 }

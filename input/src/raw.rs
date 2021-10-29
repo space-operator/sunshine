@@ -1,9 +1,8 @@
 use serde::{Deserialize, Serialize};
 
-use crate::{Event, KeyboardKey, MouseButton, MouseScrollDelta, TimestampMs, TouchId};
+use crate::{KeyboardKey, MouseButton, MouseScrollDelta, TouchId};
 
 pub type EventCoords = (i32, i32);
-pub type RawEvent<T> = Event<RawInput<T>>;
 
 #[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub enum RawInput<T> {
@@ -28,13 +27,4 @@ pub enum RawInput<T> {
     },
     Char(String),
     Custom(T),
-}
-
-impl<T> RawEvent<T> {
-    pub const fn new(kind: RawInput<T>, timestamp: TimestampMs) -> Self {
-        Self {
-            input: kind,
-            timestamp,
-        }
-    }
 }
