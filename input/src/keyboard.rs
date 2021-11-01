@@ -1,9 +1,10 @@
-use serde::{Deserialize, Serialize};
-
 // TODO: Add more keys
 
-#[allow(missing_copy_implementations)] // TODO
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct KeyboardKey(pub String);
+
+/*
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum KeyboardKey {
     // first row
     Escape,
@@ -62,10 +63,8 @@ pub enum KeyboardKey {
     KeyL,
     Semicolon,
     Quote,
-    #[serde(alias = "Result")]
     Enter,
     // fifth row
-    #[serde(alias = "ShiftLeft")]
     LeftShift,
     KeyZ,
     KeyX,
@@ -77,21 +76,14 @@ pub enum KeyboardKey {
     Comma,
     Period,
     Slash,
-    #[serde(alias = "ShiftRight")]
     RightShift,
     // sixth row
-    #[serde(alias = "ControlLeft")]
     LeftCtrl,
-    #[serde(alias = "OSLeft")]
     LeftOs,
-    #[serde(alias = "AltLeft")]
     LeftAlt,
     Space,
-    #[serde(alias = "AltRight")]
     RightAlt,
-    #[serde(alias = "OSRight")]
     RightOs,
-    #[serde(alias = "ControlRight")]
     ContextMenu,
     RightCtrl,
     // middle section
@@ -127,18 +119,6 @@ pub enum KeyboardKey {
     Numpad0,
     NumpadDecimal,
     // Other
-    #[serde(other)]
-    Other, // TODO: Other(String)
+    Other(String),
 }
-
-#[test]
-fn keyboardkey_deser_test() {
-    let test = |value: &str, expected| {
-        let value: KeyboardKey = serde_json::from_str(&format!("\"{}\"", value)).unwrap();
-        assert_eq!(value, expected);
-    };
-
-    test("Space", KeyboardKey::Space);
-    test("ControlLeft", KeyboardKey::LeftCtrl);
-    test("VolumeUp", KeyboardKey::Other);
-}
+*/

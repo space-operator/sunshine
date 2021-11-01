@@ -99,6 +99,7 @@ pub use touch::*;
 
 
     TODOs
+        generic KeyboardKey (not only the string but <T>)
         MouseScroll X and Y
         KeyboardKey::Other deserialization
         Better test for processor

@@ -41,15 +41,25 @@ pub trait MappedContext: Sized {
             }
         }
 
-        let buttons: HashSet<_> = mappings
+        let modifier_button_sets: HashSet<_> = mappings
             .iter()
             .filter_map(Clone::clone)
             .map(|binding| -> Vec<_> { binding.1.buttons.iter().cloned().collect() })
             .collect();
 
-        if buttons.len() == 1 {
+        if modifier_button_sets.len() == 1 {
             for binding in mappings.into_iter().flatten() {
                 self = self.emit(binding.0.clone());
+                // DblLmbClick -> CreateNewNode
+                // MouseDown, MouseMove, MouseUp -> DragState(x, y), ...
+                //
+                // DblLmbClick -> CreateNewNode
+                // MouseDown ->
+                // CreateNewNode: Click Lmb 2x
+                // NodeDrag(): Lmb+ MouseMoveX(),Y()
+                // Character
+                // Axis -> Act(x)
+                // (Axis, Axis) -> Act((x, y))
             }
         }
         self
@@ -131,9 +141,9 @@ fn input_mapping_test() {
         )))
     };
 
-    let ctrl = || ButtonKind::KeyboardKey(KeyboardKey::LeftCtrl);
-    let shift = || ButtonKind::KeyboardKey(KeyboardKey::LeftShift);
-    let alt = || ButtonKind::KeyboardKey(KeyboardKey::LeftAlt);
+    let ctrl = || ButtonKind::KeyboardKey(KeyboardKey("LeftCtrl".to_owned()));
+    let shift = || ButtonKind::KeyboardKey(KeyboardKey("LeftShift".to_owned()));
+    let alt = || ButtonKind::KeyboardKey(KeyboardKey("LeftAlt".to_owned()));
 
     let context = Context {
         mappings: [
@@ -195,9 +205,7 @@ fn input_mapping_test() {
 
     let mut context = context.process(CombinedEvent {
         modifiers: Arc::new(Modifiers {
-            buttons: [ButtonKind::KeyboardKey(KeyboardKey::LeftCtrl)]
-                .into_iter()
-                .collect(),
+            buttons: [ctrl()].into_iter().collect(),
             axes: HashMap::new(),
         }),
         input: lmb(),
@@ -207,12 +215,7 @@ fn input_mapping_test() {
 
     let mut context = context.process(CombinedEvent {
         modifiers: Arc::new(Modifiers {
-            buttons: [
-                ButtonKind::KeyboardKey(KeyboardKey::LeftCtrl),
-                ButtonKind::KeyboardKey(KeyboardKey::LeftAlt),
-            ]
-            .into_iter()
-            .collect(),
+            buttons: [ctrl(), alt()].into_iter().collect(),
             axes: HashMap::new(),
         }),
         input: lmb(),
@@ -222,12 +225,7 @@ fn input_mapping_test() {
 
     let mut context = context.process(CombinedEvent {
         modifiers: Arc::new(Modifiers {
-            buttons: [
-                ButtonKind::KeyboardKey(KeyboardKey::LeftCtrl),
-                ButtonKind::KeyboardKey(KeyboardKey::LeftShift),
-            ]
-            .into_iter()
-            .collect(),
+            buttons: [ctrl(), shift()].into_iter().collect(),
             axes: HashMap::new(),
         }),
         input: lmb(),
@@ -237,9 +235,7 @@ fn input_mapping_test() {
 
     let mut context = context.process(CombinedEvent {
         modifiers: Arc::new(Modifiers {
-            buttons: [ButtonKind::KeyboardKey(KeyboardKey::LeftShift)]
-                .into_iter()
-                .collect(),
+            buttons: [shift()].into_iter().collect(),
             axes: HashMap::new(),
         }),
         input: lmb(),

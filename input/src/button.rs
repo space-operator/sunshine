@@ -1,5 +1,6 @@
 use crate::{KeyboardKey, LongClickDuration, MouseButton, MultiClickDuration, TouchId};
 
+#[allow(variant_size_differences)]
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ButtonKind {
     KeyboardKey(KeyboardKey),

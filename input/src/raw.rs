@@ -1,10 +1,8 @@
-use serde::{Deserialize, Serialize};
-
 use crate::{KeyboardKey, MouseButton, MouseScrollDelta, TouchId};
 
 pub type EventCoords = (i32, i32);
 
-#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub enum RawInput<T> {
     KeyDown(KeyboardKey),
     KeyUp(KeyboardKey),

@@ -527,18 +527,20 @@ fn raw_input_to_input_test() {
     let context = RawSimpleContext { state: timed_state };
     let state = ModifiedState::new(context);
 
-    let state = state.with_context_event(RawInput::KeyDown(KeyboardKey::LeftCtrl), 10000);
-    let state = state.with_context_event(RawInput::KeyUp(KeyboardKey::LeftCtrl), 10500);
-    let state = state.with_context_event(RawInput::KeyDown(KeyboardKey::LeftCtrl), 11000);
-    let state = state.with_context_event(RawInput::KeyUp(KeyboardKey::LeftCtrl), 13000);
+    let ctrl = || KeyboardKey("LeftCtrl".to_owned());
 
-    let state = state.with_context_event(RawInput::KeyDown(KeyboardKey::LeftCtrl), 15000);
+    let state = state.with_context_event(RawInput::KeyDown(ctrl()), 10000);
+    let state = state.with_context_event(RawInput::KeyUp(ctrl()), 10500);
+    let state = state.with_context_event(RawInput::KeyDown(ctrl()), 11000);
+    let state = state.with_context_event(RawInput::KeyUp(ctrl()), 13000);
+
+    let state = state.with_context_event(RawInput::KeyDown(ctrl()), 15000);
     let state = state.with_context_event(RawInput::MouseDown(MouseButton::Primary), 15100);
     let state = state.with_context_event(RawInput::MouseUp(MouseButton::Primary), 15200);
     let state = state.with_context_event(RawInput::MouseDown(MouseButton::Primary), 15300);
     let state = state.with_context_event(RawInput::MouseUp(MouseButton::Primary), 15400);
 
-    let state = state.with_context_event(RawInput::KeyUp(KeyboardKey::LeftCtrl), 18000);
+    let state = state.with_context_event(RawInput::KeyUp(ctrl()), 18000);
 
     let _ = state;
 }

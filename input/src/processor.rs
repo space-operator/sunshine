@@ -248,18 +248,20 @@ fn test() {
         buttons: TimedStateButtons::default(),
     };
 
-    let (state, err) = state.with_event(RawInput::KeyDown(KeyboardKey::Space));
+    let space = || KeyboardKey("Space".to_owned());
+
+    let (state, err) = state.with_event(RawInput::KeyDown(space()));
     err.unwrap();
-    let (state, err) = state.with_event(RawInput::KeyUp(KeyboardKey::Space));
+    let (state, err) = state.with_event(RawInput::KeyUp(space()));
     err.unwrap();
-    let (state, err) = state.with_event(RawInput::KeyDown(KeyboardKey::Space));
+    let (state, err) = state.with_event(RawInput::KeyDown(space()));
     err.unwrap();
-    let (state, err) = state.with_event(RawInput::KeyUp(KeyboardKey::Space));
+    let (state, err) = state.with_event(RawInput::KeyUp(space()));
     err.unwrap();
 
     let _ = state;
 
-    let ev = RawInput::KeyDown(KeyboardKey::Space);
-    println!("{:?}", serde_json::to_string(&ev));
+    //let ev = RawInput::KeyDown(KeyboardKey::Space);
+    //println!("{:?}", serde_json::to_string(&ev));
     //panic!();
 }
