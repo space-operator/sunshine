@@ -99,12 +99,15 @@ pub use touch::*;
 
 
     TODOs
-        generic KeyboardKey (not only the string but <T>)
+        Generic KeyboardKey (not only the string but <T>)
+        Mapping sequential events like Adown Aup Bdown Bup
         MouseScroll X and Y
-        KeyboardKey::Other deserialization
-        Better test for processor
-        Add more keys
         ProcessorModifiedContext::result?
+        Better test for processor
+
+    Refactor
+        Replace: ev >> Context::process(impl in input) >> Context::emit(impl in app)
+            with: ev >> Context::process >> returns array with dynamic size
 
     Done
         Make TimestampMs genetic, just removed
