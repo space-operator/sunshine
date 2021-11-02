@@ -126,17 +126,19 @@ impl<T: ModifiedContext> ModifiedState<T> {
             MouseUp(button) => event.with_button_released(ButtonKind::MouseButton(button)),
             MouseMove(coords) => event
                 .with_axis_changed(Axis::new(AxisKind::MouseX, Some(coords.0)))
-                .with_axis_changed(Axis::new(AxisKind::MouseY, Some(coords.1))),
+                .with_axis_changed(Axis::new(AxisKind::MouseY, Some(coords.1)))
+                .with_trigger(TriggerKind::MouseMove),
             MouseWheelDown => event.with_trigger(TriggerKind::MouseWheelDown),
             MouseWheelUp => event.with_trigger(TriggerKind::MouseWheelUp),
             MouseScroll(delta) => event.with_trigger(TriggerKind::MouseScroll(delta)),
             TouchStart { touch_id, coords } => event
-                .with_button_pressed(ButtonKind::Touch(touch_id))
                 .with_axis_changed(Axis::new(AxisKind::TouchX(touch_id), Some(coords.0)))
-                .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), Some(coords.1))),
+                .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), Some(coords.1)))
+                .with_button_pressed(ButtonKind::Touch(touch_id)),
             TouchMove { touch_id, coords } => event
                 .with_axis_changed(Axis::new(AxisKind::TouchX(touch_id), Some(coords.0)))
-                .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), Some(coords.1))),
+                .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), Some(coords.1)))
+                .with_trigger(TriggerKind::TouchMove),
             TouchEnd { touch_id } => event
                 .with_axis_changed(Axis::new(AxisKind::TouchX(touch_id), None))
                 .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), None))

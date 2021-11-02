@@ -3,8 +3,9 @@ use thiserror::Error;
 
 use crate::{
     ButtonKind, CombinedEvent, CombinedInput, Duration, MappedContext, ModifiedContext,
-    ModifiedEvent, ModifiedState, Modifiers, ModifiersFilter, RawInput, TimedContext, TimedEvent,
-    TimedInputWithEventError, TimedInputWithTimeoutEventError, TimedState, TimedStateButtons,
+    ModifiedEvent, ModifiedState, Modifiers, ModifiersAxes, ModifiersFilter, RawInput,
+    TimedContext, TimedEvent, TimedInputWithEventError, TimedInputWithTimeoutEventError,
+    TimedState, TimedStateButtons,
 };
 
 pub trait ProcessorContext: Sized {
@@ -19,7 +20,7 @@ pub trait ProcessorContext: Sized {
         input: &CombinedInput<Self::CustomEvent>,
     ) -> Vec<(Self::MappedEvent, ModifiersFilter)>;
 
-    fn emit(self, ev: Self::MappedEvent) -> Self;
+    fn emit(self, ev: Self::MappedEvent, axes: ModifiersAxes) -> Self;
 }
 
 #[derive(Clone, Debug)]
@@ -184,8 +185,8 @@ impl<C: ProcessorContext> MappedContext for C {
         C::events(self, input)
     }
 
-    fn emit(self, ev: Self::MappedEvent) -> Self {
-        ProcessorContext::emit(self, ev)
+    fn emit(self, ev: Self::MappedEvent, axes: ModifiersAxes) -> Self {
+        ProcessorContext::emit(self, ev, axes)
     }
 }
 
@@ -236,8 +237,8 @@ fn test() {
             vec![("SpaceDblClick", ModifiersFilter::default())]
         }
 
-        fn emit(self, ev: Self::MappedEvent) -> Self {
-            dbg!(ev);
+        fn emit(self, ev: Self::MappedEvent, axes: ModifiersAxes) -> Self {
+            dbg!(ev, axes);
             self
         }
     }

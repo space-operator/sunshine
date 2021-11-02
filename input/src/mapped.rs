@@ -1,6 +1,6 @@
 use std::collections::HashSet;
 
-use crate::{CombinedEvent, CombinedInput, ModifiersFilter};
+use crate::{CombinedEvent, CombinedInput, ModifiersAxes, ModifiersFilter};
 
 pub trait MappedContext: Sized {
     type CustomEvent;
@@ -11,7 +11,7 @@ pub trait MappedContext: Sized {
         input: &CombinedInput<Self::CustomEvent>,
     ) -> Vec<(Self::MappedEvent, ModifiersFilter)>;
 
-    fn emit(self, ev: Self::MappedEvent) -> Self;
+    fn emit(self, ev: Self::MappedEvent, axes: ModifiersAxes) -> Self;
 
     fn process(mut self, ev: CombinedEvent<Self::CustomEvent>) -> Self {
         let mappings = self.events(&ev.input);
@@ -49,17 +49,7 @@ pub trait MappedContext: Sized {
 
         if modifier_button_sets.len() == 1 {
             for binding in mappings.into_iter().flatten() {
-                self = self.emit(binding.0.clone());
-                // DblLmbClick -> CreateNewNode
-                // MouseDown, MouseMove, MouseUp -> DragState(x, y), ...
-                //
-                // DblLmbClick -> CreateNewNode
-                // MouseDown ->
-                // CreateNewNode: Click Lmb 2x
-                // NodeDrag(): Lmb+ MouseMoveX(),Y()
-                // Character
-                // Axis -> Act(x)
-                // (Axis, Axis) -> Act((x, y))
+                self = self.emit(binding.0.clone(), ev.modifiers.axes.clone());
             }
         }
         self
@@ -114,7 +104,7 @@ fn input_mapping_test() {
     #[derive(Clone, Debug)]
     struct Context {
         mappings: HashSet<InputMapping>,
-        events: Vec<AppEvent>,
+        events: Vec<(AppEvent, ModifiersAxes)>,
     }
 
     let lmb = || {
@@ -183,8 +173,8 @@ fn input_mapping_test() {
                 .collect()
         }
 
-        fn emit(mut self, ev: Self::MappedEvent) -> Self {
-            self.events.push(ev);
+        fn emit(mut self, ev: Self::MappedEvent, axes: ModifiersAxes) -> Self {
+            self.events.push((ev, axes));
             self
         }
     }
