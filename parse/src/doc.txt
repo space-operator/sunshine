@@ -1,0 +1,427 @@
+trait Node {
+    fn parents(&self) -> Iter<'_, Arc<NodeRef>> // !
+    fn children(&self) -> Iter<'_, Arc<NodeRef>>
+    fn attrs(&self) -> Iter<'_, Ref<Attribute>> // ?
+}
+
+trait NodeRef {
+    fn node(&self) -> Arc<Node>
+    fn parent(&self) -> Arc<Node>
+    fn prev(&self) -> Option<Arc<NodeRef>> // ?
+    fn next(&self) -> Option<Arc<NodeRef>> // ?
+}
+
+trait NodeView {
+    fn node(&self) -> Arc<NodeRef>
+    fn view(&self) -> View
+}
+
+impl Node for PdfViewer {
+
+}
+
+NodeView
+    view
+NodeEditor
+    text
+        modified the Node
+
+
+![image,url:http://,width:800] -> ![image]
+asdqw
+
+node
+    hello
+    [logo] -> /logo
+    buy
+    [logo] -> /image,a,b,c 
+
+
+/node/hello
+/node/logo1 -> /logo
+/node/buy
+/node/logo2 -> /logo
+
+
+node>
+node>
+
+node>
+    node
+        node
+        node
+        node
+
+
+hello [logo], buy [logo]
+
+
+struct VisualNode {
+    node: Ref<Ref<Node>>
+
+}
+
+
+enum Node {
+    Container(Vec<Arc<Node>>)
+    Text(String),
+    Image(url),
+    Browser
+    Map
+    PdfViewer
+        title
+        pdf*
+    Widget // map, pdfviewer, browser
+}
+
+struct NodeRef(Arc<Node>)
+
+struct VisualNode {
+    node: Arc<NodeRef>,
+}
+
+
+Node::Container([
+    Node::Container([
+        Node::Text("BrowserNode")
+    ])
+    Node::Container([
+        Node::PDFViewer("School1")
+        Node::Container([
+
+        ])
+        Node::Container([
+            
+        ])
+    ])
+    Node::Container([
+        Node::Text("Maps")
+    ])
+    
+    BrowserNode
+    Containe(notes)
+    PDFs
+    
+    Container(
+        TextTitle(Locations)
+         5x Maps
+    )
+    Container(
+        Text(calculate commute)
+        get(home-location>Maps)> 5x times
+    )
+
+])
+
+
+
+[container]
+    textA
+    ref: [logo]
+    textB
+    ref: [logo]
+
+[logo]
+
+
+
+node
+    node
+
+
+Node: "text"
+Node:
+    Node: "text"
+    Node: image
+
+data
+
+node
+    node:Text
+
+
+
+Node with text "some text"
+
+Node
+    text: "some text"
+
+
+Node with text "**some text**"
+
+Node
+    style: bold
+    text: "some text"
+
+Node with text "**some text**" and text-title "title"
+
+Node
+    Title("title")
+    Paragraph
+        Text("text")
+
+    Paragraph
+        Text("text") Text("text") Text("text")
+    Text("text")
+
+    Image("http://wwsdfwadf")
+
+node
+    node:text between node distance
+    node:text
+    node:text
+
+
+node
+    custom
+    node1(text bold, not-bold)-nestednode-image3|box boundary
+    node4.
+
+Node:109374019hroisajf98qheiufhbw08fuh2084f
+    Node:En: qwd12e1wdqwsda
+
+view node1 -> data node
+view node2 -> data node
+
+data node -> view node1, view node2
+
+spacing
+    group
+        text
+        text
+    group
+        text
+
+<span style="style1">text</span>
+<span style="style2">text</span>
+<span style="style3">text</span>
+
+<b> text <i> text </i> </i>
+
+
+http://google.ru
+    type more text
+    widgets
+http://google.com
+    type more text
+
+    Span
+        Text (+style)
+        InlineCode
+        Code
+        Link :text
+            Text* (+style)
+            InlineCode*
+            Widget*
+        Image :name
+            Text*
+            Link
+        Widget
+        Attribute
+
+
+
+
+Edge case:
+
+1. select text in sentence, click-drag to empty canvas area
+        converts selected text into a node
+        and adds an edge to newly created node on canvas
+        text focus transferred to new node so user can keep typing
+        (can be done with shortcut as well, maybe ctrl + > after a word or selection, when you are done
+        type another shortcut, and return to previous node spot)
+
+2. five nodes with attributes
+    connect them to new node
+    as user types in the new node, he can link to the attributes as reference or value
+    by typing the budget is /node1/budget
+
+
+  sentence
+node1  node2
+this was a sentence
+
+ 
+
+textspan :# heading
+   
+    textspan  emojispan ![thumbsup]
+
+## heading
+text
+
+
+$company_name$
+Our company ......
+
+![Image][company_logo]
+
+
+![company_logo]: http://url/b.jpg
+![thumbsup]: http://url/b.jpg
+$company_name$: Best Compnay in the world
+
+
+Paragraph
+    Text abc
+    Text bcd
+    Paragraph
+        Text 123
+        Text 234
+    Text cdf
+
+node is 100 pixel wide
+text abc. text bcd.
+widget:linebreak
+textspan:style, dfg
+
+<br/>
+
+aa asd
+
+ab
+
+Node: attr.inline
+
+span div
+
+display: inline
+display: inline-block
+
+<span>
+    <span>abc</span>
+    <span>bcd</span>
+    <div>
+        <span>123</span>
+        <span>234</span>
+    </div>
+    <span>abc</span>
+    <span>bcd</span>
+</span>
+
+abc bcd 123 abc bcd a |
+        234           |
+asd asd
+
+[andrey@qweqweqljhfakldjfhlaksjdf.ru:FirstName]
+
+note to Andrei 
+
+user: andrey@qweqweqljhfakldjfhlaksjdf.ru
+    Firstname: Andey
+    Lastname
+
+UniquePerson
+    Firstname
+    Lastname
+
+
+123 234 {
+    aaa
+    bbb
+} 345 546 
+
+123
+234
+
+cdf
+
+Node
+    Paragraph*
+        Span*
+    Heading*
+        Span*
+
+    Span
+        Text (+style)
+        InlineCode
+        Code
+        Link :text
+            Text* (+style)
+            InlineCode*
+            Widget*
+        Image :name
+            Text*
+            Link
+        Widget
+        Attribute
+
+abc | <b>                </b>
+         bcd | <i>   </i>
+                  cdf
+
+
+Node
+    This is readlly *great* node. I like it. ![great_node](http:://)
+    ---------------|-------|-----|-----------|--------------------==
+
+
+
+I like you **your** idea! [:thumbsup] Let's implement thi
+
+[:thumbsup]
+    children
+
+Node
+    all images  
+        [Image]
+
+Node
+    Paragraph, InlineImage
+
+    (build:passed)
+    (version:1.0)
+
+
+Node
+    link to smile photo
+
+
+== qweqwe
+
+teasdaxt...text asda sd 
+== heading
+:prop= value
+Prop: 
+
+Node
+    Node
+    Node
+
+Node
+    child node: Span
+    keep typing within
+
+    
+
+
+
+
+
+
+
+
+[![Foo](http://www.google.com.au/images/nav_logo7.png)](http://google.com.au/)
+
+[Link](http://a.com) - URL 
+
+[Link](Node/Paragraph/Span) - sub node
+
+!inline!(Node/Paragraph/Span) - change this text, in
+
+
+
+
+    abc<b>bcd<i>cdf</i></b>
+    abc
+    bcd +bold
+    cdf +bold+italic
+
+    Text abc
+    Bold
+        Text bcd
+        Italic
+            Text cdf
+
+        parent node
+            child: TextSpan(bold,italic text value), TextSpan(italic), InlineWidge(MapWidget())
