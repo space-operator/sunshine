@@ -1,24 +1,462 @@
-trait Node {
-    fn parents(&self) -> Iter<'_, Arc<NodeRef>> // !
-    fn children(&self) -> Iter<'_, Arc<NodeRef>>
-    fn attrs(&self) -> Iter<'_, Ref<Attribute>> // ?
+1. Tabs for visualnode+datanode (+layoutnode)
+    Schools
+    >>>>
+2. Every line is layoutnode
+    Schools
+    >>>>line1
+    >>>>line2
+    >>>>
+3. escaping \\ -> \, \[ -> [
+4. [link]           // link
+   [link](http://google.com)
+5. ![image]         // image
+   ![image]
+6. .attr=value
+   .attr="value with spaces and \"quoting escaping"
+7. +[link]          // embed
+8. @[widget-data]   // widget
+9. **bold**
+10. *italics*
+11. ~~italics~~
+12. 1.      // changes the attributes like .numbered
+    2.
+    3.
+13. -       // changes the attributes like .ordered
+    -
+    -
+14. *       // changes the attributes like .ordered
+    *
+    *
+
+{
+    type: text
+    name: "School $2000",
+    children: [
+        [
+            {
+                type: image,
+                text: "foo",
+            }
+            {
+                type: text,
+                text: "bar",
+                style: bold
+            }
+            {
+                type: widget,
+                ...attrs
+            }
+            {
+                type: link,
+                ...attrs
+            }
+        ]
+        [
+            {
+                type: widget,
+                ...attrs
+            }
+        ]
+    ],
+    attributes: {
+        ordered: true,
+    }
 }
 
-trait NodeRef {
-    fn node(&self) -> Arc<Node>
-    fn parent(&self) -> Arc<Node>
-    fn prev(&self) -> Option<Arc<NodeRef>> // ?
-    fn next(&self) -> Option<Arc<NodeRef>> // ?
+    layout node >         data
+        visual node School    >  data
+            layout node >       data
+                visual node
+
+#$%^&*
+
+
+!@#$%^&*-+[]
+
++[Documentation]
+    
+    
+
+
+Reference to node
+[[node1]] replaces text with a hyperlink node1
+
+Reference to node, travel to find
+[[node1/.../node2]] replaces text with a hyperlink node2
+
+Embed a node
+{{[[embed]]: ((node id to embed))}} //fix syntax
+
+Add attributes to a node
+property_name::
+
+
+1. tabs for subnodes
+2. escaping \\ -> \, \[ -> [
+3. \\[link]
+4. ![image](qwe)
+5. .attr=...  
+
+
+3. autodetect 1., a.
+
+John High School
+    [
+        [
+
+        ]
+    ]
+
+
+John High School
+    asdflkj  sdlkjf  sdflk
+
+Andrei Gymnasium
+Andrei Gymnasium
+Andrei Gymnasium
+
+Andrei Gymnasium Andrei Gymnasium Andrei Gymnasium
+
+node
+    layoutnode*
+        node*
+        attr*
+        etc.
+
+Andrei Gymnasium
+    asdflkj ctrl enter
+    sdlkjf ctrl enter
+    sdflk enter
+    .cost=1230
+    enter
+    sdflk enter
+    
+    
+
+John High School
+    - asdflkj 
+        - sdlkjf 
+                 .cost=1231
+    - sdflk
+
+
+avg cost
+
+
+Schools
+    French Lycee
+        .university_educational_cost=1231
+        Director
+            House
+                .cost=1231
+
+
+/
+====
+Universities
+Schools --------------------->  French Lycee
+                                John High School
+                                Andrei Gymnasium
+
+====
+
+
+====
+Schools     visualnode, layoutnode, datanode
+    1. French Lycee
+        cost::2200
+    2. John High School    
+    3. [[Andrei Gymnasium]]
+    4. q
+
+====
+
+
+
+Andrei Gymnasium
+
+French Lyceen --cost--> price
+price --value-->    2200
+price --currency->  $
+
+Schools
+    /calc_avg/cost: 
+    1. French Lycee
+        cost:: $2200   
+        [[curriculum_pdf]]
+        276 Moliere Ave
+    2. John High School
+        cost::2500
+        close to us at 120 JFK Street, would only be a 2m drive. ![image2]   // virtuaNode/[TextSpan, Image]
+        ![image_1](http://...), add some notes on the same line
+
+    3. Andrei Gymnasium
+
+
+Node
+    Node::TextSpan{text:Schools}
+        Node::ListOrderedNode::TextSpan{text:French Lycee}
+            Node::Attribute{cost:2200, unit:$}
+            Node::PdfViewer{url: file/http}
+        >>>> Node::TextSpan{text:276 Moliere Ave}
+        Node::ListOrderedNode::TextSpan{text:John High School}
+            virtualnode
+                TextSpan
+                Image
+
+/Schools/2..../ flatten autocomplete  three lines, select one them, select image2
+
+
+![logo](http://bestlogos.com/logo.png)
+![logo](http://bestlogos.com/logo.png)
+
+276 Moliere Ave
+
+address::276 Moliere Ave
+
+
+address::276 Mo... tab select it
+
+
+
+
+[[Schools/1. French Lycee/276 Moliere Ave]] -> 276 Moliere Ave
+
+/Map
+
+
+
+
+{
+    "/school": {
+        name: "/school/text",
+        list: [
+            "/school/list/fl"
+        ]
+    }
+    "/school": {
+        type: "text",
+        data: "Schools",
+    }
 }
 
-trait NodeView {
-    fn node(&self) -> Arc<NodeRef>
-    fn view(&self) -> View
+
+
+
+
+
+
+
+
+
+
+Rust documentation
+[[link]] ![[image]]
+
+
+
+    
+
+
+{
+    "..."
+    children: [
+        {
+            type:"text",
+            data:" foo",
+        }
+    ]   
 }
 
-impl Node for PdfViewer {
 
-}
+
+
+
+
+
+
+
+Node
+    type
+    data
+Edge
+    source
+    target
+    relationship
+
+
+
+Footer -> TermsOfUsage, CookiePolicy, Else
+
+
+parent -> {foo, bar, bazz}
+
+footer -> logo
+footer -> logo800x600 -> logo
+
+
+footer -> footerreferences -> logo
+
+
+VisualNodeAvisual
+ child 
+    virtualnode[node1, node2, node3]  link
+
+datanode
+    VisualNodeA -data, expired> dataNodeA
+
+dataNodeA -> dataNodeA v2 >         dataNodeA v3    
+  ------------latestversion-------------->
+
+no version cotrol prev/next bak
+no  nodes /datanode
+edge with type /datachild
+
+  +---\
+ /     +--\
++     /    +
+     /
+    +
+
+O -kind> N
+O -> kind1 -> N
+A -> kind2 -> B
+C -> kind3 -> D
+
+
+
+
+
+dataNodeA
+    VisualNodeA
+    VisualNodeB
+    VisualNodeG
+
+
+node2   
+    /parent -> virtualnode
+    /neighbours
+    nodeA
+    node1
+    node3
+
+
+
+p -> (n - p -> (n - n))
+
+
+![logo]
+![logo with size 800x600]
+
+
+Footer
+    # subnode
+    just a text ![logo](http://bestlogos.com/logo.png) $[pdf](http://bestpdfs) i dont know
+    i dont know
+
+    ...
+
+    #anothernode
+    i dont know ![logo](http://bestlogos.com/logo.png)
+
+    ![logo](http://bestlogos.com/logo.png) ![logo](http://bestlogos.com/logo.png)
+
+
+Footer
+    ![logo](http://bestlogos.com/logo.png)
+
+Footer
+    ![logo](http://bestlogos.com/logo.png) ![logo](http://bestlogos.com/logo.png)
+
+footer node
+
+Footer
+    1.virtual node[text,dsafasfas, asdf]
+    2.
+    3.qn
+    
+
+node
+    start typing
+    add more text
+    
+
+Footer -> ??? -> "just a text"
+Footer -> ??? -> ![logo](http://bestlogos.com/logo.png)
+Footer -> ??? -> $[pdf](http://bestpdfs)
+Footer -> ??? -> i dont know
+
+graph
+
+indradb createnode, edge,
+save on rocksdatabase
+
+Dgraph
+
+
+
+
+Database
+    WebSite
+        Footer
+            TermOfUsage
+    Documents
+        PdfViewer
+            TermOfUsage
+
+    -------------------------------------------All nodes---------------------------------
+    ----------------------------Database-------------------------------     -TermOfUsage-
+    ------------WebSite-----------    -----------Documents-----
+    ------Footer------    .........    ------PdfViewer-----
+    -TermOfUsage-          ..   ...     -TermOfUsage-  ...
+
+
+
+    -------Document---------
+    text [http://a.com] text2 [http://a.com]
+
+    fotyij asdfjaopdf dsfopijaopdf asdofijaoi
+
+
+    
+     (link?) text3
+
+     see http://a.com for details A.
+     see http://b.com for details B.  // change for every occurence or just this one
+    
+    -------Document---------
+    ability to reference
+    text [reference: textA] text2 [reference:textB]
+
+    ability to edit reference content
+    text [mut ref: textA, changes: this is new text] text2 [reference:textB]                 textA this is new text
+
+    ability to copy reference content
+    text [reference: textA] text2 textB
+
+
+    [[http://a.com] #ref for community edition users]
+
+
+    // edit original textA 
+    // make a copy
+    // make an alias
+
+
+
+
+Document.push([logo])
+Document.push([logo])
+
+[logo]
+
+
+
+VisualNode => (Footer, TermOfUsage with index)
+
+
+
+
 
 NodeView
     view
