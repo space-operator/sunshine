@@ -1,3 +1,117 @@
+Schools
+    Looking to find shool less than .cost: 4200
+    .total= avg().cost
+    London School
+        Location: London
+        Rating: 5 [link]
+    New-York School
+        Location: New-York
+        Rating: 6
+    Tokio School
+        Location: Tokio
+        Rating: 7
+        .cost:3500
+    London School
+        Location: London
+        Rating: 1
+        .cost:2200
+
+
+Text with newline / ctrl enter
+    London School
+        text text text text text text text text.
+        text text text text.
+        text text text text text text text text.
+        text text text text text text text text text text text text.
+        text text text text text text text text.
+
+School (enter)
+    text text text (ctrl+enter)
+    text text (enter)
+    text text text text (enter)
+
+Vec<String>
+
+"text text text\n    text text"
+
+
+block
+    inlines
+        text: Schools
+    blocks
+        block
+            inlines
+                text: London School
+            blocks
+                block
+                    inlines
+                        text: Location: London
+                block
+                    inlines
+                        text: Rating: 5
+                        link: [link]
+        block
+            inlines
+                text: New-York School
+...
+
+
+
+
+each input line create block with inlines
+tabbed input moved to parent block blocks (as a block)
+
+
+struct Block {
+    inlines: Vec<Arc<Inline>>,
+    blocks: Vec<Arc<Block>>,
+}
+
+enum Inline {
+    Text(Text),
+    Link {
+        title: Text,
+        address: String,
+    },
+    Image {
+        title: String,
+        address: String,
+    }
+    Attribute {
+        name: String,
+        value: String,
+    }
+    Widget
+}
+
+struct Text {
+    value: String,
+    style: Style,
+}
+
+
+blocks:
+    block*
+
+block: (struct)
+    inlines
+    blocks
+
+inlines:
+    inline*
+
+inline: (enum)
+    text
+    link
+    widget
+    image
+
+
+
+
+
+
+Syntax
 1. Tabs for visualnode+datanode (+layoutnode)
     Schools
     >>>>
@@ -9,10 +123,16 @@
 3. escaping \\ -> \, \[ -> [
 4. [link]           // link
    [link](http://google.com)
+4b. follow-through link ]]   //creates link, opens node on side, type on new node, [[ to return
 5. ![image]         // image
    ![image]
 6. .attr=value
    .attr="value with spaces and \"quoting escaping"
+   ./path/attr= fetch attribute
+   avg .cost/all/specify parent/etc:
+    different parents
+        .cost Schools
+        .cost London
 7. +[link]          // embed
 8. @[widget-data]   // widget
 9. **bold**
@@ -27,6 +147,265 @@
 14. *       // changes the attributes like .ordered
     *
     *
+15. copy paste
+
+
+
+
+
+
+
+
+block
+    block
+        block
+            text
+            text
+        text
+
+Schools
+    anth else
+        aqwe fjkdlfas 
+            text
+            [anth else]
+    [Schools]
+
+
+@![map/of/smth]
+
+block Schools
+    block London School
+        bloc Location: London
+
+Schools
+    London School
+    New-York School
+    Tokio School
+    London School
+
+1.
+    1.1.
+        1.1.1.
+        1.1.2.
+    1.2.
+        1.2.1.
+
+
+block (id:schools, title:Schools)                  
+                                                        
+    block (id:London School, title:London School)
+        text (text:London School)
+    block
+    block
+    block
+
+London School
+    Location: London
+    Map
+
+
+(uid: map)
+
+
+
+// create block and start typing
+block
+    text:Schools
+    block
+        text: Location: London
+        block
+            text: Rating: 5
+            link: [link]
+
+
+text and @[/widget]
+    some data
+    some data
+
+@[/widget]
+
+
+block
+    inlines
+        inline: text: text and
+        inline: widget: @[/widget]
+    blocks
+        block
+
+
+block
+    block
+        inline(text: text and )
+        inline(widget: @[/widget])
+        block
+            inline(text:some data)
+        block
+            inline(text:some data)
+        
+block
+    block
+        inlines
+            text: text and 
+            widget: @[/widget]
+        blocks
+            block
+                inlines
+                    text:some data
+                inlines
+                    text:some data
+
+        
+    
+
+widget
+    text
+    link
+
+// create block and type command to create specific widget          
+block
+    text: Map of London
+    widget  @[/map]
+
+
+
+
+Schools
+    
+    
+
+
+Schools
+
+
+[London School]
+[London School]
+
+
+
+block
+    block @[map]
+        block qwe
+
+
+
+
+
+
+██████████████████████████████████████████
+█                                        █
+█   Schools                              █
+█  ████████████████████████████████████  █
+█  █                                  █  █
+█  █  ███████████████████████████     █  █
+█  █  █                         █     █  █
+█  █  █   London School         █     █  █
+█  █  █  █████████████████████  █     █  █
+█  █  █  █  Location: London █  █     █  █
+█  █  █  █      Rating: 5    █  █     █  █
+█  █  █  █████████████████████  █     █  █
+█  █  █                         █     █  █
+█  █  ███████████████████████████     █  █
+█  █                                  █  █
+█  █  ███████████████████████████     █  █
+█  █  █                         █     █  █
+█  █  █   New-York School       █     █  █
+█  █  █  █████████████████████  █     █  █
+█  █  █  █  Location: New... █  █     █  █
+█  █  █  █      Rating: 6    █  █     █  █
+█  █  █  █████████████████████  █     █  █
+█  █  █                         █     █  █
+█  █  ███████████████████████████     █  █
+
+
+
+
+
+block                 inline(Schools)
+    block              
+        block           inline(map)
+        block           inline(text:)
+    block
+
+block
+    inline[]
+
+    
+    
+
+Div
+Span
+
+
+LayoutNode > area that can contain visual node, only position, relationship
+    VisualNode > 
+
+
+Schools: VisualNode
+    type some [link](http://google.com) /MapWidget qwe
+
+Schools: VisualNode
+    LayoutNode
+        type some [link](http://google.com) qwe
+    LayoutNode
+        type
+
+display: block
+display: inline 
+
+
+LayoutNode : rectangle, circle, 
+    LayoutNode    
+        LayoutNode
+
+layoutnode(inline)
+    visualnode, visualnode, visualnode
+
+layoutnode(orderedlist)
+    1.visualnode
+    2.visualnode
+    3.visualnode
+
+layoutnode(canvasstyle)
+
+
+
+        
+
+container:LayoutNode
+
+text:VisualNode
+link:VisualNode
+widget:VisualNode
+
+VisualNode
+    type some [link](http://google.com) /MapWidget qwe
+
+
+LayoutNode
+    visualNode(type:textspan, content:Schools)
+        LayoutNod
+            VisualNode
+                type some [link](http://google.com) qwe
+            VisualNode
+                type
+
+
+
+Schools: VisualNode + paragrath|span|relative children
+    LayoutNode: type some [link](http://google.com) /MapWidget qwe
+        layout: asdasd
+            layoutnode: 10 visual nodes
+
+Schools: VisualNode + div|absolte children
+    VisualNode+paragrath|span|relative children
+        type some [link](http://google.com) qwe
+    VisualNode+paragrath|span|relative children
+        type
+
+
+
+
+
 
 {
     type: text
