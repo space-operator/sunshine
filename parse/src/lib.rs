@@ -1,5 +1,8 @@
 use core::borrow::Borrow;
 use core::ops::Range;
+use std::collections::BTreeMap;
+use std::sync::Arc;
+
 use nom::combinator::peek;
 use nom::error::Error as NomError;
 use nom::{
@@ -13,6 +16,287 @@ use nom::{
     sequence::{delimited, pair, preceded, separated_pair, terminated},
     Err as NomErr, IResult,
 };
+use regex::Regex;
+
+#[derive(Clone, Debug, Default)]
+pub struct Block {
+    spans: Vec<Span>,
+    blocks: Vec<Block>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Span(String);
+
+/*#[derive(Clone, Debug)]
+pub enum Span {
+    Text(Text),
+    Link { title: Text, address: String },
+    Image { title: String, address: String },
+    Attribute { name: String, value: String },
+    Widget,
+}*/
+
+#[derive(Clone, Debug)]
+pub enum Style {
+    Default,
+    Bold,
+    SuperBold,
+}
+
+#[derive(Clone, Debug)]
+pub struct Text {
+    value: String,
+    style: Style,
+}
+
+#[derive(Clone, Debug, Default)]
+pub struct Parser {
+    nestings: BTreeMap<String, ParserNestingLevel>,
+}
+
+#[derive(Clone, Debug)]
+pub struct ParserNestingLevel {
+    blocks: Vec<Block>,
+    spans: Vec<Span>,
+}
+
+/*#[test]
+fn test() {
+    let regex = Regex::new("^[ \t]*").unwrap();
+    println!("{:?}", regex.find("   aaa"));
+    panic!();
+}*/
+
+impl Parser {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn into_blocks(self) -> Vec<Block> {
+        self.nestings
+            .into_iter()
+            .rev()
+            .fold(vec![], |children, (_, nesting)| {
+                let mut blocks = nesting.blocks;
+                blocks.push(Block {
+                    spans: nesting.spans,
+                    blocks: children,
+                });
+                blocks
+            })
+    }
+
+    fn parse_spans(span: String) -> Vec<Span> {
+        /*vec![Span::Text(Text {
+            value: span,
+            style: Style::Default,
+        })]*/
+        vec![Span(span)]
+    }
+
+    pub fn with(self, line: String) -> Self {
+        let mut nestings = self.nestings;
+        let regex = Regex::new("^[ \t]*").unwrap();
+        let prefix_len = regex.find(&line).unwrap().end();
+        if prefix_len == line.len() {
+            return Self { nestings };
+        }
+        let prefix = line[..prefix_len].to_owned();
+        let span = line[prefix_len..].to_owned();
+        let rest = nestings.split_off(&prefix);
+        if rest.is_empty() {
+            let prev = nestings.range(..prefix.clone()).rev().next();
+
+            match prev {
+                Some(prev) => {
+                    if prefix.starts_with(prev.0) {
+                        let mut nestings = nestings;
+                        nestings.insert(
+                            prefix,
+                            ParserNestingLevel {
+                                blocks: Vec::new(),
+                                spans: Self::parse_spans(span),
+                            },
+                        );
+                        Self { nestings }
+                    } else {
+                        panic!("invalid indentation");
+                    }
+                }
+                None => {
+                    if nestings.is_empty() {
+                        Self {
+                            nestings: [(
+                                prefix,
+                                ParserNestingLevel {
+                                    blocks: Vec::new(),
+                                    spans: Self::parse_spans(span),
+                                },
+                            )]
+                            .into_iter()
+                            .collect(),
+                        }
+                    } else {
+                        panic!("invalid indentation");
+                    }
+                }
+            }
+        } else {
+            let blocks = Parser { nestings: rest }.into_blocks();
+
+            nestings.insert(
+                prefix,
+                ParserNestingLevel {
+                    blocks,
+                    spans: Self::parse_spans(span),
+                },
+            );
+            Self { nestings }
+        }
+    }
+}
+
+#[test]
+fn test() {
+    let lines = r#"
+    A
+            B
+        C
+    "#;
+    // should panic
+    let lines = r#"
+        A
+    B
+    "#;
+    /* let lines = r#"
+    A
+    B
+      C
+      D
+    E
+        F
+        G
+            H
+            I
+    J
+            K
+                                    L
+                                    M
+    N
+    "#;*/
+    let lines = lines.split("\n").map(ToOwned::to_owned);
+    let mut parser = Parser::new();
+    for line in lines {
+        parser = parser.with(line);
+    }
+    println!("{:#?}", parser.into_blocks());
+    panic!();
+}
+
+/*
+
+A
+    B
+      C
+         D
+    E
+*/
+
+/*
+A
+    B
+      C
+      D
+    E
+        F           nesting.blocks
+        G           nesting.spans
+            H       prev_blocks
+            J       ...
+    Y
+
+
+4   Schools         4 spans
+8       SchoolA     8 blocks[0]
+8       SchoolB     8 blocks[1]
+8       SchoolC     8 blocks[2]
+8       SchoolD     8 spans
+4   Uni...v
+
+{
+    0: [] / A
+    4: [ (B: (C:), (D:)) ] / E
+    8: [ (F:) ] / G
+    12: [ (H:) ] / J
+}
+
+    12: [ (H:), (J:) ]
+    8: [ (F:) (G: (H:), (J:)) ]
+    4: [ (B: (C:), (D:)), (E: (F:), (G: (H:), (J:))) ]
+
+
+
+
+
+
+"": [], A
+"    ": [B(C, D)], E
+"        ": [F], G
+"            ": H
+"        ": [F, G(H)]
+"    ": [B(C, D), E([F, G(H)])
+
+
+Schools
+    Looking to find shool less than .cost: 4200
+    .total= avg().cost
+    London School
+        Location: London
+        Rating: 5 [link]
+    New-York School
+        Location: New-York
+        Rating: 6
+    Tokio School
+        Location: Tokio
+        Rating: 7
+        .cost:3500
+    London School
+        Location: London
+        Rating: 1
+        .cost:2200
+
+
+Schools
+    Abc
+==== convert tab to spaces
+Schools
+ Abc
+ dfg
+    qwe
+
+Schools2
+   A
+   B
+
+
+====
+Schools
+      Abc
+====
+Schools
+\t\t\t\tAbc
+====
+        Schools
+            Abc
+==== Invalid case
+Root
+       Schools
+    Abc
+        Schools
+    Abc
+        Schools
+*/
+
+/*
 
 #[derive(Clone, Debug)]
 struct Markdown<T> {
@@ -192,7 +476,7 @@ _Italic_
 
 __Bold__
 
-# Heading 1 
+# Heading 1
 
 Heading 1
 =========
@@ -368,3 +652,4 @@ id:
 //     unknown_command // not found or typo
 //     exit_app //app exited
 // }
+*/
