@@ -1,13 +1,180 @@
-use pulldown_cmark::{Options, Parser};
+use crate::BlockId;
 
 #[derive(Clone, Debug)]
-pub struct Span(String);
+pub enum Span<'a> {
+    Link(BlockId<'a>),
+    Url(Url<'a>),
+    Text(&'a str),
+}
 
+#[derive(Clone, Debug)]
+pub struct Url<'a> {
+    name: &'a str,
+    url: &'a str,
+}
+
+#[derive(Clone, Debug)]
+pub struct SpanParser<'a> {
+    spans: Vec<Span<'a>>,
+    state: State,
+}
+
+#[derive(Clone, Copy, Debug)]
+enum State {
+    Text(usize),
+    LinkOrUrl(usize),
+    TextOrUrl(usize),
+    Url(usize, usize),
+}
+
+impl<'a> SpanParser<'a> {
+    pub fn parse(text: &'a str) -> Vec<Span<'a>> {
+        let mut parser = Self::new();
+        for (offset, ch) in text.bytes().enumerate() {
+            parser = parser.with(text, offset, ch);
+        }
+        let len = text.len();
+        match parser.state {
+            State::Text(offset) => {
+                if offset == text.len() {
+                    parser.spans
+                } else {
+                    parser.spans.with(Span::Text(&text[offset..len]))
+                }
+            }
+            State::LinkOrUrl(offset) => parser.spans.with(Span::Text(&text[offset - 1..len])),
+            State::TextOrUrl(offset) => parser.spans,
+            State::Url(title_start, url_start) => {
+                parser.spans.with(Span::Text(&text[title_start - 1..len]))
+            }
+        }
+    }
+
+    fn new() -> Self {
+        Self {
+            spans: vec![],
+            state: State::Text(0),
+        }
+    }
+
+    fn with(self, text: &'a str, offset: usize, ch: u8) -> Self {
+        use self::Url as SpanUrl;
+        use State::*;
+
+        let spans = self.spans;
+        let state = self.state;
+        let (spans, state) = match state {
+            Text(start) => match ch {
+                b'[' => (
+                    spans.with(Span::Text(&text[start..offset])),
+                    LinkOrUrl(offset + 1),
+                ),
+                _ => (spans, Text(start)),
+            },
+            LinkOrUrl(start) => match ch {
+                b'[' => panic!(),
+                b']' => (spans, TextOrUrl(start)),
+                _ => (spans, LinkOrUrl(start)),
+            },
+            TextOrUrl(start) => match ch {
+                b'(' => (spans, Url(start, offset + 1)),
+                _ => (
+                    spans.with(Span::Link(BlockId(&text[start..offset - 1]))),
+                    Text(offset),
+                ),
+            },
+            Url(title_start, url_start) => match ch {
+                b')' => (
+                    spans.with(Span::Url(SpanUrl {
+                        name: &text[title_start..url_start - 2],
+                        url: &text[url_start..offset],
+                    })),
+                    Text(offset + 1),
+                ),
+                _ => (spans, Url(title_start, url_start)),
+            },
+        };
+        Self { spans, state }
+    }
+}
+
+trait VecWith<T> {
+    fn with(self, value: T) -> Self;
+}
+
+impl<T> VecWith<T> for Vec<T> {
+    fn with(mut self, value: T) -> Self {
+        self.push(value);
+        self
+    }
+}
+
+#[test]
+fn test() {
+    let text = "abc [link] def [href](http://website.com) qwe [123";
+    let result = SpanParser::parse(text);
+    dbg!(result);
+}
+
+/*
+#[test]
+fn test() {
+    let text = "*asd*";
+    let parser = Parser::new_ext(text, Options::all());
+    let events: Vec<_> = parser.collect();
+    for event in events {
+        println!("{:?}", event);
+    }
+    panic!();
+}
+*/
 /*
 syntax
 */
 
 /*
+
+Good:
+    [internal block]
+    [title](https://www.example.com)
+    **bold**
+    *italics*
+
+
+Root
+    //Schools
+    //    [1829-1234] asdasdasdasdqwdasdqwdasdq]
+    Schools
+        [Schools] asdasdasdasdqwdas qweasdqwe qweqweqqweasd
+    Hello
+        [1232-2341] asdasdasdasdqqqq
+
+Root
+    //Schools
+    //    [Root] asdasdasdasdqwdasdqwdasdq]
+    Schools
+        [Schools(!)] asdasdasddqwdas qweasdqwe
+    Hello
+        [Schools] asdasdasdasdqwdas qweasdqwe
+
+Added "a" on 15
+Removed "123" on 1234
+
+
+[\[\[qdasdqwe\]\]] -> [[[qdasdqwe]]]
+
+
+[abc[dfg[hj]]]
+[abc[dfg[hj]
+[abc[dfg[hj]]]
+
+
+[link_id]
+[link_id][link_id][link_id][link_id][link_    id]
+[link name] long long very
+
+
+
 PasteOrType convert [link name] into [link_id]
     or maybe create if [link name] not exist
     or do nothing if multiple matches
@@ -20,7 +187,7 @@ Good:
     [title](https://www.example.com)
     **bold**
     *italics*
-    
+
 We can do it better:
     +bold text -bold
     +16pts text -16pts
@@ -55,7 +222,7 @@ SpanParser [1231] -> ...visual form...
 [internal block link name]
 [block_uid]
 
-[Schools][Schools][SchoolsA] 
+[Schools][Schools][SchoolsA]
 [Schools][Schools][graphid-asdq-123s-f24f-w24d:] Schools
 
 [Schools                |
@@ -104,7 +271,7 @@ Schools
 
 preview
     [[asdas]] sdasdq qwasd qweasd
-    
+
 
 
 
@@ -113,14 +280,14 @@ preview
     visually [B]
     on delete visible [B
 
-    
+
  edit
 
     [Schools/A/B/A/B]
     visually [123123123]
     on delete visible [123123123
 
-    
+
     [123123123]
 
     [Schools/A/B/A/B]
@@ -134,7 +301,6 @@ preview
 
 
 */
-
 
 //#[derive(Clone, Debug)]
 //pub struct SpanParser {
@@ -161,7 +327,7 @@ November 10, 2021
 
   https://github.com/athensresearch/athens
   https://github.com/athensresearch/athens/blob/main/src/cljc/athens/parser/impl.cljc
-  
+
 
     [title: ttps://www.example.com]
 
@@ -182,7 +348,7 @@ November 10, 2021
     [title](https://www.example.com)
 
 
-     	[title](https://www.example.com)
+         [title](https://www.example.com)
     [Schools/.../.../]
         SchoolsA
 
@@ -203,14 +369,14 @@ November 10, 2021
     +u underline -u
 
     [123]qwe[123]
-    
+
     underline text underline -
 
     test (+styleA)text(-) qwe
 
     text
 
-   
+
 */
 
 /*
@@ -235,26 +401,8 @@ asdf @[]
 
 */
 
-
-Paragrath
-    Text
-    Image
-    Wdiged
-Paragrath
-    Text
-    Image
-    Wdiged
-Paragrath
-    Text
-    Image
-    Wdiged
-Paragrath
-    Text
-    Image
-    Wdiged
-
 /*pub enum Span {
-        
+
 
     Text(Markdown, Style:Heading),
     Link { title: Text, address: String },
@@ -262,26 +410,6 @@ Paragrath
     Attribute { name: String, value: String },
     Widget,
 }*/
-
-//#[derive(Clone, Debug)]
-pub struct SpanParser;
-
-impl SpanParser {
-    pub fn parse(value: &str) -> Vec<Span> {
-        vec![Span(value.to_owned())]
-    }
-}
-
-#[test]
-fn test() {
-    let text = "*asd*";
-    let parser = Parser::new_ext(text, Options::all());
-    let events: Vec<_> = parser.collect();
-    for event in events {
-        println!("{:?}", event);
-    }
-    panic!();
-}
 
 /*
 #[derive(Clone, Copy, Debug)]

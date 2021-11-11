@@ -1,10 +1,30 @@
 mod block;
+//mod history;
+//mod resolver;
 mod span;
 mod text;
 
 pub use block::*;
+//pub use history::*;
+//pub use resolver::*;
 pub use span::*;
 pub use text::*;
+
+/*
+
+paste:
+    current_block_id
+    text_before
+    text_after
+    pasted_text
+
+TODO:
+    db interaction
+    change db using text for input
+    change db using test for paste
+    change db using text for input, parse and input
+
+*/
 
 /*#[derive(Clone, Debug)]
 pub enum Span {

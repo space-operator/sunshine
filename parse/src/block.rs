@@ -2,11 +2,12 @@ use std::collections::BTreeMap;
 
 use regex::Regex;
 
-use crate::{Span, SpanParser};
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub struct BlockId<'a>(pub &'a str);
 
 #[derive(Clone, Debug, Default)]
 pub struct Block {
-    spans: Vec<Span>,
+    spans: String,
     blocks: Vec<Block>,
 }
 
@@ -18,7 +19,7 @@ pub struct BlockParser<'a> {
 #[derive(Clone, Debug)]
 struct ParserNestingLevel {
     blocks: Vec<Block>,
-    spans: Vec<Span>,
+    spans: String,
 }
 
 impl<'a> BlockParser<'a> {
@@ -48,7 +49,7 @@ impl<'a> BlockParser<'a> {
             return Self { nestings };
         }
         let prefix = &line[..prefix_len];
-        let span = &line[prefix_len..];
+        let spans = line[prefix_len..].to_owned();
 
         let rest = nestings.split_off(prefix);
         if let Some(first) = rest.iter().next() {
@@ -56,13 +57,7 @@ impl<'a> BlockParser<'a> {
         }
         let blocks = BlockParser { nestings: rest }.into_blocks();
 
-        nestings.insert(
-            prefix,
-            ParserNestingLevel {
-                blocks,
-                spans: SpanParser::parse(span),
-            },
-        );
+        nestings.insert(prefix, ParserNestingLevel { blocks, spans });
         Self { nestings }
     }
 }
@@ -91,6 +86,7 @@ fn test() {
         parser = parser.with(&line);
     }
     //println!("{:#?}", parser.into_blocks());
+    //panic!();
 }
 
 #[test]
