@@ -1,5 +1,7 @@
 use crate::BlockId;
 
+type Spans<'a> = Vec<Span<'a>>;
+
 #[derive(Clone, Debug)]
 pub enum Span<'a> {
     Link(BlockId<'a>),
@@ -15,86 +17,131 @@ pub struct Url<'a> {
 
 #[derive(Clone, Debug)]
 pub struct SpanParser<'a> {
-    spans: Vec<Span<'a>>,
+    spans: Spans<'a>,
     state: State,
 }
 
 #[derive(Clone, Copy, Debug)]
 enum State {
-    Text(usize),
-    LinkOrUrl(usize),
-    TextOrUrl(usize),
-    Url(usize, usize),
+    Text(TextState),
+    LinkOrUrl(LinkOrUrlState),
+    TextOrUrl(TextOrUrlState),
+    Url(UrlState),
+    End,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TextState {
+    offset: usize,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct LinkOrUrlState {
+    offset: usize,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct TextOrUrlState {
+    offset: usize,
+}
+
+#[derive(Clone, Copy, Debug)]
+struct UrlState {
+    title_offset: usize,
+    url_offset: usize,
+}
+
+#[derive(Clone, Debug)]
+enum ParseChunkResult<'a> {
+    TextAndParser((&'a str, SpanParser<'a>)),
+    Spans(Spans<'a>),
 }
 
 impl<'a> SpanParser<'a> {
-    pub fn parse(text: &'a str) -> Vec<Span<'a>> {
+    pub fn parse(text: &'a str) -> Spans<'a> {
         let mut parser = Self::new();
-        for (offset, ch) in text.bytes().enumerate() {
-            parser = parser.with(text, offset, ch);
-        }
-        let len = text.len();
-        match parser.state {
-            State::Text(offset) => {
-                if offset == text.len() {
-                    parser.spans
-                } else {
-                    parser.spans.with(Span::Text(&text[offset..len]))
-                }
-            }
-            State::LinkOrUrl(offset) => parser.spans.with(Span::Text(&text[offset - 1..len])),
-            State::TextOrUrl(offset) => parser.spans,
-            State::Url(title_start, url_start) => {
-                parser.spans.with(Span::Text(&text[title_start - 1..len]))
-            }
+        let mut rest = text;
+        loop {
+            let (new_rest, new_parser) = match parser.parse_chunk(rest) {
+                ParseChunkResult::TextAndParser(result) => result,
+                ParseChunkResult::Spans(spans) => return spans,
+            };
+            rest = new_rest;
+            parser = new_parser;
         }
     }
 
     fn new() -> Self {
         Self {
             spans: vec![],
-            state: State::Text(0),
+            state: State::Text(TextState { offset: 0 }),
         }
     }
 
-    fn with(self, text: &'a str, offset: usize, ch: u8) -> Self {
-        use self::Url as SpanUrl;
-        use State::*;
-
+    fn parse_chunk(self, text: &'a str) -> ParseChunkResult {
         let spans = self.spans;
-        let state = self.state;
-        let (spans, state) = match state {
-            Text(start) => match ch {
-                b'[' => (
-                    spans.with(Span::Text(&text[start..offset])),
-                    LinkOrUrl(offset + 1),
-                ),
-                _ => (spans, Text(start)),
-            },
-            LinkOrUrl(start) => match ch {
-                b'[' => panic!(),
-                b']' => (spans, TextOrUrl(start)),
-                _ => (spans, LinkOrUrl(start)),
-            },
-            TextOrUrl(start) => match ch {
-                b'(' => (spans, Url(start, offset + 1)),
-                _ => (
-                    spans.with(Span::Link(BlockId(&text[start..offset - 1]))),
-                    Text(offset),
-                ),
-            },
-            Url(title_start, url_start) => match ch {
-                b')' => (
-                    spans.with(Span::Url(SpanUrl {
-                        name: &text[title_start..url_start - 2],
-                        url: &text[url_start..offset],
-                    })),
-                    Text(offset + 1),
-                ),
-                _ => (spans, Url(title_start, url_start)),
-            },
-        };
-        Self { spans, state }
+        match self.state {
+            State::Text(state) => ParseChunkResult::TextAndParser(state.parse(text, spans)),
+            State::LinkOrUrl(state) => ParseChunkResult::TextAndParser(state.parse(text, spans)),
+            State::TextOrUrl(state) => ParseChunkResult::TextAndParser(state.parse(text, spans)),
+            State::Url(state) => ParseChunkResult::TextAndParser(state.parse(text, spans)),
+            State::End => ParseChunkResult::Spans(spans),
+        }
+    }
+}
+
+impl TextState {
+    fn parse<'a>(self, text: &'a str, spans: Spans<'a>) -> (&'a str, SpanParser<'a>) {
+        match text.find('[') {
+            Some(offset) => (
+                &text[offset..],
+                SpanParser {
+                    spans,
+                    state: State::LinkOrUrl(LinkOrUrlState { offset }),
+                },
+            ),
+            None => (
+                text.empty_end(),
+                SpanParser {
+                    spans: spans.with(Span::Text(&text)),
+                    state: State::End,
+                },
+            ),
+        }
+    }
+}
+
+impl LinkOrUrlState {
+    fn parse<'a>(self, text: &'a str, spans: Spans<'a>) -> (&'a str, SpanParser<'a>) {
+        let rest = text;
+        let state = todo!();
+        (rest, SpanParser { spans, state })
+    }
+}
+
+impl TextOrUrlState {
+    fn parse<'a>(self, text: &'a str, spans: Spans<'a>) -> (&'a str, SpanParser<'a>) {
+        let rest = text;
+        let state = todo!();
+        (rest, SpanParser { spans, state })
+    }
+}
+
+impl UrlState {
+    fn parse<'a>(self, text: &'a str, spans: Spans<'a>) -> (&'a str, SpanParser<'a>) {
+        let rest = text;
+        let state = todo!();
+        (rest, SpanParser { spans, state })
+    }
+}
+
+trait StrEmptyEnd {
+    fn empty_end(self) -> Self;
+}
+
+impl<'a> StrEmptyEnd for &str {
+    fn empty_end(self) -> Self {
+        &self[self.len()..self.len()]
     }
 }
 
@@ -115,6 +162,98 @@ fn test() {
     let result = SpanParser::parse(text);
     dbg!(result);
 }
+
+/*
+trait Spans {
+    fn parse_text(self, text: &'a str) -> (&'a str, SpanParser<'a>);
+    fn parse_link_or_url(self, text: &'a str) -> (&'a str, SpanParser<'a>);
+    fn parse_text_or_url(self, text: &'a str) -> (&'a str, SpanParser<'a>);
+    fn parse_url(self, text: &'a str) -> (&'a str, SpanParser<'a>);
+}
+
+impl<'a> Spans for Spans<'a> {
+    fn parse_text(self, text: &'a str) -> (&'a str, SpanParser<'a>) {
+        let rest = text;
+        let state = todo!();
+        (rest, SpanParser { spans: self, state })
+    }
+
+    fn parse_link_or_url(self, text: &'a str) -> (&'a str, SpanParser<'a>) {
+        let rest = text;
+        let state = todo!();
+        (rest, SpanParser { spans: self, state })
+    }
+
+    fn parse_text_or_url(self, text: &'a str) -> (&'a str, SpanParser<'a>) {
+        let rest = text;
+        let state = todo!();
+        (rest, SpanParser { spans: self, state })
+    }
+
+    fn parse_url(self, text: &'a str) -> (&'a str, SpanParser<'a>) {
+        let rest = text;
+        let state = todo!();
+        (rest, SpanParser { spans: self, state })
+    }
+}*/
+
+/*for (offset, ch) in text.bytes().enumerate() {
+    parser = parser.with(text, offset, ch);
+}
+let len = text.len();
+match parser.state {
+    State::Text(offset) => {
+        if offset == text.len() {
+            parser.spans
+        } else {
+            parser.spans.with(Span::Text(&text[offset..len]))
+        }
+    }
+    State::LinkOrUrl(offset) => parser.spans.with(Span::Text(&text[offset - 1..len])),
+    State::TextOrUrl(offset) => parser.spans,
+    State::Url(title_start, url_start) => {
+        parser.spans.with(Span::Text(&text[title_start - 1..len]))
+    }
+}*/
+/*fn with(self, text: &'a str, offset: usize, ch: u8) -> Self {
+    use self::Url as SpanUrl;
+    use State::*;
+
+    let spans = self.spans;
+    let state = self.state;
+    let (spans, state) = match state {
+        Text(start) => match ch {
+            b'[' => (
+                spans.with(Span::Text(&text[start..offset])),
+                LinkOrUrl(offset + 1),
+            ),
+            _ => (spans, Text(start)),
+        },
+        LinkOrUrl(start) => match ch {
+            b'[' => panic!(),
+            b']' => (spans, TextOrUrl(start)),
+            _ => (spans, LinkOrUrl(start)),
+        },
+        TextOrUrl(start) => match ch {
+            b'(' => (spans, Url(start, offset + 1)),
+            _ => (
+                spans.with(Span::Link(BlockId(&text[start..offset - 1]))),
+                Text(offset),
+            ),
+        },
+        Url(title_start, url_start) => match ch {
+            b')' => (
+                spans.with(Span::Url(SpanUrl {
+                    name: &text[title_start..url_start - 2],
+                    url: &text[url_start..offset],
+                })),
+                Text(offset + 1),
+            ),
+            _ => (spans, Url(title_start, url_start)),
+        },
+    };
+    Self { spans, state }
+}*/
 
 /*
 #[test]
