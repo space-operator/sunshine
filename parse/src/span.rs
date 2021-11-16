@@ -5,29 +5,247 @@ type Spans<'a> = Vec<Span<'a>>;
 #[derive(Clone, Debug)]
 pub enum Span<'a> {
     Link(BlockId<'a>),
-    Url(Url<'a>),
+    Url(Vec<Span<'a>>, &'a str),
     Text(&'a str),
+    Bold(Vec<Span<'a>>),
+    Italics(Vec<Span<'a>>),
+    Strikethrough(Vec<Span<'a>>),
 }
 
-#[derive(Clone, Debug)]
-pub struct Url<'a> {
-    name: &'a str,
-    url: &'a str,
+/*impl<'a> Span<'a> {
+    pub fn parse(text: &'a str) -> Spans<'a> {
+        let offset = 0;
+        let bytes = text.bytes().enumerate();
+        let spans = Vec::new();
+
+        SpanParser {
+            text,
+            offset,
+            bytes,
+            spans,
+        }
+        .parse()
+    }
 }
 
+trait Is {
+    fn is() -> bool;
+}
+
+struct Yes;
+impl Is for Yes {
+    fn is() -> bool {
+        true
+    }
+}
+
+struct No;
+impl Is for No {
+    fn is() -> bool {
+        false
+    }
+}*/
+
+/*
 #[derive(Clone, Debug)]
-pub struct SpanParser<'a> {
+struct SpanParser<'a, Bold, Italics> {
+    text: &'a str,
+    offset: usize,
+    bytes: std::iter::Enumerate<std::str::Bytes<'a>>,
+    spans: Spans<'a>,
+    _: Bold,
+    _: Italics,
+}*/
+
+/*
+    a ** b * c ~~ d ~~ e ~~ f * g ~~ h * j **
+         BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+             IIIIIIIIIIIIIIII
+                  S
+                         ~~       ~~   *
+
+
+**asdasda **asda** asda
+asdasd**aa*asd~~asd**
+asdasd**
+
+
+**sasdasda*
+
+asdasd **asdasd
+asdasd** asdasda
+
+asdasda**asdasdasd sda*a*sd
+**ad **asd**
+asdasd**as*dasd*asda
+    -> [Bold(spans..)]
+    -> [spans..]
+
+
+*/
+
+/*
+impl<'a, Bold: Is, Italics: Is> SpanParser<'a, Bold, Italics> {
+    pub fn parse(mut self) -> Spans<'a> {
+        self = self.parse_after_char();
+        if self.offset == self.text.len() {
+            self.spans
+        } else {
+            self.spans.with(Span::Text(&self.text[self.offset..]))
+        }
+    }
+
+    pub fn parse_after_char(mut self) -> Self {
+        while let Some((start, ch)) = self.bytes.next() {
+            match ch {
+                b'*' => parse_after_char_star(self),
+                b' ' => parse_after_space(self),
+                _ => parse_after_char(self),
+            }
+        }
+    }
+
+    pub fn parse_after_space(mut self) -> Self {
+        while let Some((start, ch)) = self.bytes.next() {
+            match ch {
+                b'*' => parse_after_space_star(self),
+                b' ' => parse_after_space(self),
+                _ => parse_after_char(self),
+            }
+        }
+    }
+
+    pub fn parse_after_char_star(mut self) -> Self {
+        while let Some((start, ch)) = self.bytes.next() {
+            match ch {
+                b'*' => parse_after_char(self), // wrap bold
+                b' ' => parse_after_space(self),
+                _ => if Italics::is() {
+
+                } else {
+                    let offset = self.offset;
+                    let spans = self.spans;
+                    let parser = SpanParser {
+                        text: self.text,
+                        offset,
+                        bytes: self.bytes,
+                        spans: vec![],
+                    }
+                    .parse_after_char();
+                    Self {
+                        text: parser.text,
+                        offset,
+                        bytes,
+                        spans.with()
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn parse_after_space_star(mut self) -> Self {
+        while let Some((start, ch)) = self.bytes.next() {
+            match ch {
+                b'*' => parse_after_char(self), // wrap bold
+                b' ' => parse_after_space(self),
+                _ => parse_after_char(self),
+            }
+        }
+    }
+
+
+    /*pub fn parse_maybe_italics(mut self) -> Self {
+        match self.bytes.next() {
+            Some((offset, b'*')) => self.parse_maybe_bold(),
+            Some((offset, b' ')) => self,
+            (offset, _) => {
+                // a*
+                SpanParser {
+                    text: self.text,
+                    offset,
+                    bytes: self.bytes,
+                    spans: vec![],
+                }
+                .parse()
+            }
+        }
+    }
+
+    pub fn parse_maybe_bold(mut self) -> Self {
+        match self.bytes.next() {
+            Some((offset, b' ')) => todo!(),
+            _ => todo!(),
+        }
+    }*/
+}*/
+
+/*
+        let maybe_italics = || match iter.next() {
+            Some(b'*') => match iter.next() {
+                Some(b'*') => {}
+            },
+        };
+
+        while let Some(start, ch) = iter.next() {
+            match ch {
+                b'*' => maybe_italics(),
+            }
+        }
+*/
+/*enum Found {
+    LinkStart,
+    LinkEnd,
+    BoldStart,
+    BoldEnd,
+    ItalicsStart,
+    ItalicsEnd,
+    StrikethroughStart,
+    StrikethroughEnd,
+}
+
+let pred = |ch| {
+    if ch == b'*' {
+        if state.bold {
+
+        }
+    }
+    if ch == "*" {
+
+    }
+    let link_ch == if state.link { b']' } else { b'[' };
+    ch == b'*' || ch == b'~' || ch == link_ch
+};
+match text.iter().find_map(pred) {
+    Some(start) => match text.as_bytes()[start] {
+        b'[' =>
+        b'*',
+        b'~',
+        _ => unreachable!(),
+    }
+    None => Span::Text(&text),
+}*/
+
+/*
+#[derive(Clone, Debug)]
+pub struct SpanParser2<'a> {
     spans: Spans<'a>,
     state: State,
 }
 
 #[derive(Clone, Copy, Debug)]
 enum State {
-    Text(TextState),
-    LinkOrUrl(LinkOrUrlState),
-    TextOrUrl(TextOrUrlState),
-    Url(UrlState),
-    End,
+    Text(ParentState),
+    MaybeItalics(ParentState),
+    MaybeBold(ParentState),
+    MaybeStrikethrough(ParentState),
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct ParentState {
+    maybe_link: bool,
+    maybe_bold: bool,
+    maybe_italics: bool,
+    maybe_strikethrough: bool,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -53,21 +271,20 @@ struct UrlState {
 
 #[derive(Clone, Debug)]
 enum ParseChunkResult<'a> {
-    TextAndParser((&'a str, SpanParser<'a>)),
+    TextAndParser((&'a str, Spans<'a>, State)),
     Spans(Spans<'a>),
 }
 
-impl<'a> SpanParser<'a> {
-    pub fn parse(text: &'a str) -> Spans<'a> {
+impl<'a> SpanParser2<'a> {
+    pub fn parse(mut text: &'a str) -> Spans<'a> {
         let mut parser = Self::new();
-        let mut rest = text;
         loop {
-            let (new_rest, new_parser) = match parser.parse_chunk(rest) {
+            let (rest, spans, state) = match parser.parse_chunk(text) {
                 ParseChunkResult::TextAndParser(result) => result,
                 ParseChunkResult::Spans(spans) => return spans,
             };
-            rest = new_rest;
-            parser = new_parser;
+            text = rest;
+            parser = Self { spans, state };
         }
     }
 
@@ -91,47 +308,39 @@ impl<'a> SpanParser<'a> {
 }
 
 impl TextState {
-    fn parse<'a>(self, text: &'a str, spans: Spans<'a>) -> (&'a str, SpanParser<'a>) {
+    fn parse<'a>(self, text: &'a str, spans: Spans<'a>) -> (&'a str, Spans<'a>, State) {
         match text.find('[') {
             Some(offset) => (
                 &text[offset..],
-                SpanParser {
-                    spans,
-                    state: State::LinkOrUrl(LinkOrUrlState { offset }),
-                },
+                spans,
+                State::LinkOrUrl(LinkOrUrlState { offset }),
             ),
-            None => (
-                text.empty_end(),
-                SpanParser {
-                    spans: spans.with(Span::Text(&text)),
-                    state: State::End,
-                },
-            ),
+            None => (text.empty_end(), spans.with(Span::Text(&text)), State::End),
         }
     }
 }
 
 impl LinkOrUrlState {
-    fn parse<'a>(self, text: &'a str, spans: Spans<'a>) -> (&'a str, SpanParser<'a>) {
+    fn parse<'a>(self, text: &'a str, spans: Spans<'a>) -> (&'a str, Spans<'a>, State) {
         let rest = text;
         let state = todo!();
-        (rest, SpanParser { spans, state })
+        (rest, spans, state)
     }
 }
 
 impl TextOrUrlState {
-    fn parse<'a>(self, text: &'a str, spans: Spans<'a>) -> (&'a str, SpanParser<'a>) {
+    fn parse<'a>(self, text: &'a str, spans: Spans<'a>) -> (&'a str, Spans<'a>, State) {
         let rest = text;
         let state = todo!();
-        (rest, SpanParser { spans, state })
+        (rest, spans, state)
     }
 }
 
 impl UrlState {
-    fn parse<'a>(self, text: &'a str, spans: Spans<'a>) -> (&'a str, SpanParser<'a>) {
+    fn parse<'a>(self, text: &'a str, spans: Spans<'a>) -> (&'a str, Spans<'a>, State) {
         let rest = text;
         let state = todo!();
-        (rest, SpanParser { spans, state })
+        (rest, spans, state)
     }
 }
 
@@ -159,9 +368,79 @@ impl<T> VecWith<T> for Vec<T> {
 #[test]
 fn test() {
     let text = "abc [link] def [href](http://website.com) qwe [123";
-    let result = SpanParser::parse(text);
+    let result = SpanParser2::parse(text);
     dbg!(result);
 }
+*/
+/*
+/*
+    a ** b * c ~~ d ~~ e ~~ f * g ~~ h * j **
+         BBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBBB
+             IIIIIIIIIIIIIIII
+                  S
+                         ~~       ~~   *
+*/
+
+#[derive(Clone, Debug, Default)]
+struct State2 {
+    link: bool,
+    bold: bool,
+    italics: bool,
+    strikethrough: bool,
+}
+
+impl Span<'a> {
+    pub fn parse<'a>(text: &'a str) -> Spans<'a> {
+        Self::parse_chunk(text, State2::default())
+    }
+
+    fn parse_chunk<'a>(text: &'a str, state: State2) -> Spans<'a> {
+        for j in 0..text.len() {
+            if text[j] == b'*' {
+
+            }
+        }
+
+        enum Found {
+            LinkStart,
+            LinkEnd,
+            BoldStart,
+            BoldEnd,
+            ItalicsStart,
+            ItalicsEnd,
+            StrikethroughStart,
+            StrikethroughEnd,
+        }
+
+        [[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[[
+
+        ** aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa aaaaaaaaaaaaa **
+        **
+
+        let pred = |ch| {
+            if ch == b'*' {
+                if state.bold {
+
+                }
+            }
+            if ch == "*" {
+
+            }
+            let link_ch == if state.link { b']' } else { b'[' };
+            ch == b'*' || ch == b'~' || ch == link_ch
+        };
+        match text.iter().find_map(pred) {
+            Some(start) => match text.as_bytes()[start] {
+                b'[' =>
+                b'*',
+                b'~',
+                _ => unreachable!(),
+            }
+            None => Span::Text(&text),
+        }
+    }
+}
+*/
 
 /*
 trait Spans {
