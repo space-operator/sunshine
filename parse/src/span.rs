@@ -6,11 +6,195 @@ type Spans<'a> = Vec<Span<'a>>;
 pub enum Span<'a> {
     Link(BlockId<'a>),
     Url(Vec<Span<'a>>, &'a str),
+    Style(Vec<Span<'a>>, &'a str),
     Text(&'a str),
-    Bold(Vec<Span<'a>>),
-    Italics(Vec<Span<'a>>),
-    Strikethrough(Vec<Span<'a>>),
 }
+
+impl<'a> Span<'a> {
+    fn parse(text: &'a str) -> Spans<'a> {
+        let bytes = text.bytes().enumerate();
+        let spans = Vec::new();
+        SpanParser {
+            text,
+            bytes,
+            spans,
+            maybe_href: false,
+        }
+        .parse()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct SpanParser<'a> {
+    text: &'a str,
+    bytes: std::iter::Enumerate<std::str::Bytes<'a>>,
+    spans: Spans<'a>,
+    maybe_href: bool,
+}
+
+// [1324-1234](qwerasdf[1234-1234](qwerasdf[1234-1234](qwerasdf[1234-1234](qwerasdf[1234-1234])
+// [1234-2345]
+// https://github.com/pest-parser/pest
+
+// [^[]
+// \[eqerqwer\]( map
+
+// https://pest.rs/book/grammars/syntax.html
+
+impl<'a> SpanParser<'a> {
+    fn parse(mut self) -> Spans<'a> {
+        let mut text_offset = 0;
+        let mut open_offset = None;
+        while let Some((offset, ch)) = self.bytes.next() {
+            match ch {
+                b'[' => open_offset = Some(offset),
+                b']' => match open_offset {
+                    Some(start) => {
+                        let next = self.bytes.next();
+                        if next == Some(b'(') {
+                        } else {
+                        }
+                    }
+                    None => {}
+                },
+                _ => {}
+            }
+        }
+        spans
+    }
+
+    fn parse_href(mut self, link_offset: usize, url_offset: usize) -> Spans<'a> {
+        let mut open_offset = None;
+        while let Some((offset, ch)) = self.bytes.next() {
+            match ch {
+                b')' => self.spans,
+                b'[' => open_offset = Some(offset),
+                b']' => match open_offset {
+                    Some(start) => {
+                        let next = self.bytes.next();
+                        if next == Some(b'(') {
+                        } else {
+                        }
+                    }
+                    None => {}
+                },
+                _ => {}
+            }
+        }
+        spans
+    }
+}
+
+#[test]
+fn test() {
+    for value in [
+        "**abc*",
+        "**abc*abcasda**",
+        "**abc* abc",
+        "**abc* abc**asd",
+        "[LINK] _abc*abc_abc*\n\n[LINK]: /blah",
+        "_abc*abc_ abc*",
+    ] {
+        use pulldown_cmark::{Options, Parser};
+
+        let mut options = Options::empty();
+        options.insert(Options::ENABLE_STRIKETHROUGH);
+        let parser = Parser::new_ext(value, options);
+
+        let events: Vec<_> = parser.collect();
+        println!("{:?}", events);
+    }
+
+    todo!();
+}
+
+/*
+    [link]
+    [style A, text]
+    [title](url)
+
+
+
+    edge cases not handled yet
+    [1234-2345-3456-4567](http://wow)
+
+
+
+
+    library of style for the user
+
+    style 1
+        alias: book cover
+
+
+    [style1,style2|text]
+
+    !italics@
+    #bold$
+    %strike^
+
+
+
+        italic
+        bold
+        16pts
+
+
+https://github.com/raphlinus/pulldown-cmark/blob/master/src/linklabel.rs
+https://github.com/raphlinus/pulldown-cmark/blob/master/tests/suite/regression.rs
+
+
+    Url
+        StyleA
+
+
+    // **abc*           *[i]abc[/]
+    // **abc*abc        **abc*abc
+    // **abc* abc       *[i]abc[/] abc
+    // **abc* abc**asd  [i]abc abc[/]*abc
+    // _abc*abc_abc*    _asd[i]asd_asd[/]
+    // _abc*abc_ abc*   [i]abc*abc[/] abc*
+
+    text_start: usize
+    underscore_bold_start: usize,
+    asterisk_bold_start: usize,
+    underscore_italics_start: usize,
+    asterisk_italics_start: usize,
+
+    c char
+    - space
+    * asterisk
+    _ underscore
+    ~ tilde
+
+    c*a     *italics end or start
+    c*-     *italics end
+    c**
+    c*_c    *italics end or start
+    c*_-    *italics end or start or _italics end or start
+    c*_*
+
+    -*a     italics start
+    -*-
+
+    [qweqwe]
+
+    asd**asdasdas...**asdasd
+    ^    ***********
+    ---  ***********  ^
+
+    asd**asdasdas*asdda*aass
+         ^^^^^^^^
+    -------------+++++++++++
+
+    0    1   2    3   4
+    abc**abc*abc**abc*abc
+
+    bold(0, 1)
+        italics(1, 2) +b
+
+    ParseChunkResult
+*/
 
 /*impl<'a> Span<'a> {
     pub fn parse(text: &'a str) -> Spans<'a> {
