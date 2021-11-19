@@ -11,7 +11,6 @@ pub use span::*;
 pub use text::*;
 
 /*
-
 paste:
     current_block_id
     text_before

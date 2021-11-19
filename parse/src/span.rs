@@ -1,6 +1,226 @@
+use nom::branch::alt;
+use nom::bytes::complete::is_not;
+use nom::bytes::complete::tag;
+use nom::bytes::complete::tag_no_case;
+use nom::bytes::complete::take;
+use nom::bytes::complete::take_until;
+use nom::character::complete::char as nom_char;
+use nom::character::complete::digit1;
+use nom::character::complete::hex_digit1;
+use nom::character::complete::none_of;
+use nom::character::complete::one_of;
+use nom::combinator::cond;
+use nom::combinator::fail;
+use nom::combinator::iterator;
+use nom::combinator::map;
+use nom::combinator::not;
+use nom::combinator::opt;
+use nom::combinator::peek;
+use nom::combinator::recognize;
+use nom::combinator::verify;
+use nom::error::Error as NomError;
+use nom::error::ParseError;
+use nom::multi::many0;
+use nom::multi::separated_list0;
+use nom::sequence::delimited;
+use nom::sequence::{pair, preceded, tuple};
+use nom::IResult;
+use regex::{Regex, RegexSet};
+use std::net::{IpAddr, Ipv6Addr};
+
 use crate::BlockId;
 
-type Spans<'a> = Vec<Span<'a>>;
+#[derive(Clone, Debug)]
+pub enum Span<'a> {
+    Link(BlockId<'a>),
+    Url(Vec<Span<'a>>, &'a str),
+    Text(&'a str),
+    Char(char),
+    Bold(Vec<Span<'a>>),
+    Italics(Vec<Span<'a>>),
+    Strikethrough(Vec<Span<'a>>),
+}
+
+pub fn parse<'a>(text: &'a str) -> Vec<Span<'a>> {
+    let (rest, spans) = Parser::default().parse()(text).unwrap();
+    assert_eq!(rest, "");
+    spans
+}
+
+#[test]
+fn main() {
+    let result = parse(
+        "some text[internal-link] more text \
+        [href-*link](http://anything)\\r\\n[not-a-href]\\(text)**bold*and-italics[Yay](http://yay.yay)*yeah~~no~~**",
+    );
+    dbg!(result);
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+pub struct Parser {
+    should_stop_on_closing_bracket: bool,
+    should_stop_on_single_asterisk: bool,
+    should_stop_on_double_asterisk: bool,
+    should_stop_on_single_underscore: bool,
+    should_stop_on_double_underscore: bool,
+    should_stop_on_double_tilde: bool,
+}
+
+impl Parser {
+    fn stop_on_bracket(self) -> Self {
+        Self {
+            should_stop_on_closing_bracket: true,
+            ..self
+        }
+    }
+
+    fn stop_on_single_asterisk(self) -> Self {
+        Self {
+            should_stop_on_single_asterisk: true,
+            ..self
+        }
+    }
+
+    fn stop_on_double_asterisk(self) -> Self {
+        Self {
+            should_stop_on_double_asterisk: true,
+            ..self
+        }
+    }
+
+    fn stop_on_single_underscore(self) -> Self {
+        Self {
+            should_stop_on_single_underscore: true,
+            ..self
+        }
+    }
+
+    fn stop_on_double_underscore(self) -> Self {
+        Self {
+            should_stop_on_double_underscore: true,
+            ..self
+        }
+    }
+
+    fn stop_on_double_tilde(self) -> Self {
+        Self {
+            should_stop_on_double_tilde: true,
+            ..self
+        }
+    }
+
+    fn parse_terminator<'a>(self) -> impl FnMut(&'a str) -> IResult<&'a str, &'a str> {
+        alt((
+            parser_with_cond(self.should_stop_on_closing_bracket, tag("]")),
+            parser_with_cond(self.should_stop_on_single_asterisk, tag("*")),
+            parser_with_cond(self.should_stop_on_double_asterisk, tag("**")),
+            parser_with_cond(self.should_stop_on_single_underscore, tag("_")),
+            parser_with_cond(self.should_stop_on_double_underscore, tag("__")),
+            parser_with_cond(self.should_stop_on_double_tilde, tag("~~")),
+        ))
+    }
+
+    fn parse<'a>(self) -> impl FnMut(&'a str) -> IResult<&'a str, Vec<Span<'a>>> {
+        many0(preceded(
+            peek(not(self.parse_terminator())),
+            alt((
+                map(
+                    pair(
+                        delimited(
+                            tag("["),
+                            move |text| self.stop_on_bracket().parse()(text),
+                            tag("]"),
+                        ),
+                        delimited(tag("("), parse_until_with_escaping(")"), tag(")")),
+                    ),
+                    |(spans, url)| Span::Url(spans, url),
+                ),
+                map(delimited(tag("["), take_until("]"), tag("]")), |link| {
+                    Span::Link(BlockId(link))
+                }),
+                map(
+                    delimited(
+                        tag("**"),
+                        move |text| self.stop_on_double_asterisk().parse()(text),
+                        tag("**"),
+                    ),
+                    |spans| Span::Bold(spans),
+                ),
+                map(
+                    delimited(
+                        tag("*"),
+                        move |text| self.stop_on_single_asterisk().parse()(text),
+                        tag("*"),
+                    ),
+                    |spans| Span::Italics(spans),
+                ),
+                map(
+                    delimited(
+                        tag("__"),
+                        move |text| self.stop_on_double_underscore().parse()(text),
+                        tag("__"),
+                    ),
+                    |spans| Span::Bold(spans),
+                ),
+                map(
+                    delimited(
+                        tag("_"),
+                        move |text| self.stop_on_single_underscore().parse()(text),
+                        tag("_"),
+                    ),
+                    |spans| Span::Italics(spans),
+                ),
+                map(
+                    delimited(
+                        tag("~~"),
+                        move |text| self.stop_on_double_tilde().parse()(text),
+                        tag("~~"),
+                    ),
+                    |spans| Span::Strikethrough(spans),
+                ),
+                map(tag("\\n"), |_| Span::Char('\n')),
+                map(tag("\\r"), |_| Span::Char('\r')),
+                map(tag("\\t"), |_| Span::Char('\t')),
+                map(preceded(nom_char('\\'), one_of("[]()*_~\\")), |ch| {
+                    Span::Char(ch)
+                }),
+                map(recognize(pair(take(1usize), is_not("[]()*_~\\"))), |ch| {
+                    Span::Text(ch)
+                }),
+                map(take(1usize), |ch| Span::Text(ch)),
+            )),
+        ))
+    }
+}
+
+fn parse_until_with_escaping<'a>(text: &'a str) -> impl Fn(&'a str) -> IResult<&'a str, &'a str> {
+    take_until(text) // TODO: escape sequences
+}
+
+/*
+impl<'a, I, O, E, F> Parser<I, O, E> for F
+where
+    F: FnMut(I) -> IResult<I, O, E> + 'a,
+{
+    fn parse(&mut self, i: I) -> IResult<I, O, E> {
+        self(i)
+    }
+}*/
+
+fn parser_with_cond<'a, T>(
+    cond: bool,
+    mut parser: impl FnMut(&'a str) -> IResult<&'a str, T>,
+) -> impl FnMut(&'a str) -> IResult<&'a str, T> {
+    move |i: &'a str| {
+        if cond {
+            parser(i)
+        } else {
+            fail(i)
+        }
+    }
+}
+
+/*type Spans<'a> = Vec<Span<'a>>;
 
 #[derive(Clone, Debug)]
 pub enum Span<'a> {
@@ -106,7 +326,7 @@ fn test() {
     }
 
     todo!();
-}
+}*/
 
 /*
     [link]

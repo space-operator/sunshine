@@ -1,3 +1,7 @@
+paste-parser
+pre-render-parser
+input-raw-to-app-event
+
 Schools
     Looking to find shool less than .cost: 4200
     .total= avg().cost

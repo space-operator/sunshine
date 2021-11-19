@@ -7,8 +7,8 @@ pub struct BlockId<'a>(pub &'a str);
 
 #[derive(Clone, Debug, Default)]
 pub struct Block {
-    spans: String,
-    blocks: Vec<Block>,
+    span_text: String,
+    children: Vec<Block>,
 }
 
 #[derive(Clone, Debug, Default)]
@@ -19,7 +19,7 @@ pub struct BlockParser<'a> {
 #[derive(Clone, Debug)]
 struct ParserNestingLevel {
     blocks: Vec<Block>,
-    spans: String,
+    span_text: String,
 }
 
 impl<'a> BlockParser<'a> {
@@ -34,8 +34,8 @@ impl<'a> BlockParser<'a> {
             .fold(vec![], |children, (_, nesting)| {
                 let mut blocks = nesting.blocks;
                 blocks.push(Block {
-                    spans: nesting.spans,
-                    blocks: children,
+                    span_text: nesting.span_text,
+                    children: children,
                 });
                 blocks
             })
@@ -49,7 +49,7 @@ impl<'a> BlockParser<'a> {
             return Self { nestings };
         }
         let prefix = &line[..prefix_len];
-        let spans = line[prefix_len..].to_owned();
+        let span_text = line[prefix_len..].to_owned();
 
         let rest = nestings.split_off(prefix);
         if let Some(first) = rest.iter().next() {
@@ -57,7 +57,7 @@ impl<'a> BlockParser<'a> {
         }
         let blocks = BlockParser { nestings: rest }.into_blocks();
 
-        nestings.insert(prefix, ParserNestingLevel { blocks, spans });
+        nestings.insert(prefix, ParserNestingLevel { blocks, span_text });
         Self { nestings }
     }
 }
