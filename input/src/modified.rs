@@ -1,7 +1,9 @@
+use core::iter::FusedIterator;
 use std::sync::Arc;
 
 use crate::{
-    Axis, AxisKind, ButtonKind, EventWithModifiers, Modifiers, MouseScrollDelta, RawInput,
+    Axis, AxisKind, ButtonKind, EventCoord, EventCoords, EventWithModifiers, Modifiers,
+    MouseScrollDelta, RawInput, TouchId,
 };
 
 pub type ModifiedEvent<T> = EventWithModifiers<ModifiedInput<T>>;
@@ -28,21 +30,226 @@ pub enum TriggerKind<T> {
 }
 
 #[derive(Clone, Debug)]
-pub struct ModifiedState<T: ModifiedContext> {
+pub struct ModifiedState {
     modifiers: Arc<Modifiers>,
-    context: T,
 }
 
-struct ModifiedStateUpdater<T: ModifiedContext> {
+#[derive(Clone, Debug)]
+struct ModifiedTransitionEventsBuilder {
     modifiers: Modifiers,
-    context: T,
-    kinds: Vec<ModifiedInput<T::CustomEvent>>,
 }
 
-pub trait ModifiedContext: Sized {
-    type CustomEvent;
-    fn emit_event(self, ev: ModifiedEvent<Self::CustomEvent>) -> Self;
+#[derive(Clone, Debug)]
+pub struct ModifiedTransitionEvents<T> {
+    state: ModifiedTransitionEventsState<T>,
+    modifiers: Arc<Modifiers>,
 }
+
+#[derive(Clone, Debug)]
+enum ModifiedTransitionEventsState<T> {
+    Pressed(ButtonKind),
+    Released(ButtonKind),
+    MouseMoveXY(EventCoords),
+    MouseMoveY(EventCoord),
+    Trigger(TriggerKind<T>),
+    TouchStartXY(TouchId, EventCoords),
+    TouchStartY(TouchId, EventCoord),
+    TouchMoveXY(TouchId, EventCoords),
+    TouchMoveY(TouchId, EventCoord),
+    TouchEndXY(TouchId),
+    TouchEndY(TouchId),
+    Empty,
+}
+
+impl ModifiedState {
+    pub fn new() -> Self {
+        Self {
+            modifiers: Arc::default(),
+        }
+    }
+
+    pub fn modifiers(&self) -> &Arc<Modifiers> {
+        &self.modifiers
+    }
+
+    pub fn with_event<T>(self, ev: RawInput<T>) -> ModifiedTransitionEvents<T> {
+        use RawInput::{
+            Char, Custom, KeyDown, KeyUp, MouseDown, MouseMove, MouseScroll, MouseUp,
+            MouseWheelDown, MouseWheelUp, TouchEnd, TouchMove, TouchStart,
+        };
+
+        let builder = ModifiedTransitionEventsBuilder::new(self.modifiers.as_ref().clone());
+        match ev {
+            KeyDown(key) => builder.with_pressed(ButtonKind::KeyboardKey(key)),
+            KeyUp(key) => builder.with_released(ButtonKind::KeyboardKey(key)),
+            MouseDown(button) => builder.with_pressed(ButtonKind::MouseButton(button)),
+            MouseUp(button) => builder.with_released(ButtonKind::MouseButton(button)),
+            MouseMove(coords) => builder.with_mouse_move(coords),
+            MouseWheelDown => builder.with_trigger(TriggerKind::MouseWheelDown),
+            MouseWheelUp => builder.with_trigger(TriggerKind::MouseWheelUp),
+            MouseScroll(delta) => builder.with_trigger(TriggerKind::MouseScroll(delta)),
+            TouchStart { touch_id, coords } => builder.with_touch_start(touch_id, coords),
+            TouchMove { touch_id, coords } => builder.with_touch_move(touch_id, coords),
+            TouchEnd { touch_id } => builder.with_touch_end(touch_id),
+            Char(ch) => builder.with_trigger(TriggerKind::Char(ch)),
+            Custom(ev) => builder.with_trigger(TriggerKind::Custom(ev)),
+        }
+    }
+}
+
+impl<T> ModifiedTransitionEvents<T> {
+    pub fn to_state(&self) -> ModifiedState {
+        ModifiedState {
+            modifiers: Arc::clone(&self.modifiers),
+        }
+    }
+
+    pub fn modifiers(&self) -> &Arc<Modifiers> {
+        &self.modifiers
+    }
+}
+
+impl ModifiedTransitionEventsBuilder {
+    fn new(modifiers: Modifiers) -> Self {
+        Self { modifiers }
+    }
+
+    fn with_pressed<T>(mut self, button: ButtonKind) -> ModifiedTransitionEvents<T> {
+        let is_added = self.modifiers.buttons.insert(button.clone());
+        assert!(is_added);
+        ModifiedTransitionEvents {
+            state: ModifiedTransitionEventsState::Pressed(button),
+            modifiers: Arc::new(self.modifiers),
+        }
+    }
+
+    fn with_released<T>(mut self, button: ButtonKind) -> ModifiedTransitionEvents<T> {
+        let is_removed = self.modifiers.buttons.remove(&button);
+        assert!(is_removed);
+        ModifiedTransitionEvents {
+            state: ModifiedTransitionEventsState::Released(button),
+            modifiers: Arc::new(self.modifiers),
+        }
+    }
+
+    fn with_trigger<T>(self, trigger: TriggerKind<T>) -> ModifiedTransitionEvents<T> {
+        ModifiedTransitionEvents {
+            state: ModifiedTransitionEventsState::Trigger(trigger),
+            modifiers: Arc::new(self.modifiers),
+        }
+    }
+
+    fn with_mouse_move<T>(mut self, (x, y): EventCoords) -> ModifiedTransitionEvents<T> {
+        let _ = self.modifiers.axes.insert(AxisKind::MouseX, x);
+        let _ = self.modifiers.axes.insert(AxisKind::MouseY, y);
+        ModifiedTransitionEvents {
+            state: ModifiedTransitionEventsState::MouseMoveXY((x, y)),
+            modifiers: Arc::new(self.modifiers),
+        }
+    }
+
+    fn with_touch_start<T>(
+        mut self,
+        touch_id: TouchId,
+        (x, y): EventCoords,
+    ) -> ModifiedTransitionEvents<T> {
+        let prev = self.modifiers.axes.insert(AxisKind::TouchX(touch_id), x);
+        assert!(prev.is_none());
+        let prev = self.modifiers.axes.insert(AxisKind::TouchY(touch_id), y);
+        assert!(prev.is_none());
+        ModifiedTransitionEvents {
+            state: ModifiedTransitionEventsState::TouchStartXY(touch_id, (x, y)),
+            modifiers: Arc::new(self.modifiers),
+        }
+    }
+
+    fn with_touch_move<T>(
+        mut self,
+        touch_id: TouchId,
+        (x, y): EventCoords,
+    ) -> ModifiedTransitionEvents<T> {
+        let prev = self.modifiers.axes.insert(AxisKind::TouchX(touch_id), x);
+        assert!(prev.is_some());
+        let prev = self.modifiers.axes.insert(AxisKind::TouchY(touch_id), y);
+        assert!(prev.is_some());
+        ModifiedTransitionEvents {
+            state: ModifiedTransitionEventsState::TouchMoveXY(touch_id, (x, y)),
+            modifiers: Arc::new(self.modifiers),
+        }
+    }
+
+    fn with_touch_end<T>(mut self, touch_id: TouchId) -> ModifiedTransitionEvents<T> {
+        let prev = self.modifiers.axes.remove(&AxisKind::TouchX(touch_id));
+        assert!(prev.is_some());
+        let prev = self.modifiers.axes.remove(&AxisKind::TouchY(touch_id));
+        assert!(prev.is_some());
+        ModifiedTransitionEvents {
+            state: ModifiedTransitionEventsState::TouchEndXY(touch_id),
+            modifiers: Arc::new(self.modifiers),
+        }
+    }
+}
+
+impl<T> Iterator for ModifiedTransitionEvents<T> {
+    type Item = ModifiedEvent<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.state.next().map(|input| ModifiedEvent {
+            input,
+            modifiers: Arc::clone(&self.modifiers),
+        })
+    }
+}
+
+impl<T> Iterator for ModifiedTransitionEventsState<T> {
+    type Item = ModifiedInput<T>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let axis = |kind, value| Some(ModifiedInput::Change(Axis { kind, value }));
+
+        use ModifiedTransitionEventsState as State;
+        let (state, input) = match core::mem::replace(self, State::Empty) {
+            State::Pressed(button) => (State::Empty, Some(ModifiedInput::Press(button))),
+            State::Released(button) => (State::Empty, Some(ModifiedInput::Release(button))),
+            State::Trigger(trigger) => (State::Empty, Some(ModifiedInput::Trigger(trigger))),
+            State::MouseMoveXY((x, y)) => (State::MouseMoveY(y), axis(AxisKind::MouseX, Some(x))),
+            State::MouseMoveY(y) => (
+                State::Trigger(TriggerKind::MouseMove),
+                axis(AxisKind::MouseY, Some(y)),
+            ),
+            State::TouchStartXY(touch_id, (x, y)) => (
+                State::TouchStartY(touch_id, y),
+                axis(AxisKind::TouchX(touch_id), Some(x)),
+            ),
+            State::TouchStartY(touch_id, y) => (
+                State::Pressed(ButtonKind::Touch(touch_id)),
+                axis(AxisKind::TouchY(touch_id), Some(y)),
+            ),
+            State::TouchMoveXY(touch_id, (x, y)) => (
+                State::TouchMoveY(touch_id, y),
+                axis(AxisKind::TouchX(touch_id), Some(x)),
+            ),
+            State::TouchMoveY(touch_id, y) => (
+                State::Trigger(TriggerKind::TouchMove),
+                axis(AxisKind::TouchY(touch_id), Some(y)),
+            ),
+            State::TouchEndXY(touch_id) => (
+                State::TouchEndY(touch_id),
+                axis(AxisKind::TouchX(touch_id), None),
+            ),
+            State::TouchEndY(touch_id) => (
+                State::Released(ButtonKind::Touch(touch_id)),
+                axis(AxisKind::TouchY(touch_id), None),
+            ),
+            State::Empty => (State::Empty, None),
+        };
+        *self = state;
+        input
+    }
+}
+
+impl<T> FusedIterator for ModifiedTransitionEvents<T> {}
+impl<T> FusedIterator for ModifiedTransitionEventsState<T> {}
 
 impl<T> ModifiedEvent<T> {
     pub fn clone_without_custom(&self) -> ModifiedEvent<()> {
@@ -77,131 +284,5 @@ impl<T> TriggerKind<T> {
             Self::TouchMove => TriggerKind::TouchMove,
             Self::Custom(_) => TriggerKind::Custom(()),
         }
-    }
-}
-
-impl<T: ModifiedContext> ModifiedState<T> {
-    pub fn new(context: T) -> Self {
-        Self {
-            modifiers: Arc::default(),
-            context,
-        }
-    }
-
-    pub fn from_parts(modifiers: Arc<Modifiers>, context: T) -> Self {
-        Self { modifiers, context }
-    }
-
-    pub fn modifiers(&self) -> &Arc<Modifiers> {
-        &self.modifiers
-    }
-
-    pub fn context(&self) -> &T {
-        &self.context
-    }
-
-    pub fn context_mut(&mut self) -> &mut T {
-        &mut self.context
-    }
-
-    pub fn split(self) -> (Arc<Modifiers>, T) {
-        (self.modifiers, self.context)
-    }
-
-    fn make_event(self) -> ModifiedStateUpdater<T> {
-        ModifiedStateUpdater::new(self)
-    }
-
-    pub fn with_event(self, ev: RawInput<T::CustomEvent>) -> Self {
-        use RawInput::{
-            Char, Custom, KeyDown, KeyUp, MouseDown, MouseMove, MouseScroll, MouseUp,
-            MouseWheelDown, MouseWheelUp, TouchEnd, TouchMove, TouchStart,
-        };
-
-        let event = self.make_event();
-        let updater = match ev {
-            KeyDown(key) => event.with_button_pressed(ButtonKind::KeyboardKey(key)),
-            KeyUp(key) => event.with_button_released(ButtonKind::KeyboardKey(key)),
-            MouseDown(button) => event.with_button_pressed(ButtonKind::MouseButton(button)),
-            MouseUp(button) => event.with_button_released(ButtonKind::MouseButton(button)),
-            MouseMove(coords) => event
-                .with_axis_changed(Axis::new(AxisKind::MouseX, Some(coords.0)))
-                .with_axis_changed(Axis::new(AxisKind::MouseY, Some(coords.1)))
-                .with_trigger(TriggerKind::MouseMove),
-            MouseWheelDown => event.with_trigger(TriggerKind::MouseWheelDown),
-            MouseWheelUp => event.with_trigger(TriggerKind::MouseWheelUp),
-            MouseScroll(delta) => event.with_trigger(TriggerKind::MouseScroll(delta)),
-            TouchStart { touch_id, coords } => event
-                .with_axis_changed(Axis::new(AxisKind::TouchX(touch_id), Some(coords.0)))
-                .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), Some(coords.1)))
-                .with_button_pressed(ButtonKind::Touch(touch_id)),
-            TouchMove { touch_id, coords } => event
-                .with_axis_changed(Axis::new(AxisKind::TouchX(touch_id), Some(coords.0)))
-                .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), Some(coords.1)))
-                .with_trigger(TriggerKind::TouchMove),
-            TouchEnd { touch_id } => event
-                .with_axis_changed(Axis::new(AxisKind::TouchX(touch_id), None))
-                .with_axis_changed(Axis::new(AxisKind::TouchY(touch_id), None))
-                .with_button_released(ButtonKind::Touch(touch_id)),
-            Char(ch) => event.with_trigger(TriggerKind::Char(ch)),
-            Custom(ev) => event.with_trigger(TriggerKind::Custom(ev)),
-        };
-        updater.apply()
-    }
-}
-
-impl<T: ModifiedContext> ModifiedStateUpdater<T> {
-    pub fn new(state: ModifiedState<T>) -> Self {
-        Self {
-            modifiers: state.modifiers.as_ref().clone(),
-            context: state.context,
-            kinds: Vec::new(),
-        }
-    }
-
-    fn with_trigger(mut self, trigger: TriggerKind<T::CustomEvent>) -> Self {
-        self.kinds.push(ModifiedInput::Trigger(trigger));
-        self
-    }
-
-    fn with_button_pressed(mut self, button: ButtonKind) -> Self {
-        self.kinds.push(ModifiedInput::Press(button.clone()));
-        let is_added = self.modifiers.buttons.insert(button);
-        assert!(is_added);
-        self
-    }
-
-    fn with_button_released(mut self, button: ButtonKind) -> Self {
-        let is_removed = self.modifiers.buttons.remove(&button);
-        assert!(is_removed);
-        self.kinds.push(ModifiedInput::Release(button));
-        self
-    }
-
-    fn with_axis_changed(mut self, axis: Axis) -> Self {
-        self.kinds.push(ModifiedInput::Change(axis.clone()));
-        match axis.value {
-            Some(value) => {
-                let _ = self.modifiers.axes.insert(axis.kind, value);
-            }
-            None => {
-                let _ = self.modifiers.axes.remove(&axis.kind);
-            }
-        }
-
-        self
-    }
-
-    pub fn apply(self) -> ModifiedState<T> {
-        assert!(!self.kinds.is_empty());
-        let modifiers = Arc::new(self.modifiers);
-        let mut context = self.context;
-        for kind in self.kinds {
-            context = context.emit_event(ModifiedEvent {
-                input: kind,
-                modifiers: Arc::clone(&modifiers),
-            });
-        }
-        ModifiedState { modifiers, context }
     }
 }

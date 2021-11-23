@@ -41,6 +41,27 @@ pub enum ButtonTimedInput<T> {
     LongReleased { timeout: Arc<T> },
 }
 
+// TODO
+impl ButtonKind {
+    #[must_use]
+    pub const fn long_click_duration(&self) -> LongClickDuration {
+        match self {
+            ButtonKind::KeyboardKey(_) => LongClickDuration::Key,
+            ButtonKind::MouseButton(_) => LongClickDuration::Mouse,
+            ButtonKind::Touch(_) => LongClickDuration::Touch,
+        }
+    }
+
+    #[must_use]
+    pub const fn multi_click_duration(&self) -> MultiClickDuration {
+        match self {
+            ButtonKind::KeyboardKey(_) => MultiClickDuration::Key,
+            ButtonKind::MouseButton(_) => MultiClickDuration::Mouse,
+            ButtonKind::Touch(_) => MultiClickDuration::Touch,
+        }
+    }
+}
+
 #[derive(Clone, Copy, Debug)]
 pub enum Duration {
     LongClick(LongClickDuration),
@@ -402,11 +423,76 @@ impl<T> Default for TimedStateButtons<T> {
     }
 }
 
+/*
+pub type TimedInputWithEventResultWithData<T> = Result<T, TimedInputWithEventErrorWithData<T>>;
+
+#[derive(Clone, Debug, Error)]
+#[error("{err}")]
+pub struct TimedInputWithEventErrorWithData<T> {
+    data: T,
+    err: TimedInputWithEventError,
+}
+*/
+
+#[derive(Clone, Debug, Error)]
+pub enum TimedInputWithEventError {
+    #[error(transparent)]
+    Pressed(#[from] TimedInputWithPressEventError),
+    #[error(transparent)]
+    Released(#[from] TimedInputWithReleaseEventError),
+}
+
+#[derive(Clone, Debug, Error)]
+pub enum TimedInputWithPressEventError {
+    #[error("Button {button:?} is pressed while in Pressed state")]
+    AlreadyPressed { button: ButtonKind },
+
+    #[error("Button {button:?} is pressed while in LongPressed state")]
+    AlreadyLongPressed { button: ButtonKind },
+}
+
+#[derive(Clone, Debug, Error)]
+pub enum TimedInputWithReleaseEventError {
+    #[error("Button {button:?} is released while in Released state")]
+    AlreadyReleased { button: ButtonKind },
+
+    #[error("Button {button:?} is released while in LongPressed state")]
+    AlreadyLongPressed { button: ButtonKind },
+}
+
+#[derive(Clone, Debug, Error)]
+pub enum TimedInputWithTimeoutEventError {
+    #[error("Timeout handler for button {button:?} called while in LongPressed state that do not schedule any timeouts")]
+    LongPressed { button: ButtonKind },
+
+    #[error("Timeout handler for button {button:?} called for default button state")]
+    DefaultButtonState { button: ButtonKind },
+}
+
+/*
+impl TimedInputWithEventError {
+    fn with_data<T>(self, data: T) -> TimedInputWithEventErrorWithData<T> {
+        TimedInputWithEventErrorWithData { data, err: self }
+    }
+}
+
+impl<T> TimedInputWithEventErrorWithData<T> {
+    fn map_data<U, F>(self, f: F) -> TimedInputWithEventErrorWithData<U>
+    where
+        F: FnMut(T) -> U,
+    {
+        TimedInputWithEventErrorWithData {
+            data: f(self.data),
+            err: self.err,
+        }
+    }
+}
+*/
+
 #[test]
 fn raw_input_to_input_test() {
     use std::{collections::BTreeMap, sync::Arc, sync::Weak};
 
-    use crate::ModifiedContext;
     use crate::{
         ButtonKind, CombinedEvent, CombinedInput, KeyboardKey, ModifiedEvent, ModifiedState,
         MouseButton, RawInput,
@@ -420,11 +506,33 @@ fn raw_input_to_input_test() {
     }
 
     #[derive(Clone, Debug)]
-    struct RawSimpleContext {
-        state: TimedState<TimedSimpleContext>,
+    struct State {
+        modified_state: ModifiedState,
+        timed_state: TimedState<TimedSimpleContext>,
     }
 
-    impl ModifiedState<RawSimpleContext> {
+    impl State {
+        fn with_context_event(self, ev: RawInput<()>, timestamp: TimestampMs) -> Self {
+            println!("{:?}", ev);
+
+            let mut timed_state = self.timed_state;
+            assert!(timed_state.context.time < timestamp);
+            timed_state.context.time = timestamp;
+
+            let result = self.modified_state.with_event(ev);
+            let modified_state = result.to_state();
+            for ev in result {
+                println!("{:?}", ev);
+                timed_state = timed_state.with_context_event(ev);
+            }
+            Self {
+                modified_state,
+                timed_state,
+            }
+        }
+    }
+
+    /*impl ModifiedState<RawSimpleContext> {
         fn with_context_event(mut self, ev: RawInput<()>, timestamp: TimestampMs) -> Self {
             println!("{:?}", ev);
 
@@ -444,9 +552,9 @@ fn raw_input_to_input_test() {
             context.state.context.events.clear();
             Self::from_parts(modifiers, context)
         }
-    }
+    }*/
 
-    impl ModifiedContext for RawSimpleContext {
+    /*impl ModifiedContext for RawSimpleContext {
         type CustomEvent = ();
 
         fn emit_event(mut self, ev: ModifiedEvent<Self::CustomEvent>) -> Self {
@@ -458,7 +566,7 @@ fn raw_input_to_input_test() {
                 state: self.state.with_context_event(ev),
             }
         }
-    }
+    }*/
 
     #[derive(Clone, Debug)]
     struct TimedSimpleContext {
@@ -524,8 +632,11 @@ fn raw_input_to_input_test() {
         events: vec![],
     };
     let timed_state = TimedState::new(timed_context);
-    let context = RawSimpleContext { state: timed_state };
-    let state = ModifiedState::new(context);
+    let modified_state = ModifiedState::new();
+    let state = State {
+        modified_state,
+        timed_state,
+    };
 
     let ctrl = || KeyboardKey("LeftCtrl".to_owned());
 
@@ -544,70 +655,3 @@ fn raw_input_to_input_test() {
 
     let _ = state;
 }
-
-/*
-pub type TimedInputWithEventResultWithData<T> = Result<T, TimedInputWithEventErrorWithData<T>>;
-
-#[derive(Clone, Debug, Error)]
-#[error("{err}")]
-pub struct TimedInputWithEventErrorWithData<T> {
-    data: T,
-    err: TimedInputWithEventError,
-}
-*/
-
-#[derive(Clone, Debug, Error)]
-pub enum TimedInputWithEventError {
-    #[error(transparent)]
-    Pressed(#[from] TimedInputWithPressEventError),
-    #[error(transparent)]
-    Released(#[from] TimedInputWithReleaseEventError),
-}
-
-#[derive(Clone, Debug, Error)]
-pub enum TimedInputWithPressEventError {
-    #[error("Button {button:?} is pressed while in Pressed state")]
-    AlreadyPressed { button: ButtonKind },
-
-    #[error("Button {button:?} is pressed while in LongPressed state")]
-    AlreadyLongPressed { button: ButtonKind },
-}
-
-#[derive(Clone, Debug, Error)]
-pub enum TimedInputWithReleaseEventError {
-    #[error("Button {button:?} is released while in Released state")]
-    AlreadyReleased { button: ButtonKind },
-
-    #[error("Button {button:?} is released while in LongPressed state")]
-    AlreadyLongPressed { button: ButtonKind },
-}
-
-#[derive(Clone, Debug, Error)]
-pub enum TimedInputWithTimeoutEventError {
-    #[error("Timeout handler for button {button:?} called while in LongPressed state that do not schedule any timeouts")]
-    LongPressed { button: ButtonKind },
-
-    #[error("Timeout handler for button {button:?} called for default button state")]
-    DefaultButtonState { button: ButtonKind },
-}
-
-/*
-impl TimedInputWithEventError {
-    fn with_data<T>(self, data: T) -> TimedInputWithEventErrorWithData<T> {
-        TimedInputWithEventErrorWithData { data, err: self }
-    }
-}
-
-impl<T> TimedInputWithEventErrorWithData<T> {
-    fn map_data<U, F>(self, f: F) -> TimedInputWithEventErrorWithData<U>
-    where
-        F: FnMut(T) -> U,
-    {
-        TimedInputWithEventErrorWithData {
-            data: f(self.data),
-            err: self.err,
-        }
-    }
-}
-
-*/
