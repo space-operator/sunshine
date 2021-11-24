@@ -4,68 +4,55 @@ use thiserror::Error;
 use crate::{ButtonKind, EventWithModifiers, ModifiedEvent, ModifiedInput, Modifiers};
 
 pub type NumClicks = u32;
+pub type TimedEvent = EventWithModifiers<TimedInput>;
 
-#[derive(Clone, Debug)]
-pub struct TimedState<T: TimedContext> {
-    buttons: TimedStateButtons<T::Timeout>,
-    context: T,
+#[derive(Clone, Debug, Default)]
+pub struct TimedState {
+    buttons: TimedStateButtons,
 }
 
 #[derive(Clone, Debug)]
-pub struct TimedStateButtons<T>(HashMap<ButtonKind, ButtonTimedState<T>>);
+pub struct TimedStateButtons(HashMap<ButtonKind, ButtonTimedState>);
 
 #[derive(Clone, Debug)]
-struct ButtonTimedState<T> {
-    input: ButtonTimedInput<T>,
+struct ButtonTimedState {
+    input: ButtonTimedInput,
     modifiers: Arc<Modifiers>,
     num_clicks: NumClicks,
 }
 
-struct ButtonTimedStateWithContext<T: TimedContext> {
-    context: T,
-    input: ButtonTimedInput<T::Timeout>,
-    modifiers: Arc<Modifiers>,
-    num_clicks: NumClicks,
-}
-
-enum TimedEventResult<T: TimedContext> {
-    StateWithContext(ButtonTimedStateWithContext<T>),
-    Context(T),
-}
-
 #[derive(Clone, Debug)]
-pub enum ButtonTimedInput<T> {
-    Pressed { timeout: Arc<T> },
+enum ButtonTimedInput {
+    Pressed(Arc<ScheduledTransition>),
     LongPressed,
-    Released { timeout: Arc<T> },
-    LongReleased { timeout: Arc<T> },
+    Released(Arc<ScheduledTransition>),
+    LongReleased(Arc<ScheduledTransition>),
 }
 
-// TODO
-impl ButtonKind {
-    #[must_use]
-    pub const fn long_click_duration(&self) -> LongClickDuration {
-        match self {
-            ButtonKind::KeyboardKey(_) => LongClickDuration::Key,
-            ButtonKind::MouseButton(_) => LongClickDuration::Mouse,
-            ButtonKind::Touch(_) => LongClickDuration::Touch,
-        }
-    }
+#[derive(Clone, Debug)]
+pub struct ScheduledTimeout {
+    pub transition: Arc<ScheduledTransition>,
+    pub duration: Duration,
+}
 
-    #[must_use]
-    pub const fn multi_click_duration(&self) -> MultiClickDuration {
-        match self {
-            ButtonKind::KeyboardKey(_) => MultiClickDuration::Key,
-            ButtonKind::MouseButton(_) => MultiClickDuration::Mouse,
-            ButtonKind::Touch(_) => MultiClickDuration::Touch,
+#[derive(Clone, Debug)]
+pub struct ScheduledTransition {
+    button: ButtonKind,
+}
+
+impl ScheduledTimeout {
+    fn new(transition: Arc<ScheduledTransition>, duration: Duration) -> Self {
+        Self {
+            transition,
+            duration,
         }
     }
 }
 
 #[derive(Clone, Copy, Debug)]
 pub enum Duration {
-    LongClick(LongClickDuration),
-    MultiClick(MultiClickDuration),
+    LongClick,
+    MultiClick,
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -81,14 +68,6 @@ pub enum MultiClickDuration {
     Mouse,
     Touch,
 }
-
-pub trait TimedContext: Sized {
-    type Timeout;
-    fn schedule(self, button: ButtonKind, delay: Duration) -> (Self, Arc<Self::Timeout>);
-    fn emit_event(self, ev: TimedEvent) -> Self;
-}
-
-pub type TimedEvent = EventWithModifiers<TimedInput>;
 
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum TimedInput {
@@ -114,60 +93,50 @@ pub enum TimedInput {
     },
 }
 
-impl<T: TimedContext> TimedState<T> {
-    pub fn new(context: T) -> Self {
-        Self {
-            buttons: TimedStateButtons::default(),
-            context,
-        }
+#[derive(Clone, Debug)]
+pub struct TimedTransition {
+    pub event: Option<TimedEvent>,
+    pub scheduled: Option<ScheduledTimeout>,
+    pub state: TimedState,
+}
+
+#[derive(Clone, Debug)]
+pub struct TimedTransitionError<E> {
+    pub state: TimedState,
+    pub error: E,
+}
+
+impl TimedState {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    pub fn from_parts(buttons: TimedStateButtons<T::Timeout>, context: T) -> Self {
-        Self { buttons, context }
-    }
-
-    pub fn context(&self) -> &T {
-        &self.context
-    }
-
-    pub fn context_mut(&mut self) -> &mut T {
-        &mut self.context
-    }
-
-    pub fn split(self) -> (TimedStateButtons<T::Timeout>, T) {
-        (self.buttons, self.context)
-    }
-
-    #[allow(clippy::missing_panics_doc)] // asserts should never be called
-    pub fn with_event<U>(
+    pub fn with_event<T>(
         self,
-        ev: ModifiedEvent<U>,
-    ) -> (Self, Result<(), TimedInputWithEventError>) {
+        ev: ModifiedEvent<T>,
+    ) -> Result<TimedTransition, TimedTransitionError<TimedInputWithEventError>> {
         use std::collections::hash_map::Entry;
         use ModifiedInput::{Change, Press, Release, Repeat, Trigger};
 
         let modifiers = ev.modifiers;
         let mut buttons = self.buttons;
-        let context = self.context;
-        let (context, err) = match ev.input {
+        match ev.input {
             Press(button) => {
                 let entry = buttons.0.entry(button.clone());
                 match entry {
                     Entry::Occupied(entry) => {
                         let state = entry.remove();
-                        let (result, err) =
-                            state.with_context(context).with_press_event(button.clone());
-                        let (state, context) = result.split();
-                        let prev = buttons.0.insert(button, state);
-                        assert!(prev.is_none());
-                        (context, err.map_err(Into::into))
+                        let transition = state.with_press_event(button.clone());
+                        Self::from_buttons_transition(buttons, button, transition)
                     }
                     Entry::Vacant(entry) => {
-                        let (state, context) =
-                            ButtonTimedStateWithContext::from_pressed(button, &modifiers, context)
-                                .split();
-                        let _: &mut _ = entry.insert(state);
-                        (context, Ok(()))
+                        let transition = ButtonTimedState::from_pressed(button, &modifiers);
+                        let _: &mut _ = entry.insert(transition.state);
+                        Ok(TimedTransition {
+                            event: transition.event,
+                            scheduled: transition.scheduled,
+                            state: Self { buttons },
+                        })
                     }
                 }
             }
@@ -176,118 +145,161 @@ impl<T: TimedContext> TimedState<T> {
                 match entry {
                     Entry::Occupied(entry) => {
                         let state = entry.remove();
-                        let (result, err) = state
-                            .with_context(context)
-                            .with_release_event(button.clone());
-                        let (state, context) = result.split();
-                        let prev = buttons.0.insert(button, state);
-                        assert!(prev.is_none());
-                        (context, err.map_err(Into::into))
+                        let transition = state.with_release_event(button.clone());
+                        Self::from_buttons_transition(buttons, button, transition)
                     }
-                    Entry::Vacant(_) => (context, Ok(())),
+                    Entry::Vacant(_) => Ok(TimedTransition {
+                        event: None,
+                        scheduled: None,
+                        state: Self { buttons },
+                    }),
                 }
             }
-            Repeat(_) | Change(_) | Trigger(_) => (context, Ok(())),
-        };
-        (Self { buttons, context }, err)
+            Repeat(_) | Change(_) | Trigger(_) => Ok(TimedTransition {
+                event: None,
+                scheduled: None,
+                state: Self { buttons },
+            }),
+        }
     }
 
-    #[allow(clippy::missing_panics_doc)] // asserts should never be called
-    pub fn with_timeout_event(
-        mut self,
+    fn from_buttons_transition<E1, E2: From<E1>>(
+        mut buttons: TimedStateButtons,
         button: ButtonKind,
-    ) -> (Self, Result<(), TimedInputWithTimeoutEventError>) {
-        match self.buttons.0.remove(&button) {
-            Some(state) => {
-                let mut buttons = self.buttons;
-                let (result, err) = state
-                    .with_context(self.context)
-                    .with_timeout_event(button.clone());
-                let context = match result {
-                    TimedEventResult::StateWithContext(result) => {
-                        let (state, context) = result.split();
-                        let prev = buttons.0.insert(button, state);
-                        assert!(prev.is_none());
-                        context
-                    }
-                    TimedEventResult::Context(context) => context,
-                };
-                (Self { buttons, context }, err)
+        transition: Result<TimedButtonTransition, TimedButtonTransitionError<E1>>,
+    ) -> Result<TimedTransition, TimedTransitionError<E2>> {
+        match transition {
+            Ok(transition) => {
+                let prev = buttons.0.insert(button, transition.state);
+                assert!(prev.is_none());
+                Ok(TimedTransition {
+                    event: transition.event,
+                    scheduled: transition.scheduled,
+                    state: Self { buttons },
+                })
             }
-            None => (
-                self,
-                Err(TimedInputWithTimeoutEventError::DefaultButtonState { button }),
-            ),
+            Err(error) => {
+                let prev = buttons.0.insert(button, error.state);
+                assert!(prev.is_none());
+                Err(TimedTransitionError {
+                    state: Self { buttons },
+                    error: error.error.into(),
+                })
+            }
         }
     }
-}
 
-impl<U> ButtonTimedState<U> {
-    fn with_context<T: TimedContext<Timeout = U>>(
+    pub fn with_timeout_event(
         self,
-        context: T,
-    ) -> ButtonTimedStateWithContext<T> {
-        ButtonTimedStateWithContext {
-            context,
-            input: self.input,
-            modifiers: self.modifiers,
-            num_clicks: self.num_clicks,
+        transition: Arc<ScheduledTransition>,
+    ) -> Result<TimedTransition, TimedTransitionError<TimedInputWithTimeoutEventError>> {
+        let button = transition.button.clone(); // TODO: no clone
+        let mut buttons = self.buttons;
+        match buttons.0.remove(&button) {
+            Some(state) => {
+                let transition = state.with_timeout_event(button.clone());
+
+                match transition {
+                    Ok(transition) => {
+                        if let Some(state) = transition.state {
+                            let prev = buttons.0.insert(button, state);
+                            assert!(prev.is_none());
+                        }
+                        Ok(TimedTransition {
+                            event: transition.event,
+                            scheduled: transition.scheduled,
+                            state: Self { buttons },
+                        })
+                    }
+                    Err(error) => {
+                        let prev = buttons.0.insert(button, error.state);
+                        assert!(prev.is_none());
+                        Err(TimedTransitionError {
+                            state: Self { buttons },
+                            error: error.error.into(),
+                        })
+                    }
+                }
+            }
+            None => Err(TimedTransitionError {
+                state: Self { buttons },
+                error: TimedInputWithTimeoutEventError::DefaultButtonState { button },
+            }),
         }
     }
 }
 
-impl<T: TimedContext> ButtonTimedStateWithContext<T> {
-    fn split(self) -> (ButtonTimedState<T::Timeout>, T) {
-        (
-            ButtonTimedState {
-                input: self.input,
-                modifiers: self.modifiers,
-                num_clicks: self.num_clicks,
-            },
-            self.context,
-        )
-    }
+#[derive(Clone, Debug)]
+pub struct TimedButtonTransition {
+    state: ButtonTimedState,
+    event: Option<TimedEvent>,
+    scheduled: Option<ScheduledTimeout>,
+}
 
-    fn from_pressed(button: ButtonKind, modifiers: &Arc<Modifiers>, context: T) -> Self {
-        let delay = Duration::LongClick(button.long_click_duration());
-        let (context, timeout) = context.schedule(button, delay);
-        let kind = ButtonTimedInput::Pressed { timeout };
-        let modifiers = Arc::clone(modifiers);
-        Self {
-            context,
-            input: kind,
-            modifiers,
-            num_clicks: 0,
+#[derive(Clone, Debug)]
+pub struct TimedButtonOptionTransition {
+    state: Option<ButtonTimedState>,
+    event: Option<TimedEvent>,
+    scheduled: Option<ScheduledTimeout>,
+}
+
+/*
+#[derive(Clone, Debug)]
+pub struct TimedButtonTransitionOutput {
+    event: Option<TimedEvent>,
+    scheduled: Option<ScheduledTimeout>,
+}
+*/
+
+#[derive(Clone, Debug)]
+pub struct TimedButtonTransitionError<E> {
+    state: ButtonTimedState,
+    error: E,
+}
+
+impl ButtonTimedState {
+    fn from_pressed(button: ButtonKind, modifiers: &Arc<Modifiers>) -> TimedButtonTransition {
+        let transition = Arc::new(ScheduledTransition { button });
+        let scheduled = ScheduledTimeout::new(Arc::clone(&transition), Duration::LongClick);
+        TimedButtonTransition {
+            state: Self {
+                input: ButtonTimedInput::Pressed(transition),
+                modifiers: Arc::clone(modifiers),
+                num_clicks: 0,
+            },
+            event: None,
+            scheduled: Some(scheduled),
         }
     }
 
     fn with_press_event(
         self,
         button: ButtonKind,
-    ) -> (Self, Result<(), TimedInputWithPressEventError>) {
+    ) -> Result<TimedButtonTransition, TimedButtonTransitionError<TimedInputWithPressEventError>>
+    {
         use ButtonTimedInput::{LongPressed, LongReleased, Pressed, Released};
 
         match self.input {
-            Pressed { timeout: _ } => (
-                self,
-                Err(TimedInputWithPressEventError::AlreadyPressed { button }),
-            ),
-            LongPressed {} => (
-                self,
-                Err(TimedInputWithPressEventError::AlreadyLongPressed { button }),
-            ),
-            Released { timeout: _ } | LongReleased { timeout: _ } => {
-                let delay = Duration::LongClick(button.long_click_duration());
-                let (context, timeout) = self.context.schedule(button, delay);
-                (
-                    Self {
-                        context,
-                        input: Pressed { timeout },
+            Pressed(_) => Err(TimedButtonTransitionError {
+                state: self,
+                error: TimedInputWithPressEventError::AlreadyPressed { button },
+            }),
+            LongPressed => Err(TimedButtonTransitionError {
+                state: self,
+                error: TimedInputWithPressEventError::AlreadyLongPressed { button },
+            }),
+            Released(_) | LongReleased(_) => {
+                let transition = Arc::new(ScheduledTransition { button });
+                let scheduled = ScheduledTimeout::new(Arc::clone(&transition), Duration::LongClick);
+                Ok(TimedButtonTransition {
+                    state: Self {
+                        input: Pressed(transition),
                         modifiers: self.modifiers,
                         num_clicks: self.num_clicks,
                     },
-                    Ok(()),
-                )
+                    event: None,
+                    scheduled: Some(scheduled),
+                })
             }
         }
     }
@@ -295,114 +307,114 @@ impl<T: TimedContext> ButtonTimedStateWithContext<T> {
     fn with_release_event(
         self,
         button: ButtonKind,
-    ) -> (Self, Result<(), TimedInputWithReleaseEventError>) {
+    ) -> Result<TimedButtonTransition, TimedButtonTransitionError<TimedInputWithReleaseEventError>>
+    {
         use ButtonTimedInput::{LongPressed, LongReleased, Pressed, Released};
 
         match self.input {
-            Pressed { timeout: _ } => {
-                let context = self.context.emit_event(TimedEvent::new(
-                    TimedInput::Click {
-                        button: button.clone(),
+            Pressed(_) => {
+                let transition = Arc::new(ScheduledTransition {
+                    button: button.clone(),
+                });
+                let scheduled =
+                    ScheduledTimeout::new(Arc::clone(&transition), Duration::MultiClick);
+                Ok(TimedButtonTransition {
+                    state: Self {
+                        input: Released(transition),
+                        modifiers: Arc::clone(&self.modifiers),
                         num_clicks: self.num_clicks + 1,
                     },
-                    Arc::clone(&self.modifiers),
-                ));
-                let delay = Duration::MultiClick(button.multi_click_duration());
-                let (context, timeout) = context.schedule(button, delay);
-                (
-                    Self {
-                        context,
-                        input: Released { timeout },
-                        modifiers: self.modifiers,
-                        num_clicks: self.num_clicks + 1,
-                    },
-                    Ok(()),
-                )
+                    event: Some(TimedEvent::new(
+                        TimedInput::Click {
+                            button: button,
+                            num_clicks: self.num_clicks + 1,
+                        },
+                        self.modifiers,
+                    )),
+                    scheduled: Some(scheduled),
+                })
             }
-            LongPressed => {
-                let context = self.context.emit_event(TimedEvent::new(
-                    TimedInput::LongClick {
-                        button: button.clone(),
-                        num_clicks: self.num_clicks + 1,
-                    },
-                    Arc::clone(&self.modifiers),
-                ));
-                let delay = Duration::MultiClick(button.multi_click_duration());
-                let (context, timeout) = context.schedule(button, delay);
-                (
-                    Self {
-                        context,
-                        input: Released { timeout },
-                        modifiers: self.modifiers,
-                        num_clicks: self.num_clicks + 1,
-                    },
-                    Ok(()),
-                )
-            }
-            Released { timeout: _ } => (
-                self,
-                Err(TimedInputWithReleaseEventError::AlreadyReleased { button }),
-            ),
 
-            LongReleased { timeout: _ } => (
-                self,
-                Err(TimedInputWithReleaseEventError::AlreadyLongPressed { button }),
-            ),
+            LongPressed => {
+                let transition = Arc::new(ScheduledTransition { button });
+                let scheduled =
+                    ScheduledTimeout::new(Arc::clone(&transition), Duration::MultiClick);
+                Ok(TimedButtonTransition {
+                    state: Self {
+                        input: LongReleased(transition),
+                        modifiers: self.modifiers,
+                        num_clicks: self.num_clicks + 1,
+                    },
+                    event: None,
+                    scheduled: Some(scheduled),
+                })
+            }
+
+            Released(_) => Err(TimedButtonTransitionError {
+                state: self,
+                error: TimedInputWithReleaseEventError::AlreadyReleased { button },
+            }),
+
+            LongReleased(_) => Err(TimedButtonTransitionError {
+                state: self,
+                error: TimedInputWithReleaseEventError::AlreadyLongPressed { button },
+            }),
         }
     }
 
     fn with_timeout_event(
         self,
         button: ButtonKind,
-    ) -> (
-        TimedEventResult<T>,
-        Result<(), TimedInputWithTimeoutEventError>,
-    ) {
+    ) -> Result<
+        TimedButtonOptionTransition,
+        TimedButtonTransitionError<TimedInputWithTimeoutEventError>,
+    > {
         use ButtonTimedInput::{LongPressed, LongReleased, Pressed, Released};
+        let num_clicks = self.num_clicks;
 
         match self.input {
-            Pressed { timeout: _ } => {
-                let context = self.context.emit_event(EventWithModifiers::new(
-                    TimedInput::LongPress {
-                        button,
-                        num_clicks: self.num_clicks,
-                    },
-                    Arc::clone(&self.modifiers),
-                ));
-                (
-                    TimedEventResult::StateWithContext(Self {
-                        context,
+            Pressed(_) => {
+                let transition = Arc::new(ScheduledTransition {
+                    button: button.clone(),
+                });
+                let scheduled =
+                    ScheduledTimeout::new(Arc::clone(&transition), Duration::MultiClick);
+                Ok(TimedButtonOptionTransition {
+                    state: Some(Self {
                         input: LongPressed,
-                        modifiers: self.modifiers,
-                        num_clicks: self.num_clicks,
+                        modifiers: Arc::clone(&self.modifiers),
+                        num_clicks,
                     }),
-                    Ok(()),
-                )
+                    event: Some(TimedEvent::new(
+                        TimedInput::LongPress { button, num_clicks },
+                        self.modifiers,
+                    )),
+                    scheduled: Some(scheduled),
+                })
             }
-            LongPressed => (
-                (TimedEventResult::StateWithContext(self)),
-                Err(TimedInputWithTimeoutEventError::LongPressed { button }),
-            ),
-            Released { timeout: _ } => {
-                let context = self.context.emit_event(EventWithModifiers::new(
-                    TimedInput::ClickExact {
-                        button,
-                        num_clicks: self.num_clicks,
-                    },
+
+            LongPressed => Err(TimedButtonTransitionError {
+                state: self,
+                error: TimedInputWithTimeoutEventError::LongPressed { button },
+            }),
+
+            Released(_) => Ok(TimedButtonOptionTransition {
+                state: None,
+                event: Some(TimedEvent::new(
+                    TimedInput::ClickExact { button, num_clicks },
                     Arc::clone(&self.modifiers),
-                ));
-                (TimedEventResult::Context(context), Ok(()))
-            }
-            LongReleased { timeout: _ } => {
-                let context = self.context.emit_event(EventWithModifiers::new(
-                    TimedInput::LongClickExact {
-                        button,
-                        num_clicks: self.num_clicks,
-                    },
+                )),
+                scheduled: None,
+            }),
+
+            LongReleased(_) => Ok(TimedButtonOptionTransition {
+                state: None,
+                event: Some(TimedEvent::new(
+                    TimedInput::LongClickExact { button, num_clicks },
                     Arc::clone(&self.modifiers),
-                ));
-                (TimedEventResult::Context(context), Ok(()))
-            }
+                )),
+                scheduled: None,
+            }),
         }
     }
 }
@@ -417,22 +429,11 @@ impl TimedEvent {
     }
 }
 
-impl<T> Default for TimedStateButtons<T> {
+impl Default for TimedStateButtons {
     fn default() -> Self {
         Self(HashMap::default())
     }
 }
-
-/*
-pub type TimedInputWithEventResultWithData<T> = Result<T, TimedInputWithEventErrorWithData<T>>;
-
-#[derive(Clone, Debug, Error)]
-#[error("{err}")]
-pub struct TimedInputWithEventErrorWithData<T> {
-    data: T,
-    err: TimedInputWithEventError,
-}
-*/
 
 #[derive(Clone, Debug, Error)]
 pub enum TimedInputWithEventError {
@@ -469,189 +470,136 @@ pub enum TimedInputWithTimeoutEventError {
     DefaultButtonState { button: ButtonKind },
 }
 
-/*
-impl TimedInputWithEventError {
-    fn with_data<T>(self, data: T) -> TimedInputWithEventErrorWithData<T> {
-        TimedInputWithEventErrorWithData { data, err: self }
-    }
-}
-
-impl<T> TimedInputWithEventErrorWithData<T> {
-    fn map_data<U, F>(self, f: F) -> TimedInputWithEventErrorWithData<U>
-    where
-        F: FnMut(T) -> U,
-    {
-        TimedInputWithEventErrorWithData {
-            data: f(self.data),
-            err: self.err,
-        }
-    }
-}
-*/
-
 #[test]
 fn raw_input_to_input_test() {
     use std::{collections::BTreeMap, sync::Arc, sync::Weak};
 
-    use crate::{
-        ButtonKind, CombinedEvent, CombinedInput, KeyboardKey, ModifiedEvent, ModifiedState,
-        MouseButton, RawInput,
-    };
+    use crate::{CombinedEvent, CombinedInput, KeyboardKey, ModifiedState, MouseButton, RawInput};
 
     type TimestampMs = u64;
 
     #[derive(Clone, Debug)]
-    struct ScheduledTimeout {
-        button: ButtonKind,
-    }
-
-    #[derive(Clone, Debug)]
     struct State {
         modified_state: ModifiedState,
-        timed_state: TimedState<TimedSimpleContext>,
+        timed_state: TimedState,
+        timeouts: BTreeMap<TimestampMs, Weak<ScheduledTransition>>,
+        last_timestamp: TimestampMs,
     }
 
     impl State {
-        fn with_context_event(self, ev: RawInput<()>, timestamp: TimestampMs) -> Self {
+        fn with_event(
+            self,
+            ev: RawInput<()>,
+            timestamp: TimestampMs,
+        ) -> (Self, Vec<CombinedEvent<()>>) {
+            fn apply_timed_transition(
+                mut events: Vec<EventWithModifiers<CombinedInput<()>>>,
+                mut timeouts: BTreeMap<TimestampMs, Weak<ScheduledTransition>>,
+                transition: TimedTransition,
+                timestamp: TimestampMs,
+            ) -> (
+                Vec<EventWithModifiers<CombinedInput<()>>>,
+                TimedState,
+                BTreeMap<TimestampMs, Weak<ScheduledTransition>>,
+            ) {
+                events.extend(transition.event.into_iter().map(|ev| CombinedEvent {
+                    input: CombinedInput::Timed(ev.input),
+                    modifiers: ev.modifiers,
+                }));
+                if let Some(scheduled) = transition.scheduled {
+                    let delay = match scheduled.duration {
+                        Duration::LongClick => 1000,
+                        Duration::MultiClick => 300,
+                    };
+                    let _ =
+                        timeouts.insert(timestamp + delay, Arc::downgrade(&scheduled.transition));
+                }
+                (events, transition.state, timeouts)
+            }
+
+            println!();
             println!("{:?}", ev);
 
             let mut timed_state = self.timed_state;
-            assert!(timed_state.context.time < timestamp);
-            timed_state.context.time = timestamp;
+            let mut timeouts = self.timeouts;
+            assert!(self.last_timestamp < timestamp);
+            let last_timestamp = timestamp;
 
-            let result = self.modified_state.with_event(ev);
-            let modified_state = result.to_state();
-            for ev in result {
-                println!("{:?}", ev);
-                timed_state = timed_state.with_context_event(ev);
-            }
-            Self {
-                modified_state,
-                timed_state,
-            }
-        }
-    }
+            let mut events = Vec::new();
 
-    /*impl ModifiedState<RawSimpleContext> {
-        fn with_context_event(mut self, ev: RawInput<()>, timestamp: TimestampMs) -> Self {
-            println!("{:?}", ev);
-
-            assert!(self.context().state.context.time < timestamp);
-            self.context_mut().state.context.time = timestamp;
-
-            let (modifiers, context) = self.split();
-            self = Self::from_parts(modifiers, context);
-            self = self.with_event(ev);
-
-            println!("{:?}", self);
-            for event in &self.context().state.context.events {
-                println!("{:?}", event);
-            }
-            println!();
-            let (modifiers, mut context) = self.split();
-            context.state.context.events.clear();
-            Self::from_parts(modifiers, context)
-        }
-    }*/
-
-    /*impl ModifiedContext for RawSimpleContext {
-        type CustomEvent = ();
-
-        fn emit_event(mut self, ev: ModifiedEvent<Self::CustomEvent>) -> Self {
-            self.state.context.events.push(CombinedEvent {
-                input: CombinedInput::Modified(ev.input.clone()),
-                modifiers: ev.modifiers.clone(),
-            });
-            Self {
-                state: self.state.with_context_event(ev),
-            }
-        }
-    }*/
-
-    #[derive(Clone, Debug)]
-    struct TimedSimpleContext {
-        time: TimestampMs,
-        timeouts: BTreeMap<TimestampMs, Weak<ScheduledTimeout>>,
-        events: Vec<CombinedEvent<()>>,
-    }
-
-    impl TimedState<TimedSimpleContext> {
-        fn with_context_event(mut self, ev: ModifiedEvent<()>) -> Self {
-            //assert!(self.context.time < ev.timestamp);
-            //self.context.time = ev.timestamp;
-            while let Some(entry) = self.context.timeouts.first_entry() {
-                if *entry.key() > self.context.time {
+            while let Some(entry) = timeouts.first_entry() {
+                if *entry.key() > timestamp {
                     break;
                 }
-                let (_timestamp, timeout) = entry.remove_entry(); // TODO: timestamp?
+                let (_, timeout) = entry.remove_entry();
                 if let Some(timeout) = timeout.upgrade() {
-                    let (state, err) = self.with_timeout_event(timeout.button.clone());
-                    err.unwrap();
-                    self = state;
+                    let transition = timed_state.with_timeout_event(timeout).unwrap();
+                    let result = apply_timed_transition(events, timeouts, transition, timestamp);
+                    events = result.0;
+                    timed_state = result.1;
+                    timeouts = result.2;
                 }
             }
-            let (state, err) = self.with_event(ev);
-            err.unwrap();
-            state
+
+            let transition = self.modified_state.with_event(ev.clone());
+            let modified_state = transition.to_state();
+
+            for ev in transition {
+                events.push(CombinedEvent {
+                    input: CombinedInput::Modified(ev.input.clone()),
+                    modifiers: ev.modifiers.clone(),
+                });
+
+                let transition = timed_state.with_event(ev.clone()).unwrap();
+                let result = apply_timed_transition(events, timeouts, transition, timestamp);
+                events = result.0;
+                timed_state = result.1;
+                timeouts = result.2;
+            }
+
+            println!("{:?}", events);
+
+            (
+                Self {
+                    modified_state,
+                    timed_state,
+                    timeouts,
+                    last_timestamp,
+                },
+                events,
+            )
         }
     }
 
-    impl TimedContext for TimedSimpleContext {
-        type Timeout = ScheduledTimeout;
-
-        fn schedule(
-            mut self,
-            button: ButtonKind,
-            delay: Duration,
-        ) -> (Self, Arc<ScheduledTimeout>) {
-            let timeout = Arc::new(ScheduledTimeout { button });
-            let delay = match delay {
-                Duration::LongClick(_) => 1000,
-                Duration::MultiClick(_) => 300,
-            };
-            dbg!(&self.timeouts, self.time + delay);
-            let prev = self
-                .timeouts
-                .insert(self.time + delay, Arc::downgrade(&timeout));
-            assert!(prev.is_none());
-            (self, timeout)
-        }
-
-        fn emit_event(mut self, ev: TimedEvent) -> Self {
-            self.events.push(CombinedEvent {
-                input: CombinedInput::Timed(ev.input),
-                modifiers: ev.modifiers,
-            });
-            self
-        }
-    }
-
-    let timed_context = TimedSimpleContext {
-        time: 0,
-        timeouts: BTreeMap::new(),
-        events: vec![],
-    };
-    let timed_state = TimedState::new(timed_context);
-    let modified_state = ModifiedState::new();
     let state = State {
-        modified_state,
-        timed_state,
+        modified_state: ModifiedState::new(),
+        timed_state: TimedState::new(),
+        timeouts: BTreeMap::new(),
+        last_timestamp: 0,
     };
 
     let ctrl = || KeyboardKey("LeftCtrl".to_owned());
 
-    let state = state.with_context_event(RawInput::KeyDown(ctrl()), 10000);
-    let state = state.with_context_event(RawInput::KeyUp(ctrl()), 10500);
-    let state = state.with_context_event(RawInput::KeyDown(ctrl()), 11000);
-    let state = state.with_context_event(RawInput::KeyUp(ctrl()), 13000);
+    let state = state.with_event(RawInput::KeyDown(ctrl()), 10000).0;
+    let state = state.with_event(RawInput::KeyUp(ctrl()), 10500).0;
+    let state = state.with_event(RawInput::KeyDown(ctrl()), 11000).0;
+    let state = state.with_event(RawInput::KeyUp(ctrl()), 13000).0;
 
-    let state = state.with_context_event(RawInput::KeyDown(ctrl()), 15000);
-    let state = state.with_context_event(RawInput::MouseDown(MouseButton::Primary), 15100);
-    let state = state.with_context_event(RawInput::MouseUp(MouseButton::Primary), 15200);
-    let state = state.with_context_event(RawInput::MouseDown(MouseButton::Primary), 15300);
-    let state = state.with_context_event(RawInput::MouseUp(MouseButton::Primary), 15400);
+    let state = state.with_event(RawInput::KeyDown(ctrl()), 15000).0;
+    let state = state
+        .with_event(RawInput::MouseDown(MouseButton::Primary), 15100)
+        .0;
+    let state = state
+        .with_event(RawInput::MouseUp(MouseButton::Primary), 15200)
+        .0;
+    let state = state
+        .with_event(RawInput::MouseDown(MouseButton::Primary), 15300)
+        .0;
+    let state = state
+        .with_event(RawInput::MouseUp(MouseButton::Primary), 15400)
+        .0;
 
-    let state = state.with_context_event(RawInput::KeyUp(ctrl()), 18000);
+    let state = state.with_event(RawInput::KeyUp(ctrl()), 18000).0;
 
     let _ = state;
 }

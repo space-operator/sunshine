@@ -29,7 +29,7 @@ pub enum TriggerKind<T> {
     Custom(T),
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ModifiedState {
     modifiers: Arc<Modifiers>,
 }
@@ -39,14 +39,15 @@ struct ModifiedTransitionEventsBuilder {
     modifiers: Modifiers,
 }
 
+// TODO: impl Iterator not for this but for some subwrapper
 #[derive(Clone, Debug)]
-pub struct ModifiedTransitionEvents<T> {
-    state: ModifiedTransitionEventsState<T>,
+pub struct ModifiedTransition<T> {
+    state: ModifiedTransitionState<T>,
     modifiers: Arc<Modifiers>,
 }
 
 #[derive(Clone, Debug)]
-enum ModifiedTransitionEventsState<T> {
+enum ModifiedTransitionState<T> {
     Pressed(ButtonKind),
     Released(ButtonKind),
     MouseMoveXY(EventCoords),
@@ -63,16 +64,14 @@ enum ModifiedTransitionEventsState<T> {
 
 impl ModifiedState {
     pub fn new() -> Self {
-        Self {
-            modifiers: Arc::default(),
-        }
+        Self::default()
     }
 
     pub fn modifiers(&self) -> &Arc<Modifiers> {
         &self.modifiers
     }
 
-    pub fn with_event<T>(self, ev: RawInput<T>) -> ModifiedTransitionEvents<T> {
+    pub fn with_event<T>(self, ev: RawInput<T>) -> ModifiedTransition<T> {
         use RawInput::{
             Char, Custom, KeyDown, KeyUp, MouseDown, MouseMove, MouseScroll, MouseUp,
             MouseWheelDown, MouseWheelUp, TouchEnd, TouchMove, TouchStart,
@@ -97,7 +96,7 @@ impl ModifiedState {
     }
 }
 
-impl<T> ModifiedTransitionEvents<T> {
+impl<T> ModifiedTransition<T> {
     pub fn to_state(&self) -> ModifiedState {
         ModifiedState {
             modifiers: Arc::clone(&self.modifiers),
@@ -114,36 +113,36 @@ impl ModifiedTransitionEventsBuilder {
         Self { modifiers }
     }
 
-    fn with_pressed<T>(mut self, button: ButtonKind) -> ModifiedTransitionEvents<T> {
+    fn with_pressed<T>(mut self, button: ButtonKind) -> ModifiedTransition<T> {
         let is_added = self.modifiers.buttons.insert(button.clone());
         assert!(is_added);
-        ModifiedTransitionEvents {
-            state: ModifiedTransitionEventsState::Pressed(button),
+        ModifiedTransition {
+            state: ModifiedTransitionState::Pressed(button),
             modifiers: Arc::new(self.modifiers),
         }
     }
 
-    fn with_released<T>(mut self, button: ButtonKind) -> ModifiedTransitionEvents<T> {
+    fn with_released<T>(mut self, button: ButtonKind) -> ModifiedTransition<T> {
         let is_removed = self.modifiers.buttons.remove(&button);
         assert!(is_removed);
-        ModifiedTransitionEvents {
-            state: ModifiedTransitionEventsState::Released(button),
+        ModifiedTransition {
+            state: ModifiedTransitionState::Released(button),
             modifiers: Arc::new(self.modifiers),
         }
     }
 
-    fn with_trigger<T>(self, trigger: TriggerKind<T>) -> ModifiedTransitionEvents<T> {
-        ModifiedTransitionEvents {
-            state: ModifiedTransitionEventsState::Trigger(trigger),
+    fn with_trigger<T>(self, trigger: TriggerKind<T>) -> ModifiedTransition<T> {
+        ModifiedTransition {
+            state: ModifiedTransitionState::Trigger(trigger),
             modifiers: Arc::new(self.modifiers),
         }
     }
 
-    fn with_mouse_move<T>(mut self, (x, y): EventCoords) -> ModifiedTransitionEvents<T> {
+    fn with_mouse_move<T>(mut self, (x, y): EventCoords) -> ModifiedTransition<T> {
         let _ = self.modifiers.axes.insert(AxisKind::MouseX, x);
         let _ = self.modifiers.axes.insert(AxisKind::MouseY, y);
-        ModifiedTransitionEvents {
-            state: ModifiedTransitionEventsState::MouseMoveXY((x, y)),
+        ModifiedTransition {
+            state: ModifiedTransitionState::MouseMoveXY((x, y)),
             modifiers: Arc::new(self.modifiers),
         }
     }
@@ -152,13 +151,13 @@ impl ModifiedTransitionEventsBuilder {
         mut self,
         touch_id: TouchId,
         (x, y): EventCoords,
-    ) -> ModifiedTransitionEvents<T> {
+    ) -> ModifiedTransition<T> {
         let prev = self.modifiers.axes.insert(AxisKind::TouchX(touch_id), x);
         assert!(prev.is_none());
         let prev = self.modifiers.axes.insert(AxisKind::TouchY(touch_id), y);
         assert!(prev.is_none());
-        ModifiedTransitionEvents {
-            state: ModifiedTransitionEventsState::TouchStartXY(touch_id, (x, y)),
+        ModifiedTransition {
+            state: ModifiedTransitionState::TouchStartXY(touch_id, (x, y)),
             modifiers: Arc::new(self.modifiers),
         }
     }
@@ -167,30 +166,30 @@ impl ModifiedTransitionEventsBuilder {
         mut self,
         touch_id: TouchId,
         (x, y): EventCoords,
-    ) -> ModifiedTransitionEvents<T> {
+    ) -> ModifiedTransition<T> {
         let prev = self.modifiers.axes.insert(AxisKind::TouchX(touch_id), x);
         assert!(prev.is_some());
         let prev = self.modifiers.axes.insert(AxisKind::TouchY(touch_id), y);
         assert!(prev.is_some());
-        ModifiedTransitionEvents {
-            state: ModifiedTransitionEventsState::TouchMoveXY(touch_id, (x, y)),
+        ModifiedTransition {
+            state: ModifiedTransitionState::TouchMoveXY(touch_id, (x, y)),
             modifiers: Arc::new(self.modifiers),
         }
     }
 
-    fn with_touch_end<T>(mut self, touch_id: TouchId) -> ModifiedTransitionEvents<T> {
+    fn with_touch_end<T>(mut self, touch_id: TouchId) -> ModifiedTransition<T> {
         let prev = self.modifiers.axes.remove(&AxisKind::TouchX(touch_id));
         assert!(prev.is_some());
         let prev = self.modifiers.axes.remove(&AxisKind::TouchY(touch_id));
         assert!(prev.is_some());
-        ModifiedTransitionEvents {
-            state: ModifiedTransitionEventsState::TouchEndXY(touch_id),
+        ModifiedTransition {
+            state: ModifiedTransitionState::TouchEndXY(touch_id),
             modifiers: Arc::new(self.modifiers),
         }
     }
 }
 
-impl<T> Iterator for ModifiedTransitionEvents<T> {
+impl<T> Iterator for ModifiedTransition<T> {
     type Item = ModifiedEvent<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -201,13 +200,13 @@ impl<T> Iterator for ModifiedTransitionEvents<T> {
     }
 }
 
-impl<T> Iterator for ModifiedTransitionEventsState<T> {
+impl<T> Iterator for ModifiedTransitionState<T> {
     type Item = ModifiedInput<T>;
 
     fn next(&mut self) -> Option<Self::Item> {
         let axis = |kind, value| Some(ModifiedInput::Change(Axis { kind, value }));
 
-        use ModifiedTransitionEventsState as State;
+        use ModifiedTransitionState as State;
         let (state, input) = match core::mem::replace(self, State::Empty) {
             State::Pressed(button) => (State::Empty, Some(ModifiedInput::Press(button))),
             State::Released(button) => (State::Empty, Some(ModifiedInput::Release(button))),
@@ -248,8 +247,8 @@ impl<T> Iterator for ModifiedTransitionEventsState<T> {
     }
 }
 
-impl<T> FusedIterator for ModifiedTransitionEvents<T> {}
-impl<T> FusedIterator for ModifiedTransitionEventsState<T> {}
+impl<T> FusedIterator for ModifiedTransition<T> {}
+impl<T> FusedIterator for ModifiedTransitionState<T> {}
 
 impl<T> ModifiedEvent<T> {
     pub fn clone_without_custom(&self) -> ModifiedEvent<()> {
