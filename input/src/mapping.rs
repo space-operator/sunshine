@@ -1,6 +1,104 @@
+//use core::iter::FusedIterator;
 use std::collections::HashSet;
+//use std::vec::IntoIter;
 
 use crate::{CombinedEvent, CombinedInput, ModifiersAxes, ModifiersFilter};
+
+/*
+
+// Ctrl+Shift+Click
+// Shift+Click
+// Shift+Click
+
+// Ctrl+Shift+Alt+A
+// Win+A
+// Ctrl+A
+// Ctrl+Alt+A
+// Ctrl+Alt+A
+// Ctrl+Shift+A
+// Ctrl+Alt+A   is sup Ctrl+A
+// Ctrl+Shift+A is sup Ctrl+A
+// Ctrl+Shift+A
+
+
+
+#[derive(Clone, Debug)]
+pub struct EventButtonMapping<T> {
+    pub input: T,
+    pub buttons: ModifiersButtons,
+    pub events: Output
+}
+
+#[derive(Clone, Debug)]
+pub struct EventAxesMapping<T> {
+    pub input: T,
+    pub buttons: ModifiersButtons,
+    pub events: Output
+}*/
+
+/*
+trait MappedEvent {
+    type Output;
+
+    fn event() -> EventWithModifiers<T> {
+
+    }
+
+    fn map()
+}
+
+trait Mapping<T> {
+    type MappedEvent;
+
+
+
+    fn process(mut self, ev: EventWithModifiers<T>) -> MappingIterator<T> {
+
+    }
+}
+
+pub fn process(mut self, ev: EventWithModifiers<T>, ) -> MappingIterator<T> {
+
+}
+
+pub MappingIterator<T>(IntoIter<T>);
+
+impl Iterator for MappingIterator<T> {
+    type Item = T;
+    fn next(&mut self) -> Self::Item {
+        self.0.next()
+    }
+}
+
+impl<T> FusedIterator for MappingIterator<T> {}
+
+
+// input =>  => output
+
+
+// Click, DblClick, SpacePressed
+
+// Map MouseX => UiX
+// Map TouchX => UiX
+// DblClick => filter => map => SelectNode
+
+// SelectNode(node)
+// StartNodeTextEdit(node)
+// DragStart(node, start)
+// DragMove(node, start(x, y), current)
+// DragEnd(node, start, last)
+// DragCancel(node, start)
+
+
+trait Mapping<T> {
+    type MappedEvent;
+
+    fn map(
+        ev: EventWithModifiers<T>,
+        mappings: Vec<(Self::MappedEvent, ModifiersFilter)>,
+    ) -> IntoIter<MappedEvent>;
+}
+*/
 
 pub trait MappedContext: Sized {
     type CustomEvent;

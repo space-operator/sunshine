@@ -27,9 +27,8 @@
 mod axis;
 mod button;
 mod combined;
-mod event;
 mod keyboard;
-mod mapped;
+mod mapping;
 mod modified;
 mod modifiers;
 mod mouse;
@@ -41,9 +40,8 @@ mod touch;
 pub use axis::*;
 pub use button::*;
 pub use combined::*;
-pub use event::*;
 pub use keyboard::*;
-pub use mapped::*;
+pub use mapping::*;
 pub use modified::*;
 pub use modifiers::*;
 pub use mouse::*;
@@ -51,6 +49,233 @@ pub use mouse::*;
 pub use raw::*;
 pub use timed::*;
 pub use touch::*;
+
+/*
+==================================
+=              C --------D                  =
+=             |
+=           Schools----------B
+=              |
+                A
+
+0010
+    spans: Schools
+    children:
+        0021 (A)
+        0022 (B)
+        0023 (C)
+
+
+node: schools
+    edge: child -> A
+    edge: child -> B
+    edge: child -> C
+
+node: C
+    edge: link -> D
+
+
+
+[dbl-click]Schools[enter]A[enter]B[enter][enter]
+Schools
+    A
+    B
+Playground
+
+[dbl-click]Schools[enter][enter]
+
+
+Root
+    Schools
+        A B []
+
+███████████████████████████████
+█ |                           █
+███████████████████████████████
+
+███████████████████████████████
+█ Schools                     █
+███████████████████████████████
+
+
+
+███████████████████████████████
+█ Schools                %$#  █ graph
+█   A                         █
+█   B                         █ ----A
+█   C                         █
+███████████████████████████████
+
+
+█████████████████████
+█                   █
+█  A            V   █ --> Q
+█      B            █
+█          [C]>     █ ~~~~~~~~ C typting <
+█              D -- █---> E
+█                   █
+█████████████████████
+
+
+
+██████████████████████████
+█     Schools      %$#  █
+        [this] [E] is ....
+██████████████████████████
+  |      |      |      |
+█████  █████  █████  █████
+█ A █  █ this █  █ C █  █ E █
+█████  █████  █████  █████
+
+Root
+    PlaygroundA
+        [C]
+    C
+
+
+Block
+                                Block
+                                    A
+
+            Block
+
+███████████████████████████████
+█      Schools                █
+█                             █
+█  ███████                    █
+█  █  A  █                    █
+█  ███████                    █
+█                             █
+█                             █
+█                             █
+█                             █
+█                             █
+███████████████████████████████
+
+
+███████████████████████████████       ██████████████████████████████████████████████████████████████
+█ -    PlaygroundA      %$#   █       █      PlaygroundB     %$#    ██      PlaygroundC      %$#   █
+█        [A] [{!Map}]         █       █        A                    ██        A                    █
+█        [C]                  █       █        C                    ██        C                    █
+█          C1                 █       █        C                    ██        C                    █
+█        D              view  █       █        D                    ██        D                    █
+█                             █       █                             ██                             █
+███████████████████████████████       ██████████████████████████████████████████████████████████████
+  |         |                            |      |      |      |        |      |      |      |
+█████    ███████                      █████  █████  █████  █████     █████  █████  █████  █████
+█ A █    █ Map █                        █ E █  █ F █  █ G █  █ H █     █ E █  █ F █  █ G █  █ H █
+█████    ███████                      █████  █████  █████  █████     █████  █████  █████  █████
+
+
+
+███████████████████████████████
+█      Playground             █
+███████████████████████████████
+  |      |      |      |
+█████  █████  █████  █████
+█ A █  █ B █  █ C █  █ D █
+█████  █████  █████  █████
+
+
+Text View
+███████████████████████████████
+█      Schools                █
+█                             █
+██ ████████████████  ███████  █            █████     █████
+█  █  A  █  █  Map█  █ [С] █  █ ---------> █[C]█     █ D █
+██ ███████  ███████  ███████  █            █████     █████
+█                             █
+█                             █
+█                             █
+█                             █
+█                             █
+███████████████████████████████
+
+
+
+███████████████████████████████
+█      Playground             █
+█                             █
+█                             █
+█                             █
+███████████████████████████████
+
+Draft:
+    Sublocks by default is indented text
+    Each block can be toggled to floating mode
+    Floated block no longer part of parent block text
+    Block moved outside replaced to link to this block and
+        block parent changed to block we move this block into
+    We somehow can move inner block outside only visually with using other kind of edge
+
+
+TODO:
+    Input contexts
+
+mapping draft:
+    Undo
+    Redo
+
+    CreateNode(coords, parent_node)
+    CreateNodeAndEditNoCoords(parent_node)
+    CreateNodeAndEdit(coords, parent_node)
+    RemoveNodes(nodes)
+
+    SelectNodes(nodes)
+    AddNodesToSelector(nodes)
+    RemoveNodesToSelector(nodes)
+
+    StartEdge(source_node)
+    ContinueEdge(source_node, current_coords, ?target_node)
+    ConnectEdge(source_node, target_node)
+    StopEdge(source_node)
+    RemoveEdges(edges)
+
+    // use touch coords mean
+    StartNodeMove(nodes, start_coords)
+    ContinueNodeMove(nodes, start_coors, current_coords);
+    StopNodeMove(nodes, start_coors, end_coords);
+
+    // use touch coords mean
+    StartScreenPan(start_coords)
+    ContinueScreenPan(start_coors, current_coords)
+    StopScreenPan(start_coors, end_coords)
+
+    // use touch deltas mult or scroll
+    StartScreenZoom(start_mult)
+    ContinueScreenZoom(start_mult, current_mult)
+    StopScreenZoom(start_mult, current_end)
+
+    StartNodeEdit
+
+    NodeEdit
+        Stop
+        Text(text)
+        Backspace
+        Delete
+        NewChild
+        Tab -> "\t"
+        Indent -> goto child    ? how to override other action (Tab) with contexts or without
+        Untab                   ? but what if we do not use tab for it
+        StartTextSelect()
+
+
+    context override
+
+
+NodeEdit + NonEmptyChildText
+NodeEdit
+
+Schools
+    A\t
+    \t
+
+
+
+
+
+
+*/
 
 /*
 
