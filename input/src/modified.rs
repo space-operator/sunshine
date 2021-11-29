@@ -8,6 +8,24 @@ use crate::{
 
 pub type ModifiedEvent<T> = EventWithModifiers<ModifiedInput<T>>;
 
+/*
+        raw
+    Keyboard        Ctrl+Shift+
+        Press
+        Release
+        Repeat
+        Char
+        CharRepeat
+    Mouse           Ctrl+Shift+ Lmb+Rmb+(X, Y)
+        Press
+        Release
+        Move
+        WheelUp
+        WheelDown
+    Touch           Ctrl+Shift+ Touch1(X,Y)+Touch3(X,Y)
+
+*/
+
 #[derive(Clone, Debug, Eq, Hash, PartialEq)]
 pub enum ModifiedInput<T> {
     Press(ButtonKind),

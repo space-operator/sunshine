@@ -27,6 +27,7 @@
 mod axis;
 mod button;
 mod combined;
+mod event;
 mod keyboard;
 mod mapping;
 mod modified;
@@ -40,6 +41,7 @@ mod touch;
 pub use axis::*;
 pub use button::*;
 pub use combined::*;
+pub use event::*;
 pub use keyboard::*;
 pub use mapping::*;
 pub use modified::*;
@@ -51,6 +53,12 @@ pub use timed::*;
 pub use touch::*;
 
 /*
+dbl-click
+    create node at position
+    enter to text mode
+
+
+
 ==================================
 =              C --------D                  =
 =             |
@@ -259,8 +267,26 @@ mapping draft:
         Untab                   ? but what if we do not use tab for it
         StartTextSelect()
 
-
     context override
+
+    HaveNode
+        Ctrl+Click  NodeSelect
+    NoNode
+        Click       UnselectNodes
+
+
+    raw | ?? => modifier | ?? => timed | ?? => mapping
+
+
+    Mouse+coords
+    Touch+touch
+
+
+    MoveMove(100, 200), Ctrl+Lmb(modifiers) =>
+        say to Input we have Ctrl+Click for NodeSelect and Click for UnselectNodes
+
+    => NodeSelect
+
 
 
 NodeEdit + NonEmptyChildText
