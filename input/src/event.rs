@@ -1,83 +1,170 @@
+use std::collections::HashSet;
 use std::sync::Arc;
-use std::collections::{HashMap, HashSet};
 
-#[derive(Clone, Debug, Eq, PartialEq)]
-pub enum Event<T1, T2, T3> {
-    Keyboard(T1),
-    Mouse(T2),
-    Touch(T3),
-}
+/*
+    ((raw event | time-event) + modifiers) => mapped event
 
-trait ToEventKind {
+    trait Event
+    trait State
+        fn apply(State, Event) -> (State, Event)
+*/
+/*
+    MouseMove(x, y), MouseButtonDown(button, x, y) >
+
+    Event
+
+*/
+
+pub trait EventWithAction {
     type Switch;
-    type Trigger;
 
-    pub fn to_event_kind(&self) -> EventKind<Switch, Trigger>;
-}
-
-trait IntoEventKind {
-    type Switch;
-    type Trigger;
-
-    pub fn into_event_kind(self) -> EventKind<Switch, Trigger>;
+    fn action(&self) -> Option<Action<Self::Switch>>;
 }
 
 #[derive(Clone, Debug, Eq, PartialEq)]
-pub enum EventKind<T1, T2> {
-    Press(T1),
-    Release(T1),
-    Trigger(T2),
+pub enum Action<T> {
+    Enable(T),
+    Disable(T),
 }
 
-struct WithModifiers<T>(T, HashMap, HashSet);
+/*
+where
+    T1: EventWithAction<Switch = T2> + EventWithTimestamp<Timestamp = T3>, */
+/* where T1: EventWithAction<Switch = T2>,*/
+pub struct EventWithModifiers<T1, T2> {
+    event: T1,
+    modifiers: Arc<HashSet<T2>>,
+}
 
-trait KeyboardModifiers {
+#[test]
+fn test() {
+    enum RawEvent {
+        KeyboardDown(&'static str, u64),
+        KeyboardUp(&'static str, u64),
+        MouseDown(&'static str, (u64, u64), u64),
+        MouseUp(&'static str, (u64, u64), u64),
+        MouseMove((u64, u64), u64),
+    }
+
+    enum RawEventSwitch {
+        Key(&'static str),
+        Button(&'static str),
+    }
+
+    impl EventWithAction for RawEvent {
+        type Switch = RawEventSwitch;
+
+        fn action(&self) -> Option<Action<Self::Switch>> {
+            match self {
+                RawEvent::KeyboardDown(s, t) => Some(Action::Enable(RawEventSwitch::Key(s))),
+                RawEvent::KeyboardUp(s, t) => Some(Action::Disable(RawEventSwitch::Key(s))),
+                RawEvent::MouseDown(s, c, t) => Some(Action::Enable(RawEventSwitch::Button(s))),
+                RawEvent::MouseUp(s, c, t) => Some(Action::Disable(RawEventSwitch::Button(s))),
+                RawEvent::MouseMove(c, t) => None,
+            }
+        }
+    }
+}
+
+/*
+#[test]
+fn test() {
+    enum RawEvent {
+        CtrlDown(u64),
+        CtrlUp(u64),
+        MouseMove(u64, u64, u64),
+        LeftMouseDown(u64, u64, u64),
+        LeftMouseUp(u64, u64, u64),
+    };
+
+    enum RawKeyboardEvent {
+        CtrlDown,
+        CtrlUp,
+    }
+
+    enum RawKeyboardButton {
+        Ctrl,
+    }
+
+    enum RawKeyboardTrigger {}
+
+    enum RawMouseEvent {
+        MouseMove(u64, u64),
+        LeftMouseDown(u64, u64),
+        LeftMouseUp(u64, u64),
+    }
+
+    enum RawTouchEvent {}
+
+    impl ToEvent for RawEvent {
+        type Keyboard = RawKeyboardEvent;
+        type Mouse = RawMouseEvent;
+        type Touch = RawTouchEvent;
+
+        fn to_event(&self) -> Event<Self::Keyboard, Self::Mouse, Self::Touch> {
+            match self {
+                RawEvent::CtrlDown(_) => Event::Keyboard(RawKeyboardEvent::CtrlDown),
+                RawEvent::CtrlUp(_) => Event::Keyboard(RawKeyboardEvent::CtrlUp),
+                RawEvent::MouseMove(x, y, _) => Event::Mouse(RawMouseEvent::MouseMove(*x, *y)),
+                RawEvent::LeftMouseDown(x, y, _) => {
+                    Event::Mouse(RawMouseEvent::LeftMouseDown(*x, *y))
+                }
+                RawEvent::LeftMouseUp(x, y, _) => Event::Mouse(RawMouseEvent::LeftMouseUp(*x, *y)),
+            }
+        }
+    }
+
+    impl ToEventKind for RawKeyboardEvent {
+        type Switch = RawKeyboardButton;
+        type Trigger = RawKeyboardTrigger;
+
+        fn to_event_kind(&self) -> EventKind<Self::Switch, Self::Trigger> {
+            match self {
+                RawKeyboardEvent::CtrlDown => EventKind::Press(RawKeyboardButton::Ctrl),
+                RawKeyboardEvent::CtrlUp => EventKind::Release(RawKeyboardButton::Ctrl),
+            }
+        }
+    }
+}*/
+
+/*
+Event<EventKind<T1, T2>, EventKind<T3, T4>, EventKind<T5, T6>>
+    timed
+Event<EventKind<T1, TriggerOrTimedTrigger<T2, T1>>, ...
+    modifiers
+Event<EventKindWithModifiers<T1, T2>
+    mapping
+AppEvent
+*/
+
+/*
+pub trait ToEvent {
+    type Keyboard;
+    type Mouse;
+    type Touch;
+
+    fn to_event(&self) -> Event<Self::Keyboard, Self::Mouse, Self::Touch>;
+}
+
+pub trait ToTimestamp {
+    type Output;
+
+    fn to_timestamp(&self) -> Self::Output;
+}
+
+pub trait ToEventKind {
     type Switch;
+    type Trigger;
 
-    pub fn keyboard_switches(&self) -> &HashSet<Self::Switch>;
+    fn to_event_kind(&self) -> EventKind<Self::Switch, Self::Trigger>;
 }
+*/
 
-#[derive(Clone, Debug, Default)]
-pub struct KeyboardEvent<T1, T2> {
-    raw: T1,
-    keyboard_switches: Arc<HashSet<T2>,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct MouseEvent<T1, T2> {
-    raw: T1,
-    keyboard_switches: Arc<HashSet<T2>>,
-    mouse_switches: Arc<HashSet<T3>>,
-    mouse_values: Arc<T4>,
-}
-
+/*
 impl< T1: ToEventKind + IntoEventKind<Switch = T2>, T2> for KeyboardEvent<T1, T2> {
     // ...
 }
-
-#[derive(Clone, Debug, Default)]
-pub struct ModifiersState<T11, T21, T22, T31, T32> {
-    keyboard: KeyboardState<T11>,
-    mouse: MouseState<T21, T22>,
-    touch: TouchState<T31, T32>,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct KeyboardState<T1> {
-    switches: HashSet<T1>,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct MouseState<T1, T2> {
-    switches: HashSet<T1>,
-    values: T2,
-}
-
-#[derive(Clone, Debug, Default)]
-pub struct TouchState<T1, T2> {
-    switches: HashSet<T1>,
-    values: T2,
-}
+*/
 
 /*
     Event<T1, T2, T3>
@@ -88,7 +175,6 @@ pub struct TouchState<T1, T2> {
     >> (handle them in program) >> mapping-processor
     >> app events
 */
-
 
 /*
 trait KeyboardModifiers {

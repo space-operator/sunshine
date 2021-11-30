@@ -26,11 +26,11 @@
 
 mod axis;
 mod button;
-mod combined;
+//mod combined;
 mod event;
 mod keyboard;
-mod mapping;
-mod modified;
+//mod mapping;
+//mod modified;
 mod modifiers;
 mod mouse;
 //mod processor;
@@ -40,11 +40,11 @@ mod touch;
 
 pub use axis::*;
 pub use button::*;
-pub use combined::*;
+//pub use combined::*;
 pub use event::*;
 pub use keyboard::*;
-pub use mapping::*;
-pub use modified::*;
+//pub use mapping::*;
+//pub use modified::*;
 pub use modifiers::*;
 pub use mouse::*;
 //pub use processor::*;
