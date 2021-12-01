@@ -15,30 +15,30 @@ use std::sync::Arc;
 
 */
 
-pub trait EventWithAction {
-    type Switch;
-
-    fn action(&self) -> Option<Action<Self::Switch>>;
-}
-
 #[derive(Clone, Debug, Eq, PartialEq)]
 pub enum Action<T> {
     Enable(T),
     Disable(T),
 }
 
+pub trait EventWithAction {
+    type Switch;
+
+    fn action(&self) -> Option<Action<Self::Switch>>;
+}
+
 /*
 where
     T1: EventWithAction<Switch = T2> + EventWithTimestamp<Timestamp = T3>, */
-/* where T1: EventWithAction<Switch = T2>,*/
+/* where T1: EventWithAction<Switch = T2>,
 pub struct EventWithModifiers<T1, T2> {
     event: T1,
     modifiers: Arc<HashSet<T2>>,
-}
+}*/
 
 #[test]
 fn test() {
-    enum RawEvent {
+    enum Event {
         KeyboardDown(&'static str, u64),
         KeyboardUp(&'static str, u64),
         MouseDown(&'static str, (u64, u64), u64),
@@ -46,21 +46,21 @@ fn test() {
         MouseMove((u64, u64), u64),
     }
 
-    enum RawEventSwitch {
+    enum EventSwitch {
         Key(&'static str),
         Button(&'static str),
     }
 
-    impl EventWithAction for RawEvent {
-        type Switch = RawEventSwitch;
+    impl EventWithAction for Event {
+        type Switch = EventSwitch;
 
         fn action(&self) -> Option<Action<Self::Switch>> {
             match self {
-                RawEvent::KeyboardDown(s, t) => Some(Action::Enable(RawEventSwitch::Key(s))),
-                RawEvent::KeyboardUp(s, t) => Some(Action::Disable(RawEventSwitch::Key(s))),
-                RawEvent::MouseDown(s, c, t) => Some(Action::Enable(RawEventSwitch::Button(s))),
-                RawEvent::MouseUp(s, c, t) => Some(Action::Disable(RawEventSwitch::Button(s))),
-                RawEvent::MouseMove(c, t) => None,
+                Event::KeyboardDown(switch, _) => Some(Action::Enable(EventSwitch::Key(switch))),
+                Event::KeyboardUp(switch, _) => Some(Action::Disable(EventSwitch::Key(switch))),
+                Event::MouseDown(switch, _, _) => Some(Action::Enable(EventSwitch::Button(switch))),
+                Event::MouseUp(switch, _, _) => Some(Action::Disable(EventSwitch::Button(switch))),
+                Event::MouseMove(_, _) => None,
             }
         }
     }
@@ -69,7 +69,7 @@ fn test() {
 /*
 #[test]
 fn test() {
-    enum RawEvent {
+    enum Event {
         CtrlDown(u64),
         CtrlUp(u64),
         MouseMove(u64, u64, u64),
@@ -96,20 +96,20 @@ fn test() {
 
     enum RawTouchEvent {}
 
-    impl ToEvent for RawEvent {
+    impl ToEvent for Event {
         type Keyboard = RawKeyboardEvent;
         type Mouse = RawMouseEvent;
         type Touch = RawTouchEvent;
 
         fn to_event(&self) -> Event<Self::Keyboard, Self::Mouse, Self::Touch> {
             match self {
-                RawEvent::CtrlDown(_) => Event::Keyboard(RawKeyboardEvent::CtrlDown),
-                RawEvent::CtrlUp(_) => Event::Keyboard(RawKeyboardEvent::CtrlUp),
-                RawEvent::MouseMove(x, y, _) => Event::Mouse(RawMouseEvent::MouseMove(*x, *y)),
-                RawEvent::LeftMouseDown(x, y, _) => {
+                Event::CtrlDown(_) => Event::Keyboard(RawKeyboardEvent::CtrlDown),
+                Event::CtrlUp(_) => Event::Keyboard(RawKeyboardEvent::CtrlUp),
+                Event::MouseMove(x, y, _) => Event::Mouse(RawMouseEvent::MouseMove(*x, *y)),
+                Event::LeftMouseDown(x, y, _) => {
                     Event::Mouse(RawMouseEvent::LeftMouseDown(*x, *y))
                 }
-                RawEvent::LeftMouseUp(x, y, _) => Event::Mouse(RawMouseEvent::LeftMouseUp(*x, *y)),
+                Event::LeftMouseUp(x, y, _) => Event::Mouse(RawMouseEvent::LeftMouseUp(*x, *y)),
             }
         }
     }

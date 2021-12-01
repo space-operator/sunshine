@@ -9,3 +9,6 @@ edition = "2021"
 nom = "7.0.0"
 pulldown-cmark = "0.8.0"
 regex = "1.5.4"
+
+[dependencies.input-processor]
+path = "../input"

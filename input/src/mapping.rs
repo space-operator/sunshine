@@ -1,8 +1,20 @@
-//use core::iter::FusedIterator;
-use std::collections::HashSet;
-//use std::vec::IntoIter;
+/*
+    TODO:
+        (ev, modifiers)
+            app: filter all mapping bindings by ev, modifires and context
+        (mapping/bindings)
+            input: (modifiers, mapping/bindings) => || => (bindings)
 
-use crate::{CombinedEvent, CombinedInput, ModifiersAxes, ModifiersFilter};
+    ?
+        Modifiers::match_modifiers(_: Binding)
+        Binding::match_modifiers(_: Modifiers)
+        trait Binding
+            fn match(modifiers)
+*/
+
+//use core::iter::FusedIterator;
+//use std::collections::HashSet;
+//use std::vec::IntoIter;
 
 /*
 

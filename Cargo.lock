@@ -130,6 +130,7 @@ dependencies = [
 name = "parse"
 version = "0.1.0"
 dependencies = [
+ "input-processor",
  "nom",
  "pulldown-cmark",
  "regex",
