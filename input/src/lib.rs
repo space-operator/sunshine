@@ -1,4 +1,3 @@
-#![feature(map_first_last)]
 #![warn(
     clippy::all,
     clippy::pedantic,
@@ -29,9 +28,8 @@
 //mod combined;
 mod event;
 //mod keyboard;
-mod mapping;
-mod modified_event;
-//mod modifiers;
+//mod mapping;
+mod event_with_modifiers;
 //mod mouse;
 //mod processor;
 mod aggregate_timed_event;
@@ -44,9 +42,8 @@ mod timed_event;
 //pub use combined::*;
 pub use event::*;
 //pub use keyboard::*;
-pub use mapping::*;
-pub use modified_event::*;
-//pub use modifiers::*;
+//pub use mapping::*;
+pub use event_with_modifiers::*;
 //pub use mouse::*;
 //pub use processor::*;
 pub use aggregate_timed_event::*;

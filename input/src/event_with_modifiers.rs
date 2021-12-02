@@ -4,19 +4,19 @@ use std::{collections::BTreeSet, sync::Arc};
 use crate::{Action, EventWithAction};
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct EventWithModifiers<Ev, Sw> {
+pub struct ModifiedEvent<Ev, Sw> {
     event: Ev,
     modifiers: Arc<BTreeSet<Sw>>,
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ModifiersState<Sw> {
+pub struct ModifiedState<Sw> {
     modifiers: Arc<BTreeSet<Sw>>,
 }
 
-impl<Ev, Sw> EventWithModifiers<Ev, Sw> {
-    fn to_state(&self) -> ModifiersState<Sw> {
-        ModifiersState {
+impl<Ev, Sw> ModifiedEvent<Ev, Sw> {
+    fn to_state(&self) -> ModifiedState<Sw> {
+        ModifiedState {
             modifiers: Arc::clone(&self.modifiers),
         }
     }
@@ -26,7 +26,7 @@ impl<Ev, Sw> EventWithModifiers<Ev, Sw> {
     }
 }
 
-impl<Sw> ModifiersState<Sw> {
+impl<Sw> ModifiedState<Sw> {
     pub fn new() -> Self {
         Self::default()
     }
@@ -35,7 +35,7 @@ impl<Sw> ModifiersState<Sw> {
         &self.modifiers
     }
 
-    pub fn with_event<Ev>(self, event: Ev) -> EventWithModifiers<Ev, Sw>
+    pub fn with_event<Ev>(self, event: Ev) -> ModifiedEvent<Ev, Sw>
     where
         Ev: EventWithAction<Switch = Sw>,
         Sw: Clone + Eq + Hash + Ord,
@@ -46,20 +46,20 @@ impl<Sw> ModifiersState<Sw> {
                 let mut modifiers_mut = Arc::make_mut(&mut modifiers);
                 let is_added = modifiers_mut.insert(switch);
                 assert!(is_added);
-                EventWithModifiers { event, modifiers }
+                ModifiedEvent { event, modifiers }
             }
             Some(Action::Disable(switch)) => {
                 let mut modifiers_mut = Arc::make_mut(&mut modifiers);
                 let is_removed = modifiers_mut.remove(&switch);
                 assert!(is_removed);
-                EventWithModifiers { event, modifiers }
+                ModifiedEvent { event, modifiers }
             }
-            None => EventWithModifiers { event, modifiers },
+            None => ModifiedEvent { event, modifiers },
         }
     }
 }
 
-impl<Sw> Default for ModifiersState<Sw> {
+impl<Sw> Default for ModifiedState<Sw> {
     fn default() -> Self {
         Self {
             modifiers: Arc::new(BTreeSet::new()),
@@ -67,8 +67,8 @@ impl<Sw> Default for ModifiersState<Sw> {
     }
 }
 
-impl<Ev, Sw> From<EventWithModifiers<Ev, Sw>> for ModifiersState<Sw> {
-    fn from(event: EventWithModifiers<Ev, Sw>) -> Self {
+impl<Ev, Sw> From<ModifiedEvent<Ev, Sw>> for ModifiedState<Sw> {
+    fn from(event: ModifiedEvent<Ev, Sw>) -> Self {
         Self {
             modifiers: event.modifiers,
         }

@@ -1,6 +1,6 @@
 use crate::*;
 
-type AggregateTimedEvent<Sw> = TimedEvent<Sw, AggregateTimedEventKind>;
+pub type AggregateTimedEvent<Sw> = TimedEvent<Sw, AggregateTimedEventKind>;
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum AggregateTimedEventKind {
