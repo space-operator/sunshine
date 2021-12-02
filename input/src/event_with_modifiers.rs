@@ -43,13 +43,13 @@ impl<Sw> ModifiedState<Sw> {
         let mut modifiers = self.modifiers;
         match event.action() {
             Some(Action::Enable(switch)) => {
-                let mut modifiers_mut = Arc::make_mut(&mut modifiers);
+                let modifiers_mut = Arc::make_mut(&mut modifiers);
                 let is_added = modifiers_mut.insert(switch);
                 assert!(is_added);
                 ModifiedEvent { event, modifiers }
             }
             Some(Action::Disable(switch)) => {
-                let mut modifiers_mut = Arc::make_mut(&mut modifiers);
+                let modifiers_mut = Arc::make_mut(&mut modifiers);
                 let is_removed = modifiers_mut.remove(&switch);
                 assert!(is_removed);
                 ModifiedEvent { event, modifiers }

@@ -1,4 +1,4 @@
-use crate::*;
+/*use crate::*;
 
 pub type AggregateTimedEvent<Sw> = TimedEvent<Sw, AggregateTimedEventKind>;
 
@@ -30,21 +30,6 @@ impl From<DelayedTimedEventKind> for AggregateTimedEventKind {
     }
 }
 
-/*
-impl<Sw1, Sw2, Ki1, Ki2> From<TimedEvent<Sw2, Ki2>> for TimedEvent<Sw1, Ki1>
-where
-    Sw1: From<Sw2>,
-    Ki1: From<Ki2>,
-{
-    fn from(event: TimedEvent<Sw2, Ki2>) -> Self {
-        Self {
-            switch: event.switch.into(),
-            kind: event.kind.into(),
-            num_switches: event.num_switches,
-        }
-    }
-}
-*/
 pub trait IntoAggregate<T> {
     fn into_aggregate(self) -> T;
 }
@@ -90,4 +75,20 @@ impl<Ev, Sw> IntoAggregate<AggregateTimedTransition<Ev, Sw>> for DelayedTimedTra
             state: self.state,
         }
     }
+}*/
+
+/*
+impl<Sw1, Sw2, Ki1, Ki2> From<TimedEvent<Sw2, Ki2>> for TimedEvent<Sw1, Ki1>
+where
+    Sw1: From<Sw2>,
+    Ki1: From<Ki2>,
+{
+    fn from(event: TimedEvent<Sw2, Ki2>) -> Self {
+        Self {
+            switch: event.switch.into(),
+            kind: event.kind.into(),
+            num_switches: event.num_switches,
+        }
+    }
 }
+*/
