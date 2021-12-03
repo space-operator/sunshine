@@ -1,31 +1,34 @@
 use core::hash::Hash;
 use std::collections::HashMap;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 
 use thiserror::Error;
 
-use crate::{Action, EventWithAction};
-
 pub type NumClicks = u32;
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TimedEvent<Ki> {
     pub kind: Ki,
     pub num_clicks: NumClicks,
 }
 
-pub type ReleaseTimedEvent = TimedEvent<ReleaseTimedEventKind>;
-pub type DelayedTimedEvent = TimedEvent<DelayedTimedEventKind>;
+pub type TimedReleaseEvent = TimedEvent<TimedReleaseEventKind>;
+pub type TimedLongPressEvent = TimedEvent<TimedLongPressEventKind>;
+pub type TimedMultiClickEvent = TimedEvent<TimedMultiClickEventKind>;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum ReleaseTimedEventKind {
+pub enum TimedReleaseEventKind {
     Click,
     LongClick,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum DelayedTimedEventKind {
+pub enum TimedLongPressEventKind {
     LongPress,
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub enum TimedMultiClickEventKind {
     ClickExact,
     LongClickExact,
 }
@@ -43,94 +46,22 @@ struct SwitchState {
 
 #[derive(Clone, Debug)]
 enum SwitchStateKind {
-    Pressed(Arc<ScheduledTag>),
+    Pressed(Arc<()>),
     LongPressed,
-    Released(Arc<ScheduledTag>),
-    LongReleased(Arc<ScheduledTag>),
+    Released(Arc<()>),
+    LongReleased(Arc<()>),
 }
 
 #[derive(Clone, Debug)]
-pub struct ScheduledTimeout {
-    pub tag: Arc<ScheduledTag>,
-    pub duration: Duration,
-}
+pub struct LongPressHandleRequest(Weak<()>);
 
 #[derive(Clone, Debug)]
-pub struct ScheduledTag;
+pub struct MultiClickHandleRequest(Weak<()>);
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum Duration {
-    LongClick,
-    MultiClick,
-}
-
-#[derive(Clone, Debug)]
-pub struct TimedTransition<Sw, Sh> {
-    pub state: TimedState<Sw>,
-    pub scheduled: Sh,
-}
-
-pub type PressTimedTransition<Sw> = TimedTransition<Sw, ScheduledTimeout>;
-pub type ReleaseTimedTransition<Sw> = TimedTransition<Sw, ScheduledTimeout>;
-pub type DelayedTimedTransition<Sw> = TimedTransition<Sw, ()>;
-
-#[derive(Clone, Debug)]
-struct SwitchTransition<Sh> {
-    pub state: SwitchState,
-    pub scheduled: Sh,
-}
-
-pub type FirstPressSwitchTransition = SwitchTransition<ScheduledTimeout>;
-pub type PressSwitchTransition = SwitchTransition<ScheduledTimeout>;
-
-#[derive(Clone, Debug)]
-pub struct TimedPressError<Sw> {
-    state: TimedState<Sw>,
-    kind: TimedPressErrorKind,
-}
-
-#[derive(Clone, Debug)]
-struct SwitchPressError {
-    state: SwitchState,
-    kind: SwitchPressErrorKind,
-}
-
-#[derive(Clone, Debug)]
-pub enum TimedPressErrorKind {
-    AlreadyPressed,
-    AlreadyLongPressed,
-}
-
-#[derive(Clone, Debug)]
-enum SwitchPressErrorKind {
-    AlreadyPressed,
-    AlreadyLongPressed,
-}
-
-impl From<SwitchPressErrorKind> for TimedPressErrorKind {
-    fn from(kind: SwitchPressErrorKind) -> Self {
-        match kind {
-            SwitchPressErrorKind::AlreadyPressed => Self::AlreadyPressed,
-            SwitchPressErrorKind::AlreadyLongPressed => Self::AlreadyLongPressed,
-        }
-    }
-}
-
-/*
 impl<Ki> TimedEvent<Ki> {
     #[must_use]
-    pub fn new(event: kind: Ki, num_clicks: NumClicks) -> Self {
-        Self {
-            kind,
-            num_clicks,
-        }
-    }
-}
-*/
-
-impl ScheduledTimeout {
-    fn new(tag: Arc<ScheduledTag>, duration: Duration) -> Self {
-        Self { tag, duration }
+    pub fn new(kind: Ki, num_clicks: NumClicks) -> Self {
+        Self { kind, num_clicks }
     }
 }
 
@@ -145,7 +76,10 @@ impl<Sw> TimedState<Sw> {
         Self::default()
     }
 
-    pub fn on_press(self, switch: Sw) -> Result<PressTimedTransition<Sw>, TimedPressError<Sw>>
+    pub fn with_press_event(
+        self,
+        switch: Sw,
+    ) -> (Self, Result<LongPressHandleRequest, TimedPressError>)
     where
         Sw: Eq + Hash,
     {
@@ -156,175 +90,112 @@ impl<Sw> TimedState<Sw> {
         match entry {
             Entry::Occupied(entry) => {
                 let (switch, state) = entry.remove_entry();
-                match state.with_press_event() {
-                    Ok(transition) => {
-                        switches.insert(switch, transition.state);
-                        Ok(PressTimedTransition {
-                            state: Self::from(switches),
-                            scheduled: transition.scheduled,
-                        })
-                    }
-                    Err(error) => {
-                        switches.insert(switch, error.state);
-                        Err(TimedPressError {
-                            state: Self::from(switches),
-                            kind: error.kind.into(),
-                        })
-                    }
-                }
+                let (state, request) = state.with_press_event();
+                switches.insert(switch, state);
+                (Self::from(switches), request)
             }
             Entry::Vacant(entry) => {
-                let transition = SwitchState::from_pressed();
-                let _: &mut _ = entry.insert(transition.state);
-                Ok(PressTimedTransition {
-                    state: Self::from(switches),
-                    scheduled: transition.scheduled,
-                })
+                let (state, request) = SwitchState::from_pressed();
+                let _: &mut _ = entry.insert(state);
+                (Self::from(switches), Ok(request))
             }
         }
     }
 
-    pub fn on_release<Ev>(self, switch: Sw) {
-        todo!()
-    }
-
-    /*
-    pub fn with_event<Ev>(
+    pub fn with_release_event(
         self,
-        event: Ev,
-    ) -> Result<ImmediateTimedTransition<Sw>, ImmediateTimedError<Sw>>
+        switch: Sw,
+    ) -> (
+        Self,
+        Result<Option<(TimedReleaseEvent, MultiClickHandleRequest)>, TimedReleaseError>,
+    )
     where
-        Sw: Clone + Eq + Hash,
-        Ev: EventWithAction<Switch = Sw>,
+        Sw: Eq + Hash,
     {
         use std::collections::hash_map::Entry;
 
         let mut switches = self.switches;
-        match event.action() {
-            Some(Action::Enable(switch)) => {
-                let entry = switches.entry(switch.clone());
-                match entry {
-                    Entry::Occupied(entry) => {
-                        let state = entry.remove();
-                        //let transition = state.with_press_event(switch.clone());
-                        //Self::from_switches_transition(switches, event, switch, transition)
-                        todo!()
-                    }
-                    Entry::Vacant(entry) => {
-                        let transition = SwitchState::from_pressed(switch);
-                        let _: &mut _ = entry.insert(transition.state);
-                        Ok(ImmediateTimedTransition {
-                            event: transition.event,
-                            scheduled: transition.scheduled,
-                            state: Self { switches },
-                        })
-                    }
-                }
+        let entry = switches.entry(switch);
+        match entry {
+            Entry::Occupied(entry) => {
+                let (switch, state) = entry.remove_entry();
+                let (state, result) = state.with_release_event();
+                switches.insert(switch, state);
+                (Self::from(switches), result.map(Some))
             }
-            Some(Action::Disable(switch)) => {
-                let entry = switches.entry(switch.clone());
-                match entry {
-                    Entry::Occupied(entry) => {
-                        let state = entry.remove();
-                        //let transition = state.with_release_event(switch.clone());
-                        //Self::from_switches_transition(switches, event, switch, transition)
-                        todo!();
-                    }
-                    Entry::Vacant(_) => Ok(ImmediateTimedTransition {
-                        event: TimedEvent {
-                            event,
-                            data: None,
-                        }
-                        timed_event: None,
-                        scheduled: None,
-                        state: Self { switches },
-                    }),
-                }
-            }
-            None => Ok(ImmediateTimedTransition {
-                event,
-                timed_event: None,
-                scheduled: None,
-                state: Self { switches },
-            }),
+            Entry::Vacant(_) => (Self::from(switches), Ok(None)),
         }
     }
 
-    pub fn with_timeout_event<Ev>(
+    pub fn with_timeout_event<T, E>(
         self,
-        event: Ev,
-        transition: Arc<ScheduledTag>,
-    ) -> Result<DelayedTimedTransition<Sw>, TimedTransitionError<Sw, DelayedTimedEventError<Sw>>>
-    where
-        Sw: Clone + Eq + Hash,
-    {
-        let switch = transition.switch.clone(); // TODO: no clone
-        let mut switches = self.switches;
-        match switches.remove(&switch) {
-            Some(state) => {
-                let transition = state.with_timeout_event(switch.clone());
-
-                match transition {
-                    Ok(transition) => {
-                        if let Some(state) = transition.state {
-                            let prev = switches.insert(switch, state);
-                            assert!(prev.is_none());
-                        }
-                        Ok(DelayedTimedTransition {
-                            timed_event: transition.event,
-                            scheduled: transition.scheduled,
-                            state: Self { switches },
-                        })
-                    }
-                    Err(error) => {
-                        let prev = switches.insert(switch, error.state);
-                        assert!(prev.is_none());
-                        Err(TimedTransitionError {
-                            state: Self { switches },
-                            error: error.error.into(),
-                        })
-                    }
-                }
-            }
-            None => Err(TimedTransitionError {
-                state: Self { switches },
-                error: DelayedTimedEventError::DefaultButtonState { switch },
-            }),
-        }
-    }*/
-
-    /*
-    fn from_switches_transition<E1, E2: From<E1>>(
-        mut switches: HashMap<Sw, SwitchState>,
-        event: Ev,
         switch: Sw,
-        transition: Result<SwitchTransition<Sw>, TimedSwitchTransitionError<E1>>,
-    ) -> Result<ImmediateTimedTransition<Sw>, TimedTransitionError<Sw, E2>>
+        callback: impl FnOnce(SwitchState) -> (Option<SwitchState>, Result<T, E>),
+        err: E,
+    ) -> (Self, Option<Result<T, E>>)
     where
         Sw: Eq + Hash,
-        Ev: EventWithAction<Switch = Sw>,
     {
-        match transition {
-            Ok(transition) => {
-                let prev = switches.insert(switch, transition.state);
-                assert!(prev.is_none());
-                Ok(ImmediateTimedTransition {
-                    event,
-                    timed_event: transition.event,
-                    scheduled: transition.scheduled,
-                    state: Self { switches },
-                })
+        use std::collections::hash_map::Entry;
+
+        let mut switches = self.switches;
+        let entry = switches.entry(switch);
+        match entry {
+            Entry::Occupied(entry) => {
+                let (switch, state) = entry.remove_entry();
+                let (state, result) = callback(state);
+                if let Some(state) = state {
+                    switches.insert(switch, state);
+                }
+                (Self::from(switches), Some(result))
             }
-            Err(error) => {
-                let prev = switches.insert(switch, error.state);
-                assert!(prev.is_none());
-                Err(TimedTransitionError {
-                    state: Self { switches },
-                    error: error.error.into(),
-                })
-            }
+            Entry::Vacant(_) => (Self::from(switches), Some(Err(err))),
         }
-    }*/
+    }
+
+    pub fn with_long_press_event(
+        self,
+        switch: Sw,
+        request: LongPressHandleRequest,
+    ) -> (
+        Self,
+        Option<Result<TimedLongPressEvent, TimedLongClickError>>,
+    )
+    where
+        Sw: Eq + Hash,
+    {
+        if let Some(_) = request.0.upgrade() {
+            self.with_timeout_event(
+                switch,
+                SwitchState::with_long_press_event,
+                TimedLongClickError::Default,
+            )
+        } else {
+            (self, None)
+        }
+    }
+
+    pub fn with_multi_click_event(
+        self,
+        switch: Sw,
+        request: MultiClickHandleRequest,
+    ) -> (
+        Self,
+        Option<Result<TimedMultiClickEvent, TimedMultiClickError>>,
+    )
+    where
+        Sw: Eq + Hash,
+    {
+        if let Some(_) = request.0.upgrade() {
+            self.with_timeout_event(
+                switch,
+                SwitchState::with_multi_click_event,
+                TimedMultiClickError::Default,
+            )
+        } else {
+            (self, None)
+        }
+    }
 }
 
 impl<Sw> Default for TimedState<Sw> {
@@ -336,256 +207,147 @@ impl<Sw> Default for TimedState<Sw> {
 }
 
 impl SwitchState {
-    fn from_pressed() -> FirstPressSwitchTransition {
-        let tag = Arc::new(ScheduledTag);
-        let scheduled = ScheduledTimeout::new(Arc::clone(&tag), Duration::LongClick);
-        let state = Self {
-            kind: SwitchStateKind::Pressed(tag),
-            num_clicks: 0,
-        };
-        FirstPressSwitchTransition { state, scheduled }
+    fn new(kind: SwitchStateKind, num_clicks: NumClicks) -> Self {
+        Self { kind, num_clicks }
     }
 
-    fn with_press_event(self) -> Result<PressSwitchTransition, SwitchPressError> {
+    fn from_pressed() -> (Self, LongPressHandleRequest) {
+        let tag = Arc::new(());
+        let request = LongPressHandleRequest(Arc::downgrade(&tag));
+        let state = Self::new(SwitchStateKind::Pressed(tag), 0);
+        (state, request)
+    }
+
+    fn with_press_event(self) -> (Self, Result<LongPressHandleRequest, TimedPressError>) {
         use SwitchStateKind::{LongPressed, LongReleased, Pressed, Released};
 
         match self.kind {
-            Pressed(_) => Err(SwitchPressError {
-                state: self,
-                kind: SwitchPressErrorKind::AlreadyPressed,
-            }),
-            LongPressed => Err(SwitchPressError {
-                state: self,
-                kind: SwitchPressErrorKind::AlreadyLongPressed,
-            }),
+            Pressed(_) => (self, Err(TimedPressError::AlreadyPressed)),
+            LongPressed => (self, Err(TimedPressError::AlreadyLongPressed)),
             Released(_) | LongReleased(_) => {
-                let tag = Arc::new(ScheduledTag);
-                let scheduled = ScheduledTimeout::new(Arc::clone(&tag), Duration::LongClick);
-                let state = Self {
-                    kind: Pressed(tag),
-                    num_clicks: self.num_clicks,
-                };
-                Ok(SwitchTransition { state, scheduled })
-            }
-        }
-    }
-}
-/*
-impl SwitchState {
-    fn from_pressed(switch: Sw) -> SwitchTransition<Sw> {
-        let transition = Arc::new(ScheduledTag);
-        let scheduled = ScheduledTimeout::new(Arc::clone(&transition), Duration::LongClick);
-        SwitchTransition {
-            state: Self {
-                kind: SwitchStateKind::Pressed(transition),
-                num_clicks: 0,
-            },
-            event: None,
-            scheduled: Some(scheduled),
-        }
-    }
-
-    fn with_press_event(
-        self,
-        switch: Sw,
-    ) -> Result<SwitchTransition<Sw>, TimedSwitchTransitionError<TimedEventEnableError<Sw>>>
-    {
-        use SwitchStateKind::{LongPressed, LongReleased, Pressed, Released};
-
-        match self.kind {
-            Pressed(_) => Err(TimedSwitchTransitionError {
-                state: self,
-                error: TimedEventEnableError::AlreadyPressed { switch },
-            }),
-            LongPressed => Err(TimedSwitchTransitionError {
-                state: self,
-                error: TimedEventEnableError::AlreadyLongPressed { switch },
-            }),
-            Released(_) | LongReleased(_) => {
-                let transition = Arc::new(ScheduledTag);
-                let scheduled = ScheduledTimeout::new(Arc::clone(&transition), Duration::LongClick);
-                Ok(SwitchTransition {
-                    state: Self {
-                        kind: Pressed(transition),
-                        num_clicks: self.num_clicks,
-                    },
-                    event: None,
-                    scheduled: Some(scheduled),
-                })
+                let tag = Arc::new(());
+                let request = LongPressHandleRequest(Arc::downgrade(&tag));
+                let state = Self::new(Pressed(tag), self.num_clicks);
+                (state, Ok(request))
             }
         }
     }
 
     fn with_release_event(
         self,
-        switch: Sw,
-    ) -> Result<SwitchTransition<Sw>, TimedSwitchTransitionError<TimedEventDisableError<Sw>>>
-    where
-        Sw: Clone,
-    {
+    ) -> (
+        Self,
+        Result<(TimedReleaseEvent, MultiClickHandleRequest), TimedReleaseError>,
+    ) {
         use SwitchStateKind::{LongPressed, LongReleased, Pressed, Released};
 
         match self.kind {
             Pressed(_) => {
-                let transition = Arc::new(ScheduledTag {
-                    switch: switch.clone(),
-                });
-                let scheduled =
-                    ScheduledTimeout::new(Arc::clone(&transition), Duration::MultiClick);
-                Ok(SwitchTransition {
-                    state: Self {
-                        kind: Released(transition),
-                        num_clicks: self.num_clicks + 1,
-                    },
-                    event: Some(ReleaseTimedEvent::new(
-                        switch,
-                        ReleaseTimedEventKind::Click,
-                        self.num_clicks + 1,
-                    )),
-                    scheduled: Some(scheduled),
-                })
+                let tag = Arc::new(());
+                let request = MultiClickHandleRequest(Arc::downgrade(&tag));
+                let state = Self::new(Released(tag), self.num_clicks + 1);
+                let event = TimedEvent::new(TimedReleaseEventKind::Click, self.num_clicks + 1);
+                (state, Ok((event, request)))
             }
 
             LongPressed => {
-                let transition = Arc::new(ScheduledTag {
-                    switch: switch.clone(),
-                });
-                let scheduled =
-                    ScheduledTimeout::new(Arc::clone(&transition), Duration::MultiClick);
-                Ok(SwitchTransition {
-                    state: Self {
-                        kind: LongReleased(transition),
-                        num_clicks: self.num_clicks + 1,
-                    },
-                    event: Some(ReleaseTimedEvent::new(
-                        switch,
-                        ReleaseTimedEventKind::LongClick,
-                        self.num_clicks + 1,
-                    )),
-                    scheduled: Some(scheduled),
-                })
+                let tag = Arc::new(());
+                let request = MultiClickHandleRequest(Arc::downgrade(&tag));
+                let state = Self::new(LongReleased(tag), self.num_clicks + 1);
+                let event = TimedEvent::new(TimedReleaseEventKind::LongClick, self.num_clicks + 1);
+                (state, Ok((event, request)))
             }
 
-            Released(_) => Err(TimedSwitchTransitionError {
-                state: self,
-                error: TimedEventDisableError::AlreadyReleased { switch },
-            }),
-
-            LongReleased(_) => Err(TimedSwitchTransitionError {
-                state: self,
-                error: TimedEventDisableError::AlreadyLongPressed { switch },
-            }),
+            Released(_) => (self, Err(TimedReleaseError::AlreadyReleased)),
+            LongReleased(_) => (self, Err(TimedReleaseError::AlreadyLongReleased)),
         }
     }
 
-    fn with_timeout_event(
+    fn with_long_press_event(
         self,
-        switch: Sw,
-    ) -> Result<
-        DelayedTimedSwitchTransition<Sw>,
-        TimedSwitchTransitionError<DelayedTimedEventError<Sw>>,
-    >
-    where
-        Sw: Clone,
-    {
+    ) -> (
+        Option<Self>,
+        Result<TimedLongPressEvent, TimedLongClickError>,
+    ) {
         use SwitchStateKind::{LongPressed, LongReleased, Pressed, Released};
-        let num_clicks = self.num_clicks;
 
         match self.kind {
             Pressed(_) => {
-                let transition = Arc::new(ScheduledTag {
-                    switch: switch.clone(),
-                });
-                let scheduled =
-                    ScheduledTimeout::new(Arc::clone(&transition), Duration::MultiClick);
-                Ok(DelayedTimedSwitchTransition {
-                    state: Some(Self {
-                        kind: LongPressed,
-                        num_clicks: num_clicks,
-                    }),
-                    event: Some(DelayedTimedEvent::new(
-                        switch,
-                        DelayedTimedEventKind::LongPress,
-                        self.num_clicks,
-                    )),
-                    scheduled: Some(scheduled),
-                })
+                let tag = Arc::new(());
+                let state = Self::new(LongPressed, self.num_clicks);
+                let event =
+                    TimedLongPressEvent::new(TimedLongPressEventKind::LongPress, self.num_clicks);
+                (Some(state), Ok(event))
             }
+            LongPressed => (Some(self), Err(TimedLongClickError::LongPressed)),
+            Released(_) => (Some(self), Err(TimedLongClickError::Released)),
+            LongReleased(_) => (Some(self), Err(TimedLongClickError::LongReleased)),
+        }
+    }
 
-            LongPressed => Err(TimedSwitchTransitionError {
-                state: self,
-                error: DelayedTimedEventError::LongPressed { switch },
-            }),
+    fn with_multi_click_event(
+        self,
+    ) -> (
+        Option<Self>,
+        Result<TimedMultiClickEvent, TimedMultiClickError>,
+    ) {
+        use SwitchStateKind::{LongPressed, LongReleased, Pressed, Released};
 
-            Released(_) => Ok(DelayedTimedSwitchTransition {
-                state: None,
-                event: Some(DelayedTimedEvent::new(
-                    switch,
-                    DelayedTimedEventKind::ClickExact,
+        match self.kind {
+            Pressed(_) => (Some(self), Err(TimedMultiClickError::Pressed)),
+            LongPressed => (Some(self), Err(TimedMultiClickError::LongPressed)),
+            Released(_) => {
+                let event = TimedMultiClickEvent::new(
+                    TimedMultiClickEventKind::ClickExact,
                     self.num_clicks,
-                )),
-                scheduled: None,
-            }),
-
-            LongReleased(_) => Ok(DelayedTimedSwitchTransition {
-                state: None,
-                event: Some(DelayedTimedEvent::new(
-                    switch,
-                    DelayedTimedEventKind::LongClickExact,
+                );
+                (None, Ok(event))
+            }
+            LongReleased(_) => {
+                let event = TimedMultiClickEvent::new(
+                    TimedMultiClickEventKind::LongClickExact,
                     self.num_clicks,
-                )),
-                scheduled: None,
-            }),
+                );
+                (None, Ok(event))
+            }
         }
     }
 }
-*/
-#[derive(Clone, Debug, Error)]
-pub enum TimedEventError<Sw> {
-    #[error(transparent)]
-    Enable(#[from] TimedEventPressError<Sw>),
-    #[error(transparent)]
-    Disable(#[from] TimedEventDisableError<Sw>),
-}
 
 #[derive(Clone, Debug, Error)]
-pub enum TimedEventPressError<Sw> {
-    #[error("Switch TODO is pressed while in Pressed state")]
-    AlreadyPressed { switch: Sw },
-
-    #[error("Switch TODO is pressed while in LongPressed state")]
-    AlreadyLongPressed { switch: Sw },
+pub enum TimedPressError {
+    #[error("Button is pressed while in Pressed state")]
+    AlreadyPressed,
+    #[error("Button is pressed while in LongPressed state")]
+    AlreadyLongPressed,
 }
 
 #[derive(Clone, Debug, Error)]
-pub enum TimedEventDisableError<Sw> {
-    #[error("Switch TODO is released while in Released state")]
-    AlreadyReleased { switch: Sw },
-
-    #[error("Switch TODO is released while in LongPressed state")]
-    AlreadyLongPressed { switch: Sw },
+pub enum TimedReleaseError {
+    #[error("Button is released while in Released state")]
+    AlreadyReleased,
+    #[error("Button is released while in LongPressed state")]
+    AlreadyLongReleased,
 }
 
 #[derive(Clone, Debug, Error)]
-pub enum DelayedTimedEventError<Sw> {
-    #[error("Timeout handler for switch TODO called while in LongPressed state that do not schedule any timeouts")]
-    LongPressed { switch: Sw },
-
-    #[error("Timeout handler for switch TODO called for default switch state")]
-    DefaultButtonState { switch: Sw },
+pub enum TimedLongClickError {
+    #[error("No handler calls requested for Default state")]
+    Default,
+    #[error("No handler calls requested for LongPressed state")]
+    LongPressed,
+    #[error("No handler calls requested for Released state")]
+    Released,
+    #[error("No handler calls requested for LongReleased state")]
+    LongReleased,
 }
 
-/*
-#[derive(Clone, Debug)]
-struct SwitchTransition<Sw> {
-    state: SwitchState,
-    event: Option<ReleaseTimedEvent<Ev>>,
-    scheduled: Option<ScheduledTimeout>,
+#[derive(Clone, Debug, Error)]
+pub enum TimedMultiClickError {
+    #[error("No handler calls requested for Default state")]
+    Default,
+    #[error("No handler calls requested for Pressed state")]
+    Pressed,
+    #[error("No handler calls requested for LongPressed state")]
+    LongPressed,
 }
-
-#[derive(Clone, Debug)]
-struct DelayedTimedSwitchTransition<Sw> {
-    state: Option<SwitchState>,
-    event: Option<DelayedTimedEvent<Ev>>,
-    scheduled: Option<ScheduledTimeout>,
-}*/

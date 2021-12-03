@@ -32,10 +32,11 @@ mod event;
 mod event_with_modifiers;
 //mod mouse;
 //mod processor;
-mod aggregate_timed_event;
+mod timed_event_ext;
 //mod raw;
 mod timed_event;
 //mod touch;
+mod result_with_context;
 
 //pub use axis::*;
 //pub use button::*;
@@ -46,10 +47,11 @@ pub use event::*;
 pub use event_with_modifiers::*;
 //pub use mouse::*;
 //pub use processor::*;
-pub use aggregate_timed_event::*;
+pub use timed_event_ext::*;
 //pub use raw::*;
 pub use timed_event::*;
 //pub use touch::*;
+pub use result_with_context::*;
 
 /*
 dbl-click

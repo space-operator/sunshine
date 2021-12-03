@@ -4,174 +4,202 @@ use std::collections::HashSet;
 
 #[test]
 fn raw_input_to_input_test() {
-    /*
-        use input_processor::*;
-        use std::{collections::BTreeMap, sync::Arc, sync::Weak};
+    use input_processor::*;
+    use std::{collections::BTreeMap, sync::Arc, sync::Weak};
 
-        type TimestampMs = u64;
-        type Coords = (u64, u64);
+    type TimestampMs = u64;
+    type Coords = (u64, u64);
 
-        type ImmediateEvent = (Option<RawEvent>, Option<AggregateTimedEvent<EventSwitch>>);
+    #[derive(Clone, Debug, Eq, PartialEq)]
+    pub enum Action {
+        Press(EventSwitch),
+        Release(EventSwitch),
+    }
 
-        #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-        enum RawEvent {
-            KeyboardDown(&'static str, TimestampMs),
-            KeyboardUp(&'static str, TimestampMs),
-            MouseDown(&'static str, Coords, TimestampMs),
-            MouseUp(&'static str, Coords, TimestampMs),
-            MouseMove(Coords, TimestampMs),
-        }
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    enum RawEvent {
+        KeyboardDown(&'static str, TimestampMs),
+        KeyboardUp(&'static str, TimestampMs),
+        MouseDown(&'static str, Coords, TimestampMs),
+        MouseUp(&'static str, Coords, TimestampMs),
+        MouseMove(Coords, TimestampMs),
+    }
 
-        #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-        enum EventSwitch {
-            Key(&'static str),
-            Button(&'static str),
-        }
+    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    enum EventSwitch {
+        Key(&'static str),
+        Button(&'static str),
+    }
 
-        impl EventWithAction for RawEvent {
-            type Switch = EventSwitch;
-
-            fn action(&self) -> Option<Action<Self::Switch>> {
-                match self {
-                    RawEvent::KeyboardDown(switch, _) => Some(Action::Enable(EventSwitch::Key(switch))),
-                    RawEvent::KeyboardUp(switch, _) => Some(Action::Disable(EventSwitch::Key(switch))),
-                    RawEvent::MouseDown(switch, _, _) => {
-                        Some(Action::Enable(EventSwitch::Button(switch)))
-                    }
-                    RawEvent::MouseUp(switch, _, _) => {
-                        Some(Action::Disable(EventSwitch::Button(switch)))
-                    }
-                    RawEvent::MouseMove(_, _) => None,
+    impl RawEvent {
+        fn action(&self) -> Option<Action> {
+            match self {
+                RawEvent::KeyboardDown(switch, _) => Some(Action::Press(EventSwitch::Key(switch))),
+                RawEvent::KeyboardUp(switch, _) => Some(Action::Release(EventSwitch::Key(switch))),
+                RawEvent::MouseDown(switch, _, _) => {
+                    Some(Action::Press(EventSwitch::Button(switch)))
                 }
+                RawEvent::MouseUp(switch, _, _) => {
+                    Some(Action::Release(EventSwitch::Button(switch)))
+                }
+                RawEvent::MouseMove(_, _) => None,
             }
         }
+    }
 
-        impl RawEvent {
-            fn timestamp(&self) -> TimestampMs {
-                match self {
-                    Self::KeyboardDown(_, timestamp) => *timestamp,
-                    Self::KeyboardUp(_, timestamp) => *timestamp,
-                    Self::MouseDown(_, _, timestamp) => *timestamp,
-                    Self::MouseUp(_, _, timestamp) => *timestamp,
-                    Self::MouseMove(_, timestamp) => *timestamp,
-                }
+    impl RawEvent {
+        fn timestamp(&self) -> TimestampMs {
+            match self {
+                Self::KeyboardDown(_, timestamp) => *timestamp,
+                Self::KeyboardUp(_, timestamp) => *timestamp,
+                Self::MouseDown(_, _, timestamp) => *timestamp,
+                Self::MouseUp(_, _, timestamp) => *timestamp,
+                Self::MouseMove(_, timestamp) => *timestamp,
             }
         }
+    }
 
-        #[derive(Clone, Debug)]
-        struct State {
-            state: TimedState<EventSwitch>,
-            timeouts: BTreeMap<TimestampMs, Weak<ScheduledTransition<EventSwitch>>>,
-            last_timestamp: TimestampMs,
-        }
+    #[derive(Clone, Debug)]
+    struct State {
+        state: TimedState<EventSwitch>,
+        timeouts: BTreeMap<TimestampMs, ()>,
+        last_timestamp: TimestampMs,
+    }
 
-        impl State {
-            fn with_event(self, event: RawEvent) -> (Self, Vec<ImmediateEvent>) {
-                fn apply_timed_transition(
-                    mut events: Vec<ImmediateEvent>,
-                    mut timeouts: BTreeMap<TimestampMs, Weak<ScheduledTransition<EventSwitch>>>,
-                    transition: AggregateTimedTransition<RawEvent, EventSwitch>,
-                    timestamp: TimestampMs,
-                ) -> (
-                    Vec<ImmediateEvent>,
-                    TimedState<EventSwitch>,
-                    BTreeMap<TimestampMs, Weak<ScheduledTransition<EventSwitch>>>,
-                ) {
-                    //println!("E {:?}", transition.event);
-                    //println!("T {:?}", transition.timed_event);
-                    //println!("S {:?}", transition.state);
-                    events.push((transition.event, transition.timed_event));
-                    if let Some(scheduled) = transition.scheduled {
-                        let delay = match scheduled.duration {
-                            Duration::LongClick => 1000,
-                            Duration::MultiClick => 300,
-                        };
-                        let _ =
-                            timeouts.insert(timestamp + delay, Arc::downgrade(&scheduled.transition));
-                    }
-                    (events, transition.state, timeouts)
+    impl State {
+        fn with_event(
+            self,
+            event: RawEvent,
+        ) -> (Self, Vec<(RawEvent, Option<TimedCombinedEvent>)>) {
+            /*fn apply_timed_transition(
+                mut events: Vec<ImmediateEvent>,
+                mut timeouts: BTreeMap<TimestampMs, ()>,
+                transition: AggregateTimedTransition<RawEvent, EventSwitch>,
+                timestamp: TimestampMs,
+            ) -> (
+                Vec<ImmediateEvent>,
+                TimedState<EventSwitch>,
+                BTreeMap<TimestampMs, ()>,
+            ) {
+                //println!("E {:?}", transition.event);
+                //println!("T {:?}", transition.timed_event);
+                //println!("S {:?}", transition.state);
+                /*events.push((transition.event, transition.timed_event));
+                if let Some(scheduled) = transition.scheduled {
+                    let delay = match scheduled.duration {
+                        Duration::LongClick => 1000,
+                        Duration::MultiClick => 300,
+                    };
+                    let _ =
+                        timeouts.insert(timestamp + delay, Arc::downgrade(&scheduled.transition));
                 }
+                (events, transition.state, timeouts)*/
+                todo!()
+            }*/
 
-                println!();
-                println!("{:?}", event);
+            println!();
+            println!("{:?}", event);
 
-                let timestamp = event.timestamp();
-                let mut state = self.state;
-                let mut timeouts = self.timeouts;
-                assert!(self.last_timestamp < timestamp);
-                let last_timestamp = timestamp;
+            let mut state = self.state;
+            let mut timeouts = self.timeouts;
+            let timestamp = event.timestamp();
+            assert!(self.last_timestamp < timestamp);
+            let last_timestamp = timestamp;
 
-                let mut events = Vec::new();
+            let mut events = Vec::new();
 
-                while let Some(entry) = timeouts.first_entry() {
-                    if *entry.key() > timestamp {
-                        break;
-                    }
-                    let (_, timeout) = entry.remove_entry();
-                    if let Some(timeout) = timeout.upgrade() {
-                        let transition = state.with_timeout_event(timeout).unwrap().into_aggregate();
-                        let result = apply_timed_transition(events, timeouts, transition, timestamp);
-                        events = result.0;
-                        state = result.1;
-                        timeouts = result.2;
+            /*while let Some(entry) = timeouts.first_entry() {
+                if *entry.key() > timestamp {
+                    break;
+                }
+                let (_, timeout) = entry.remove_entry();
+                if let Some(timeout) = timeout.upgrade() {
+                    let transition = state.with_timeout_event(timeout).unwrap().into_aggregate();
+                    let result = apply_timed_transition(events, timeouts, transition, timestamp);
+                    events = result.0;
+                    state = result.1;
+                    timeouts = result.2;
+                }
+            }*/
+
+            let (new_state, timed_event, request): (_, _, Option<TimedHandleRequest>) = match event
+                .action()
+            {
+                Some(Action::Press(switch)) => {
+                    let (state, request) = state.with_press_event(switch);
+                    let request = request.unwrap();
+                    (state, None, Some(request.into()))
+                }
+                Some(Action::Release(switch)) => {
+                    let (state, result) = state.with_release_event(switch);
+                    let result = result.unwrap();
+                    match result {
+                        Some((event, request)) => (state, Some(event.into()), Some(request.into())),
+                        None => (state, None, None),
                     }
                 }
+                None => (state, None, None),
+            };
 
-                let transition = state.with_event(event.clone()).unwrap().into_aggregate();
-                let result = apply_timed_transition(events, timeouts, transition, timestamp);
-                events = result.0;
-                state = result.1;
-                timeouts = result.2;
+            state = new_state;
+            events.push((event, timed_event));
+            let _ = request;
 
-                println!("{:?}", events);
+            //let transition = state.with_event(event.clone()).unwrap().into_aggregate();
+            //let result = apply_timed_transition(events, timeouts, transition, timestamp);
+            //events = result.0;
+            //state = result.1;
+            //timeouts = result.2;
 
-                (
-                    Self {
-                        state,
-                        timeouts,
-                        last_timestamp,
-                    },
-                    events,
-                )
-            }
+            println!("{:?}", events);
+
+            (
+                Self {
+                    state,
+                    timeouts,
+                    last_timestamp,
+                },
+                events,
+            )
         }
+    }
 
-        let state = State {
-            state: TimedState::new(),
-            timeouts: BTreeMap::new(),
-            last_timestamp: 0,
-        };
+    let state = State {
+        state: TimedState::new(),
+        timeouts: BTreeMap::new(),
+        last_timestamp: 0,
+    };
 
-        let state = state
-            .with_event(RawEvent::KeyboardDown("LeftCtrl", 10000))
-            .0;
-        let state = state.with_event(RawEvent::KeyboardUp("LeftCtrl", 10500)).0;
-        let state = state
-            .with_event(RawEvent::KeyboardDown("LeftCtrl", 11000))
-            .0;
-        let state = state.with_event(RawEvent::KeyboardUp("LeftCtrl", 13000)).0;
+    let state = state
+        .with_event(RawEvent::KeyboardDown("LeftCtrl", 10000))
+        .0;
+    let state = state.with_event(RawEvent::KeyboardUp("LeftCtrl", 10500)).0;
+    let state = state
+        .with_event(RawEvent::KeyboardDown("LeftCtrl", 11000))
+        .0;
+    let state = state.with_event(RawEvent::KeyboardUp("LeftCtrl", 13000)).0;
 
-        let state = state
-            .with_event(RawEvent::KeyboardDown("LeftCtrl", 15000))
-            .0;
-        let state = state
-            .with_event(RawEvent::MouseDown("LeftMouseButton", (0, 0), 15100))
-            .0;
-        let state = state
-            .with_event(RawEvent::MouseUp("LeftMouseButton", (0, 0), 15200))
-            .0;
-        let state = state
-            .with_event(RawEvent::MouseDown("LeftMouseButton", (0, 0), 15300))
-            .0;
-        let state = state
-            .with_event(RawEvent::MouseUp("LeftMouseButton", (0, 0), 15400))
-            .0;
+    let state = state
+        .with_event(RawEvent::KeyboardDown("LeftCtrl", 15000))
+        .0;
+    let state = state
+        .with_event(RawEvent::MouseDown("LeftMouseButton", (0, 0), 15100))
+        .0;
+    let state = state
+        .with_event(RawEvent::MouseUp("LeftMouseButton", (0, 0), 15200))
+        .0;
+    let state = state
+        .with_event(RawEvent::MouseDown("LeftMouseButton", (0, 0), 15300))
+        .0;
+    let state = state
+        .with_event(RawEvent::MouseUp("LeftMouseButton", (0, 0), 15400))
+        .0;
 
-        let state = state.with_event(RawEvent::KeyboardUp("LeftCtrl", 18000)).0;
+    let state = state.with_event(RawEvent::KeyboardUp("LeftCtrl", 18000)).0;
 
-        let _ = state;
-        panic!();
-    */
+    let _ = state;
+    panic!();
+
     /*
         binding
             binding-kind + attached-data(coords?)
@@ -289,7 +317,7 @@ fn raw_input_to_input_test() {
     /*
     enum InputEvent {
         Event(RawEvent),
-        TimedEvent(AggregateTimedEventKind),
+        TimedEvent(TimedCombinedEventKind),
     }
 
         struct MappingWithCoords {
