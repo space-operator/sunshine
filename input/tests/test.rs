@@ -1,22 +1,22 @@
 #![feature(map_first_last)]
 
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashMap};
 
 #[test]
 fn raw_input_to_input_test() {
     use input_processor::*;
-    use std::{collections::BTreeMap, sync::Arc, sync::Weak};
+    use std::collections::BTreeMap;
 
     type TimestampMs = u64;
     type Coords = (u64, u64);
 
-    #[derive(Clone, Debug, Eq, PartialEq)]
-    pub enum Action {
-        Press(EventSwitch),
-        Release(EventSwitch),
+    #[derive(Clone, Copy, Debug, Eq, PartialEq)]
+    enum RawAction {
+        Press(RawSwitch),
+        Release(RawSwitch),
     }
 
-    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
     enum RawEvent {
         KeyboardDown(&'static str, TimestampMs),
         KeyboardUp(&'static str, TimestampMs),
@@ -25,24 +25,69 @@ fn raw_input_to_input_test() {
         MouseMove(Coords, TimestampMs),
     }
 
-    #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-    enum EventSwitch {
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    enum RawSwitchEvent {
+        KeyboardDown(&'static str, TimestampMs),
+        KeyboardUp(&'static str, TimestampMs),
+        MouseDown(&'static str, Coords, TimestampMs),
+        MouseUp(&'static str, Coords, TimestampMs),
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    enum RawSwitch {
         Key(&'static str),
         Button(&'static str),
     }
 
-    impl RawEvent {
-        fn action(&self) -> Option<Action> {
+    impl RawAction {
+        fn switch(&self) -> &RawSwitch {
             match self {
-                RawEvent::KeyboardDown(switch, _) => Some(Action::Press(EventSwitch::Key(switch))),
-                RawEvent::KeyboardUp(switch, _) => Some(Action::Release(EventSwitch::Key(switch))),
-                RawEvent::MouseDown(switch, _, _) => {
-                    Some(Action::Press(EventSwitch::Button(switch)))
-                }
-                RawEvent::MouseUp(switch, _, _) => {
-                    Some(Action::Release(EventSwitch::Button(switch)))
-                }
-                RawEvent::MouseMove(_, _) => None,
+                Self::Press(switch) => &switch,
+                Self::Release(switch) => &switch,
+            }
+        }
+    }
+
+    impl RawSwitchEvent {
+        fn action(&self) -> RawAction {
+            match self {
+                Self::KeyboardDown(switch, _) => RawAction::Press(RawSwitch::Key(switch)),
+                Self::KeyboardUp(switch, _) => RawAction::Release(RawSwitch::Key(switch)),
+                Self::MouseDown(switch, _, _) => RawAction::Press(RawSwitch::Button(switch)),
+                Self::MouseUp(switch, _, _) => RawAction::Release(RawSwitch::Button(switch)),
+            }
+        }
+    }
+
+    /*impl RawEvent {
+        fn action(&self) -> Option<RawAction> {
+            RawSwitchEvent::try_from(*self)
+                .as_ref()
+                .map(RawSwitchEvent::action)
+                .ok()
+        }
+    }*/
+
+    impl TryFrom<RawEvent> for RawSwitchEvent {
+        type Error = ();
+        fn try_from(event: RawEvent) -> Result<Self, Self::Error> {
+            match event {
+                RawEvent::KeyboardDown(a, b) => Ok(Self::KeyboardDown(a, b)),
+                RawEvent::KeyboardUp(a, b) => Ok(Self::KeyboardUp(a, b)),
+                RawEvent::MouseDown(a, b, c) => Ok(Self::MouseDown(a, b, c)),
+                RawEvent::MouseUp(a, b, c) => Ok(Self::MouseUp(a, b, c)),
+                RawEvent::MouseMove(_, _) => Err(()),
+            }
+        }
+    }
+
+    impl From<RawSwitchEvent> for RawEvent {
+        fn from(event: RawSwitchEvent) -> Self {
+            match event {
+                RawSwitchEvent::KeyboardDown(a, b) => Self::KeyboardDown(a, b),
+                RawSwitchEvent::KeyboardUp(a, b) => Self::KeyboardUp(a, b),
+                RawSwitchEvent::MouseDown(a, b, c) => Self::MouseDown(a, b, c),
+                RawSwitchEvent::MouseUp(a, b, c) => Self::MouseUp(a, b, c),
             }
         }
     }
@@ -58,11 +103,112 @@ fn raw_input_to_input_test() {
             }
         }
     }
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    enum BindableEvent {
+        KeyboardDown(&'static str, TimestampMs),
+        KeyboardUp(&'static str, TimestampMs),
+        KeyboardTimed(&'static str, TimedCombinedEvent, TimestampMs),
+        MouseDown(&'static str, Coords, TimestampMs),
+        MouseUp(&'static str, Coords, TimestampMs),
+        MouseTimed(&'static str, TimedCombinedEvent, Coords, TimestampMs),
+        MouseMove(Coords, TimestampMs),
+    }
+
+    impl BindableEvent {
+        fn action(&self) -> Option<RawAction> {
+            match self {
+                Self::KeyboardDown(switch, _) => Some(RawAction::Press(RawSwitch::Key(switch))),
+                Self::KeyboardUp(switch, _) => Some(RawAction::Release(RawSwitch::Key(switch))),
+                Self::KeyboardTimed(_, _, _) => None,
+                Self::MouseDown(switch, _, _) => Some(RawAction::Press(RawSwitch::Button(switch))),
+                Self::MouseUp(switch, _, _) => Some(RawAction::Release(RawSwitch::Button(switch))),
+                Self::MouseTimed(_, _, _, _) => None,
+                Self::MouseMove(_, _) => None,
+            }
+        }
+    }
+
+    impl From<RawEvent> for BindableEvent {
+        fn from(event: RawEvent) -> Self {
+            match event {
+                RawEvent::KeyboardDown(a, b) => Self::KeyboardDown(a, b),
+                RawEvent::KeyboardUp(a, b) => Self::KeyboardUp(a, b),
+                RawEvent::MouseDown(a, b, c) => Self::MouseDown(a, b, c),
+                RawEvent::MouseUp(a, b, c) => Self::MouseUp(a, b, c),
+                RawEvent::MouseMove(a, b) => Self::MouseMove(a, b),
+            }
+        }
+    }
+
+    impl From<(RawSwitchEvent, TimedCombinedEvent)> for BindableEvent {
+        fn from((event, timed_event): (RawSwitchEvent, TimedCombinedEvent)) -> Self {
+            match (event, timed_event) {
+                (RawSwitchEvent::KeyboardDown(a, b), t) => Self::KeyboardTimed(a, t, b),
+                (RawSwitchEvent::KeyboardUp(a, b), t) => Self::KeyboardTimed(a, t, b),
+                (RawSwitchEvent::MouseDown(a, b, c), t) => Self::MouseTimed(a, t, b, c),
+                (RawSwitchEvent::MouseUp(a, b, c), t) => Self::MouseTimed(a, t, b, c),
+            }
+        }
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    enum Binding {
+        KeyboardDown(&'static str),
+        KeyboardUp(&'static str),
+        KeyboardTimed(&'static str, TimedCombinedEvent),
+        MouseDown(&'static str),
+        MouseUp(&'static str),
+        MouseTimed(&'static str, TimedCombinedEvent),
+        MouseMove,
+    }
+
+    impl From<BindableEvent> for Binding {
+        fn from(event: BindableEvent) -> Self {
+            match event {
+                BindableEvent::KeyboardDown(switch, _) => Self::KeyboardDown(switch),
+                BindableEvent::KeyboardUp(switch, _) => Self::KeyboardUp(switch),
+                BindableEvent::KeyboardTimed(switch, timed, _) => {
+                    Self::KeyboardTimed(switch, timed)
+                }
+                BindableEvent::MouseDown(switch, _, _) => Self::MouseDown(switch),
+                BindableEvent::MouseUp(switch, _, _) => Self::MouseUp(switch),
+                BindableEvent::MouseTimed(switch, timed, _, _) => Self::MouseTimed(switch, timed),
+                BindableEvent::MouseMove(_, _) => Self::MouseMove,
+            }
+        }
+    }
+
+    type NodeId = u16;
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    enum AppEvent {
+        CreateNode(NodeId),
+        RemoveNode(NodeId),
+        SelectNode(NodeId),
+        AddNodeToSelection(NodeId),
+        DeselectNodes,
+        SelectAllNodes,
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    enum PositionedAppEvent {
+        CreateNode,
+        RemoveNode,
+        SelectNode,
+        AddNodeToSelection,
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    enum TriggeredAppEvent {
+        DeselectNodes,
+        SelectAllNodes,
+    }
 
     #[derive(Clone, Debug)]
     struct State {
-        state: TimedState<EventSwitch>,
-        timeouts: BTreeMap<TimestampMs, ()>,
+        timed_state: TimedState<RawSwitch>,
+        modified_state: ModifiedState<RawSwitch>,
+        timeouts: BTreeMap<TimestampMs, (RawSwitchEvent, TimedHandleRequest)>,
         last_timestamp: TimestampMs,
     }
 
@@ -70,92 +216,81 @@ fn raw_input_to_input_test() {
         fn with_event(
             self,
             event: RawEvent,
-        ) -> (Self, Vec<(RawEvent, Option<TimedCombinedEvent>)>) {
-            /*fn apply_timed_transition(
-                mut events: Vec<ImmediateEvent>,
-                mut timeouts: BTreeMap<TimestampMs, ()>,
-                transition: AggregateTimedTransition<RawEvent, EventSwitch>,
-                timestamp: TimestampMs,
-            ) -> (
-                Vec<ImmediateEvent>,
-                TimedState<EventSwitch>,
-                BTreeMap<TimestampMs, ()>,
-            ) {
-                //println!("E {:?}", transition.event);
-                //println!("T {:?}", transition.timed_event);
-                //println!("S {:?}", transition.state);
-                /*events.push((transition.event, transition.timed_event));
-                if let Some(scheduled) = transition.scheduled {
-                    let delay = match scheduled.duration {
-                        Duration::LongClick => 1000,
-                        Duration::MultiClick => 300,
-                    };
-                    let _ =
-                        timeouts.insert(timestamp + delay, Arc::downgrade(&scheduled.transition));
-                }
-                (events, transition.state, timeouts)*/
-                todo!()
-            }*/
-
+        ) -> (Self, Vec<ModifiedEvent<BindableEvent, RawSwitch>>) {
             println!();
             println!("{:?}", event);
 
-            let mut state = self.state;
+            let mut timed_state = self.timed_state;
             let mut timeouts = self.timeouts;
             let timestamp = event.timestamp();
             assert!(self.last_timestamp < timestamp);
             let last_timestamp = timestamp;
 
-            let mut events = Vec::new();
+            let mut events: Vec<BindableEvent> = Vec::new();
 
-            /*while let Some(entry) = timeouts.first_entry() {
+            while let Some(entry) = timeouts.first_entry() {
                 if *entry.key() > timestamp {
                     break;
                 }
-                let (_, timeout) = entry.remove_entry();
-                if let Some(timeout) = timeout.upgrade() {
-                    let transition = state.with_timeout_event(timeout).unwrap().into_aggregate();
-                    let result = apply_timed_transition(events, timeouts, transition, timestamp);
-                    events = result.0;
-                    state = result.1;
-                    timeouts = result.2;
+                let (_, (event, request)) = entry.remove_entry();
+                let (new_state, result) =
+                    timed_state.with_delayed_event(*event.action().switch(), request);
+                if let Some(result) = result {
+                    let timed_event = result.unwrap();
+                    events.push((event.into(), timed_event.into()).into());
                 }
-            }*/
+                timed_state = new_state;
+            }
 
-            let (new_state, timed_event, request): (_, _, Option<TimedHandleRequest>) = match event
-                .action()
-            {
-                Some(Action::Press(switch)) => {
-                    let (state, request) = state.with_press_event(switch);
-                    let request = request.unwrap();
-                    (state, None, Some(request.into()))
-                }
-                Some(Action::Release(switch)) => {
-                    let (state, result) = state.with_release_event(switch);
-                    let result = result.unwrap();
-                    match result {
-                        Some((event, request)) => (state, Some(event.into()), Some(request.into())),
-                        None => (state, None, None),
+            events.push(event.into());
+            let (new_state, request) = match RawSwitchEvent::try_from(event) {
+                Ok(event) => match event.action() {
+                    RawAction::Press(switch) => {
+                        let (state, request) = timed_state.with_press_event(switch);
+                        let request = request.unwrap();
+                        (state, Some((event, request.into(), 1000)))
                     }
-                }
-                None => (state, None, None),
+                    RawAction::Release(switch) => {
+                        let (state, result) = timed_state.with_release_event(switch);
+                        let result = result.unwrap();
+                        match result {
+                            Some((timed_event, request)) => {
+                                events.push((event, timed_event.into()).into());
+                                (state, Some((event, request.into(), 300)))
+                            }
+                            None => (state, None),
+                        }
+                    }
+                },
+                Err(()) => (timed_state, None),
             };
 
-            state = new_state;
-            events.push((event, timed_event));
+            timed_state = new_state;
+            if let Some((event, request, timeout)) = request {
+                timeouts.insert(timestamp + timeout, (event, request));
+            }
             let _ = request;
 
-            //let transition = state.with_event(event.clone()).unwrap().into_aggregate();
-            //let result = apply_timed_transition(events, timeouts, transition, timestamp);
-            //events = result.0;
-            //state = result.1;
-            //timeouts = result.2;
+            let (events, modified_state) = events.into_iter().fold(
+                (Vec::new(), self.modified_state),
+                |(mut events, state), event| {
+                    let event = match event.action() {
+                        Some(RawAction::Press(switch)) => state.with_press_event(event, switch),
+                        Some(RawAction::Release(switch)) => state.with_release_event(event, switch),
+                        None => state.with_trigger_event(event),
+                    };
+                    let state = event.to_state();
+                    events.push(event);
+                    (events, state)
+                },
+            );
 
             println!("{:?}", events);
 
             (
                 Self {
-                    state,
+                    timed_state,
+                    modified_state,
                     timeouts,
                     last_timestamp,
                 },
@@ -164,8 +299,11 @@ fn raw_input_to_input_test() {
         }
     }
 
+    let mapping: HashMap<AppEvent, (BTreeSet<RawSwitch>, Binding)> = [].into_iter().collect();
+
     let state = State {
-        state: TimedState::new(),
+        timed_state: TimedState::new(),
+        modified_state: ModifiedState::new(),
         timeouts: BTreeMap::new(),
         last_timestamp: 0,
     };
@@ -196,6 +334,7 @@ fn raw_input_to_input_test() {
         .0;
 
     let state = state.with_event(RawEvent::KeyboardUp("LeftCtrl", 18000)).0;
+    let state = state.with_event(RawEvent::MouseMove((0, 1000), 20000)).0;
 
     let _ = state;
     panic!();

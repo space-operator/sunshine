@@ -66,11 +66,22 @@ impl From<TimedMultiClickEventKind> for TimedCombinedEventKind {
     }
 }
 
+impl From<TimedDelayedEventKind> for TimedCombinedEventKind {
+    fn from(kind: TimedDelayedEventKind) -> Self {
+        match kind {
+            TimedDelayedEventKind::LongPress => Self::LongPress,
+            TimedDelayedEventKind::ClickExact => Self::ClickExact,
+            TimedDelayedEventKind::LongClickExact => Self::LongClickExact,
+        }
+    }
+}
+
 pub trait AllowFrom<T> {}
 
 impl AllowFrom<TimedReleaseEventKind> for TimedCombinedEventKind {}
 impl AllowFrom<TimedLongPressEventKind> for TimedCombinedEventKind {}
 impl AllowFrom<TimedMultiClickEventKind> for TimedCombinedEventKind {}
+impl AllowFrom<TimedDelayedEventKind> for TimedCombinedEventKind {}
 
 impl AllowFrom<TimedLongPressEventKind> for TimedDelayedEventKind {}
 impl AllowFrom<TimedMultiClickEventKind> for TimedDelayedEventKind {}
@@ -176,7 +187,7 @@ where
     }
 }
 
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Copy, Debug, Error)]
 pub enum TimedDelayedError {
     #[error(transparent)]
     LongClick(#[from] TimedLongClickError),

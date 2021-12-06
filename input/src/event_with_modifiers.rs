@@ -1,8 +1,6 @@
 use core::hash::Hash;
 use std::{collections::BTreeSet, sync::Arc};
 
-use crate::{Action, EventWithAction};
-
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ModifiedEvent<Ev, Sw> {
     event: Ev,
@@ -15,7 +13,7 @@ pub struct ModifiedState<Sw> {
 }
 
 impl<Ev, Sw> ModifiedEvent<Ev, Sw> {
-    fn to_state(&self) -> ModifiedState<Sw> {
+    pub fn to_state(&self) -> ModifiedState<Sw> {
         ModifiedState {
             modifiers: Arc::clone(&self.modifiers),
         }
@@ -35,27 +33,34 @@ impl<Sw> ModifiedState<Sw> {
         &self.modifiers
     }
 
-    pub fn with_event<Ev>(self, event: Ev) -> ModifiedEvent<Ev, Sw>
+    pub fn with_press_event<Ev>(self, event: Ev, switch: Sw) -> ModifiedEvent<Ev, Sw>
     where
-        Ev: EventWithAction<Switch = Sw>,
         Sw: Clone + Eq + Hash + Ord,
     {
         let mut modifiers = self.modifiers;
-        match event.action() {
-            Some(Action::Enable(switch)) => {
-                let modifiers_mut = Arc::make_mut(&mut modifiers);
-                let is_added = modifiers_mut.insert(switch);
-                assert!(is_added);
-                ModifiedEvent { event, modifiers }
-            }
-            Some(Action::Disable(switch)) => {
-                let modifiers_mut = Arc::make_mut(&mut modifiers);
-                let is_removed = modifiers_mut.remove(&switch);
-                assert!(is_removed);
-                ModifiedEvent { event, modifiers }
-            }
-            None => ModifiedEvent { event, modifiers },
-        }
+        let modifiers_mut = Arc::make_mut(&mut modifiers);
+        let is_added = modifiers_mut.insert(switch);
+        assert!(is_added);
+        ModifiedEvent { event, modifiers }
+    }
+
+    pub fn with_release_event<Ev>(self, event: Ev, switch: Sw) -> ModifiedEvent<Ev, Sw>
+    where
+        Sw: Clone + Eq + Hash + Ord,
+    {
+        let mut modifiers = self.modifiers;
+        let modifiers_mut = Arc::make_mut(&mut modifiers);
+        let is_removed = modifiers_mut.remove(&switch);
+        assert!(is_removed);
+        ModifiedEvent { event, modifiers }
+    }
+
+    pub fn with_trigger_event<Ev>(self, event: Ev) -> ModifiedEvent<Ev, Sw>
+    where
+        Sw: Clone + Eq + Hash + Ord,
+    {
+        let modifiers = self.modifiers;
+        ModifiedEvent { event, modifiers }
     }
 }
 

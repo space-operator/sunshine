@@ -91,7 +91,7 @@ impl<Sw> TimedState<Sw> {
             Entry::Occupied(entry) => {
                 let (switch, state) = entry.remove_entry();
                 let (state, request) = state.with_press_event();
-                switches.insert(switch, state);
+                let _ = switches.insert(switch, state);
                 (Self::from(switches), request)
             }
             Entry::Vacant(entry) => {
@@ -120,14 +120,14 @@ impl<Sw> TimedState<Sw> {
             Entry::Occupied(entry) => {
                 let (switch, state) = entry.remove_entry();
                 let (state, result) = state.with_release_event();
-                switches.insert(switch, state);
+                let _ = switches.insert(switch, state);
                 (Self::from(switches), result.map(Some))
             }
             Entry::Vacant(_) => (Self::from(switches), Ok(None)),
         }
     }
 
-    pub fn with_timeout_event<T, E>(
+    fn with_timeout_event<T, E>(
         self,
         switch: Sw,
         callback: impl FnOnce(SwitchState) -> (Option<SwitchState>, Result<T, E>),
@@ -145,7 +145,7 @@ impl<Sw> TimedState<Sw> {
                 let (switch, state) = entry.remove_entry();
                 let (state, result) = callback(state);
                 if let Some(state) = state {
-                    switches.insert(switch, state);
+                    let _ = switches.insert(switch, state);
                 }
                 (Self::from(switches), Some(result))
             }
@@ -273,7 +273,6 @@ impl SwitchState {
 
         match self.kind {
             Pressed(_) => {
-                let tag = Arc::new(());
                 let state = Self::new(LongPressed, self.num_clicks);
                 let event =
                     TimedLongPressEvent::new(TimedLongPressEventKind::LongPress, self.num_clicks);
@@ -314,7 +313,7 @@ impl SwitchState {
     }
 }
 
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Copy, Debug, Error)]
 pub enum TimedPressError {
     #[error("Button is pressed while in Pressed state")]
     AlreadyPressed,
@@ -322,7 +321,7 @@ pub enum TimedPressError {
     AlreadyLongPressed,
 }
 
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Copy, Debug, Error)]
 pub enum TimedReleaseError {
     #[error("Button is released while in Released state")]
     AlreadyReleased,
@@ -330,7 +329,7 @@ pub enum TimedReleaseError {
     AlreadyLongReleased,
 }
 
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Copy, Debug, Error)]
 pub enum TimedLongClickError {
     #[error("No handler calls requested for Default state")]
     Default,
@@ -342,7 +341,7 @@ pub enum TimedLongClickError {
     LongReleased,
 }
 
-#[derive(Clone, Debug, Error)]
+#[derive(Clone, Copy, Debug, Error)]
 pub enum TimedMultiClickError {
     #[error("No handler calls requested for Default state")]
     Default,

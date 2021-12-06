@@ -1,6 +1,3 @@
-use std::collections::HashSet;
-use std::sync::Arc;
-
 /*
     ((raw event | time-event) + modifiers) => mapped event
 
@@ -36,6 +33,7 @@ pub struct EventWithModifiers<T1, T2> {
     modifiers: Arc<HashSet<T2>>,
 }*/
 
+/*
 #[test]
 fn test() {
     enum Event {
@@ -65,7 +63,7 @@ fn test() {
         }
     }
 }
-
+*/
 /*
 #[test]
 fn test() {
