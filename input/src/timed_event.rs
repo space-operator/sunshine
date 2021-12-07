@@ -4,12 +4,12 @@ use std::sync::{Arc, Weak};
 
 use thiserror::Error;
 
-pub type NumClicks = u32;
+pub type NumPossibleClicks = u32;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TimedEvent<Ki> {
     pub kind: Ki,
-    pub num_clicks: NumClicks,
+    pub num_possible_clicks: NumPossibleClicks,
 }
 
 pub type TimedReleaseEvent = TimedEvent<TimedReleaseEventKind>;
@@ -41,7 +41,7 @@ pub struct TimedState<Sw> {
 #[derive(Clone, Debug)]
 struct SwitchState {
     kind: SwitchStateKind,
-    num_clicks: NumClicks,
+    num_possible_clicks: NumPossibleClicks,
 }
 
 #[derive(Clone, Debug)]
@@ -60,8 +60,11 @@ pub struct MultiClickHandleRequest(Weak<()>);
 
 impl<Ki> TimedEvent<Ki> {
     #[must_use]
-    pub fn new(kind: Ki, num_clicks: NumClicks) -> Self {
-        Self { kind, num_clicks }
+    pub fn new(kind: Ki, num_clicks: NumPossibleClicks) -> Self {
+        Self {
+            kind,
+            num_possible_clicks: num_clicks,
+        }
     }
 }
 
@@ -196,6 +199,23 @@ impl<Sw> TimedState<Sw> {
             (self, None)
         }
     }
+
+    fn with_reset_click_count(mut self, switch: Sw) -> (Self, Result<(), WithResetClickCountError>)
+    where
+        Sw: Eq + Hash,
+    {
+        use std::collections::hash_map::Entry;
+
+        let mut switches = self.switches;
+        let entry = switches.entry(switch);
+        match entry {
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().num_possible_clicks = 0;
+                (Self::from(switches), Ok(()))
+            }
+            Entry::Vacant(_) => (Self::from(switches), Err(WithResetClickCountError::Default)),
+        }
+    }
 }
 
 impl<Sw> Default for TimedState<Sw> {
@@ -207,14 +227,17 @@ impl<Sw> Default for TimedState<Sw> {
 }
 
 impl SwitchState {
-    fn new(kind: SwitchStateKind, num_clicks: NumClicks) -> Self {
-        Self { kind, num_clicks }
+    fn new(kind: SwitchStateKind, num_clicks: NumPossibleClicks) -> Self {
+        Self {
+            kind,
+            num_possible_clicks: num_clicks,
+        }
     }
 
     fn from_pressed() -> (Self, LongPressHandleRequest) {
         let tag = Arc::new(());
         let request = LongPressHandleRequest(Arc::downgrade(&tag));
-        let state = Self::new(SwitchStateKind::Pressed(tag), 0);
+        let state = Self::new(SwitchStateKind::Pressed(tag), 1);
         (state, request)
     }
 
@@ -227,7 +250,7 @@ impl SwitchState {
             Released(_) | LongReleased(_) => {
                 let tag = Arc::new(());
                 let request = LongPressHandleRequest(Arc::downgrade(&tag));
-                let state = Self::new(Pressed(tag), self.num_clicks);
+                let state = Self::new(Pressed(tag), self.num_possible_clicks + 1);
                 (state, Ok(request))
             }
         }
@@ -245,16 +268,17 @@ impl SwitchState {
             Pressed(_) => {
                 let tag = Arc::new(());
                 let request = MultiClickHandleRequest(Arc::downgrade(&tag));
-                let state = Self::new(Released(tag), self.num_clicks + 1);
-                let event = TimedEvent::new(TimedReleaseEventKind::Click, self.num_clicks + 1);
+                let state = Self::new(Released(tag), self.num_possible_clicks);
+                let event = TimedEvent::new(TimedReleaseEventKind::Click, self.num_possible_clicks);
                 (state, Ok((event, request)))
             }
 
             LongPressed => {
                 let tag = Arc::new(());
                 let request = MultiClickHandleRequest(Arc::downgrade(&tag));
-                let state = Self::new(LongReleased(tag), self.num_clicks + 1);
-                let event = TimedEvent::new(TimedReleaseEventKind::LongClick, self.num_clicks + 1);
+                let state = Self::new(LongReleased(tag), self.num_possible_clicks);
+                let event =
+                    TimedEvent::new(TimedReleaseEventKind::LongClick, self.num_possible_clicks);
                 (state, Ok((event, request)))
             }
 
@@ -273,9 +297,11 @@ impl SwitchState {
 
         match self.kind {
             Pressed(_) => {
-                let state = Self::new(LongPressed, self.num_clicks);
-                let event =
-                    TimedLongPressEvent::new(TimedLongPressEventKind::LongPress, self.num_clicks);
+                let state = Self::new(LongPressed, self.num_possible_clicks);
+                let event = TimedLongPressEvent::new(
+                    TimedLongPressEventKind::LongPress,
+                    self.num_possible_clicks,
+                );
                 (Some(state), Ok(event))
             }
             LongPressed => (Some(self), Err(TimedLongClickError::LongPressed)),
@@ -298,14 +324,14 @@ impl SwitchState {
             Released(_) => {
                 let event = TimedMultiClickEvent::new(
                     TimedMultiClickEventKind::ClickExact,
-                    self.num_clicks,
+                    self.num_possible_clicks,
                 );
                 (None, Ok(event))
             }
             LongReleased(_) => {
                 let event = TimedMultiClickEvent::new(
                     TimedMultiClickEventKind::LongClickExact,
-                    self.num_clicks,
+                    self.num_possible_clicks,
                 );
                 (None, Ok(event))
             }
@@ -349,4 +375,10 @@ pub enum TimedMultiClickError {
     Pressed,
     #[error("No handler calls requested for LongPressed state")]
     LongPressed,
+}
+
+#[derive(Clone, Copy, Debug, Error)]
+pub enum WithResetClickCountError {
+    #[error("No handler calls requested for Default state")]
+    Default,
 }

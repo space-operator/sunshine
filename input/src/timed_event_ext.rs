@@ -93,7 +93,7 @@ where
     fn from(event: TimedEvent<Ki1>) -> Self {
         Self {
             kind: event.kind.into(),
-            num_clicks: event.num_clicks,
+            num_possible_clicks: event.num_possible_clicks,
         }
     }
 }
@@ -105,7 +105,7 @@ where
     fn from(event: TimedEvent<Ki1>) -> Self {
         Self {
             kind: event.kind.into(),
-            num_clicks: event.num_clicks,
+            num_possible_clicks: event.num_possible_clicks,
         }
     }
 }

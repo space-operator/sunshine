@@ -5,7 +5,7 @@ use std::collections::{BTreeSet, HashMap};
 #[test]
 fn raw_input_to_input_test() {
     use input_processor::*;
-    use std::collections::BTreeMap;
+    use std::collections::{BTreeMap, HashSet};
 
     type TimestampMs = u64;
     type Coords = (u64, u64);
@@ -103,8 +103,9 @@ fn raw_input_to_input_test() {
             }
         }
     }
+
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-    enum BindableEvent {
+    enum BasicEvent {
         KeyboardDown(&'static str, TimestampMs),
         KeyboardUp(&'static str, TimestampMs),
         KeyboardTimed(&'static str, TimedCombinedEvent, TimestampMs),
@@ -114,7 +115,7 @@ fn raw_input_to_input_test() {
         MouseMove(Coords, TimestampMs),
     }
 
-    impl BindableEvent {
+    impl BasicEvent {
         fn action(&self) -> Option<RawAction> {
             match self {
                 Self::KeyboardDown(switch, _) => Some(RawAction::Press(RawSwitch::Key(switch))),
@@ -128,7 +129,7 @@ fn raw_input_to_input_test() {
         }
     }
 
-    impl From<RawEvent> for BindableEvent {
+    impl From<RawEvent> for BasicEvent {
         fn from(event: RawEvent) -> Self {
             match event {
                 RawEvent::KeyboardDown(a, b) => Self::KeyboardDown(a, b),
@@ -140,7 +141,7 @@ fn raw_input_to_input_test() {
         }
     }
 
-    impl From<(RawSwitchEvent, TimedCombinedEvent)> for BindableEvent {
+    impl From<(RawSwitchEvent, TimedCombinedEvent)> for BasicEvent {
         fn from((event, timed_event): (RawSwitchEvent, TimedCombinedEvent)) -> Self {
             match (event, timed_event) {
                 (RawSwitchEvent::KeyboardDown(a, b), t) => Self::KeyboardTimed(a, t, b),
@@ -149,59 +150,6 @@ fn raw_input_to_input_test() {
                 (RawSwitchEvent::MouseUp(a, b, c), t) => Self::MouseTimed(a, t, b, c),
             }
         }
-    }
-
-    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-    enum Binding {
-        KeyboardDown(&'static str),
-        KeyboardUp(&'static str),
-        KeyboardTimed(&'static str, TimedCombinedEvent),
-        MouseDown(&'static str),
-        MouseUp(&'static str),
-        MouseTimed(&'static str, TimedCombinedEvent),
-        MouseMove,
-    }
-
-    impl From<BindableEvent> for Binding {
-        fn from(event: BindableEvent) -> Self {
-            match event {
-                BindableEvent::KeyboardDown(switch, _) => Self::KeyboardDown(switch),
-                BindableEvent::KeyboardUp(switch, _) => Self::KeyboardUp(switch),
-                BindableEvent::KeyboardTimed(switch, timed, _) => {
-                    Self::KeyboardTimed(switch, timed)
-                }
-                BindableEvent::MouseDown(switch, _, _) => Self::MouseDown(switch),
-                BindableEvent::MouseUp(switch, _, _) => Self::MouseUp(switch),
-                BindableEvent::MouseTimed(switch, timed, _, _) => Self::MouseTimed(switch, timed),
-                BindableEvent::MouseMove(_, _) => Self::MouseMove,
-            }
-        }
-    }
-
-    type NodeId = u16;
-
-    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-    enum AppEvent {
-        CreateNode(NodeId),
-        RemoveNode(NodeId),
-        SelectNode(NodeId),
-        AddNodeToSelection(NodeId),
-        DeselectNodes,
-        SelectAllNodes,
-    }
-
-    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-    enum PositionedAppEvent {
-        CreateNode,
-        RemoveNode,
-        SelectNode,
-        AddNodeToSelection,
-    }
-
-    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-    enum TriggeredAppEvent {
-        DeselectNodes,
-        SelectAllNodes,
     }
 
     #[derive(Clone, Debug)]
@@ -216,9 +164,9 @@ fn raw_input_to_input_test() {
         fn with_event(
             self,
             event: RawEvent,
-        ) -> (Self, Vec<ModifiedEvent<BindableEvent, RawSwitch>>) {
-            println!();
-            println!("{:?}", event);
+        ) -> (Self, Vec<EventWithModifiers<BasicEvent, RawSwitch>>) {
+            //println!();
+            //println!("{:?}", event);
 
             let mut timed_state = self.timed_state;
             let mut timeouts = self.timeouts;
@@ -226,7 +174,7 @@ fn raw_input_to_input_test() {
             assert!(self.last_timestamp < timestamp);
             let last_timestamp = timestamp;
 
-            let mut events: Vec<BindableEvent> = Vec::new();
+            let mut events: Vec<BasicEvent> = Vec::new();
 
             while let Some(entry) = timeouts.first_entry() {
                 if *entry.key() > timestamp {
@@ -285,7 +233,7 @@ fn raw_input_to_input_test() {
                 },
             );
 
-            println!("{:?}", events);
+            //println!("{:?}", events);
 
             (
                 Self {
@@ -299,45 +247,299 @@ fn raw_input_to_input_test() {
         }
     }
 
-    let mapping: HashMap<AppEvent, (BTreeSet<RawSwitch>, Binding)> = [].into_iter().collect();
-
-    let state = State {
+    let mut state = State {
         timed_state: TimedState::new(),
         modified_state: ModifiedState::new(),
         timeouts: BTreeMap::new(),
         last_timestamp: 0,
     };
 
-    let state = state
-        .with_event(RawEvent::KeyboardDown("LeftCtrl", 10000))
-        .0;
-    let state = state.with_event(RawEvent::KeyboardUp("LeftCtrl", 10500)).0;
-    let state = state
-        .with_event(RawEvent::KeyboardDown("LeftCtrl", 11000))
-        .0;
-    let state = state.with_event(RawEvent::KeyboardUp("LeftCtrl", 13000)).0;
+    let raw_events = vec![
+        RawEvent::KeyboardDown("LeftCtrl", 10000),
+        RawEvent::KeyboardUp("LeftCtrl", 10500),
+        RawEvent::KeyboardDown("LeftCtrl", 11000),
+        RawEvent::KeyboardUp("LeftCtrl", 13000),
+        RawEvent::KeyboardDown("LeftCtrl", 15000),
+        RawEvent::MouseDown("LeftMouseButton", (0, 0), 15100),
+        RawEvent::MouseUp("LeftMouseButton", (0, 0), 15200),
+        RawEvent::MouseDown("LeftMouseButton", (0, 0), 15300),
+        RawEvent::MouseUp("LeftMouseButton", (0, 0), 15400),
+        RawEvent::KeyboardUp("LeftCtrl", 18000),
+        RawEvent::MouseMove((0, 1000), 20000),
+    ];
 
-    let state = state
-        .with_event(RawEvent::KeyboardDown("LeftCtrl", 15000))
-        .0;
-    let state = state
-        .with_event(RawEvent::MouseDown("LeftMouseButton", (0, 0), 15100))
-        .0;
-    let state = state
-        .with_event(RawEvent::MouseUp("LeftMouseButton", (0, 0), 15200))
-        .0;
-    let state = state
-        .with_event(RawEvent::MouseDown("LeftMouseButton", (0, 0), 15300))
-        .0;
-    let state = state
-        .with_event(RawEvent::MouseUp("LeftMouseButton", (0, 0), 15400))
-        .0;
+    let mut imm_events = vec![];
+    for raw_event in raw_events {
+        let (new_state, new_events) = state.with_event(raw_event);
+        state = new_state;
+        imm_events.extend(new_events);
+    }
 
-    let state = state.with_event(RawEvent::KeyboardUp("LeftCtrl", 18000)).0;
-    let state = state.with_event(RawEvent::MouseMove((0, 1000), 20000)).0;
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    enum PointerEvent {
+        MouseDown(&'static str, Coords, TimestampMs),
+        MouseUp(&'static str, Coords, TimestampMs),
+        MouseTimed(&'static str, TimedCombinedEvent, Coords, TimestampMs),
+        MouseMove(Coords, TimestampMs),
+    }
 
-    let _ = state;
-    panic!();
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    enum BasicEventBinding {
+        KeyboardDown(&'static str),
+        KeyboardUp(&'static str),
+        KeyboardTimed(&'static str, TimedCombinedEvent),
+        MouseDown(&'static str),
+        MouseUp(&'static str),
+        MouseTimed(&'static str, TimedCombinedEvent),
+        MouseMove,
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    enum PointerEventBinding {
+        MouseDown(&'static str),
+        MouseUp(&'static str),
+        MouseTimed(&'static str, TimedCombinedEvent),
+        MouseMove,
+    }
+
+    impl PointerEvent {
+        fn coords(self) -> Coords {
+            match self {
+                Self::MouseDown(_, coords, _) => coords,
+                Self::MouseUp(_, coords, _) => coords,
+                Self::MouseTimed(_, _, coords, _) => coords,
+                Self::MouseMove(coords, _) => coords,
+            }
+        }
+    }
+
+    impl TryFrom<BasicEvent> for PointerEvent {
+        type Error = ();
+        fn try_from(other: BasicEvent) -> Result<Self, Self::Error> {
+            match other {
+                BasicEvent::MouseDown(a, b, c) => Ok(Self::MouseDown(a, b, c)),
+                BasicEvent::MouseUp(a, b, c) => Ok(Self::MouseUp(a, b, c)),
+                BasicEvent::MouseTimed(a, b, c, d) => Ok(Self::MouseTimed(a, b, c, d)),
+                BasicEvent::MouseMove(a, b) => Ok(Self::MouseMove(a, b)),
+                BasicEvent::KeyboardDown(..)
+                | BasicEvent::KeyboardUp(..)
+                | BasicEvent::KeyboardTimed(..) => Err(()),
+            }
+        }
+    }
+
+    impl From<BasicEvent> for BasicEventBinding {
+        fn from(event: BasicEvent) -> Self {
+            match event {
+                BasicEvent::KeyboardDown(switch, _) => Self::KeyboardDown(switch),
+                BasicEvent::KeyboardUp(switch, _) => Self::KeyboardUp(switch),
+                BasicEvent::KeyboardTimed(switch, timed, _) => Self::KeyboardTimed(switch, timed),
+                BasicEvent::MouseDown(switch, _, _) => Self::MouseDown(switch),
+                BasicEvent::MouseUp(switch, _, _) => Self::MouseUp(switch),
+                BasicEvent::MouseTimed(switch, timed, _, _) => Self::MouseTimed(switch, timed),
+                BasicEvent::MouseMove(_, _) => Self::MouseMove,
+            }
+        }
+    }
+
+    impl From<PointerEvent> for PointerEventBinding {
+        fn from(event: PointerEvent) -> Self {
+            match event {
+                PointerEvent::MouseDown(switch, _, _) => Self::MouseDown(switch),
+                PointerEvent::MouseUp(switch, _, _) => Self::MouseUp(switch),
+                PointerEvent::MouseTimed(switch, timed, _, _) => Self::MouseTimed(switch, timed),
+                PointerEvent::MouseMove(_, _) => Self::MouseMove,
+            }
+        }
+    }
+
+    type NodeId = u64;
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    enum AppEvent {
+        CreateNode(NodeId),
+        RemoveNode(NodeId),
+        SelectNode(NodeId),
+        AddNodeToSelection(NodeId),
+        RemoveSelectedNodes,
+        DeselectNodes,
+        SelectAllNodes,
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    enum PointerAppEventKind {
+        CreateNode,
+        RemoveNode,
+        SelectNode,
+        AddNodeToSelection,
+    }
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    enum BasicAppEventKind {
+        RemoveSelectedNodes,
+        DeselectNodes,
+        SelectAllNodes,
+    }
+
+    let basic_event_mappings: HashMap<
+        BasicEventBinding,
+        Vec<(BTreeSet<RawSwitch>, BasicAppEventKind)>,
+    > = [
+        (
+            BasicEventBinding::KeyboardTimed(
+                "delete",
+                TimedCombinedEvent::new(TimedCombinedEventKind::Click, 1),
+            ),
+            vec![(BTreeSet::new(), BasicAppEventKind::RemoveSelectedNodes)],
+        ),
+        (
+            BasicEventBinding::KeyboardTimed(
+                "A",
+                TimedCombinedEvent::new(TimedCombinedEventKind::Click, 1),
+            ),
+            vec![(
+                [RawSwitch::Key("ctrl")].into_iter().collect(),
+                BasicAppEventKind::SelectAllNodes,
+            )],
+        ),
+    ]
+    .into_iter()
+    .collect();
+
+    let pointer_event_mappings: HashMap<
+        PointerEventBinding,
+        Vec<(BTreeSet<RawSwitch>, PointerAppEventKind)>,
+    > = [
+        (
+            PointerEventBinding::MouseTimed(
+                "left",
+                TimedCombinedEvent::new(TimedCombinedEventKind::Click, 1),
+            ),
+            vec![(BTreeSet::new(), PointerAppEventKind::SelectNode)],
+        ),
+        (
+            PointerEventBinding::MouseTimed(
+                "left",
+                TimedCombinedEvent::new(TimedCombinedEventKind::Click, 1),
+            ),
+            vec![(BTreeSet::new(), PointerAppEventKind::CreateNode)],
+        ),
+        (
+            PointerEventBinding::MouseTimed(
+                "left",
+                TimedCombinedEvent::new(TimedCombinedEventKind::Click, 1),
+            ),
+            vec![(
+                [RawSwitch::Key("shift")].into_iter().collect(),
+                PointerAppEventKind::AddNodeToSelection,
+            )],
+        ),
+    ]
+    .into_iter()
+    .collect();
+
+    for imm_event in imm_events {
+        let mut app_events = Vec::new();
+        let modifiers = imm_event.modifiers;
+
+        if let Some(event) = PointerEvent::try_from(imm_event.event).ok() {
+            const DEFAULT_MAPPING: &Vec<(BTreeSet<RawSwitch>, PointerAppEventKind)> = &Vec::new();
+
+            let binding: PointerEventBinding = event.into();
+            let coords = event.coords();
+            let mappings = pointer_event_mappings
+                .get(&binding)
+                .unwrap_or(DEFAULT_MAPPING);
+            for (event_modifiers, app_event_kind) in mappings {
+                if !event_modifiers.is_superset(&modifiers) {
+                    continue;
+                }
+                let app_event = match app_event_kind {
+                    PointerAppEventKind::CreateNode => AppEvent::CreateNode(coords.0 / 100),
+                    PointerAppEventKind::RemoveNode => AppEvent::RemoveNode(coords.0 / 100),
+                    PointerAppEventKind::SelectNode => AppEvent::SelectNode(coords.0 / 100),
+                    PointerAppEventKind::AddNodeToSelection => {
+                        AppEvent::AddNodeToSelection(coords.0 / 100)
+                    }
+                };
+                app_events.push((app_event, event_modifiers));
+            }
+        }
+
+        {
+            const DEFAULT_MAPPING: &Vec<(BTreeSet<RawSwitch>, BasicAppEventKind)> = &Vec::new();
+
+            let event = imm_event.event;
+            let binding: BasicEventBinding = event.into();
+            let mappings = basic_event_mappings
+                .get(&binding)
+                .unwrap_or(DEFAULT_MAPPING);
+            for (event_modifiers, app_event_kind) in mappings {
+                if !event_modifiers.is_superset(&modifiers) {
+                    continue;
+                }
+                let app_event = match app_event_kind {
+                    BasicAppEventKind::RemoveSelectedNodes => AppEvent::RemoveSelectedNodes,
+                    BasicAppEventKind::DeselectNodes => AppEvent::DeselectNodes,
+                    BasicAppEventKind::SelectAllNodes => AppEvent::SelectAllNodes,
+                };
+                app_events.push((app_event, event_modifiers));
+            }
+        }
+
+        // app_events
+        // find longest app_events
+        //   A+B+C, A+B+D => remain both
+        //   A+B+C, A+B+C+D => remain second
+        // if different modifiers then drop
+        //   A+B+C, A+B+D => drop
+        //   A+B+C, A+B+C => use them all
+
+        // TouchStart(touch_id)
+        // #1 -> 100, 100
+        // 200, 200 -> #2
+        // #1 -> 100, 100 (#1 -- @1)
+        // #2 -> 200, 200 (#2 -- @2)
+        // 100, 100 -> #1
+
+        // MouseUp 100, 100     MouseTrigger(1)
+        // MouseDown 200, 200   MouseTrigger(2)
+        //  drop_state()
+
+        // TouchStart -> #1 100, 100
+        // TouchMove -> #1(active) 100, 110
+        // TouchStart -> #2 100, 100
+        // TouchMove -> #2 (@1)
+
+        // TouchStart   @1 100, 100 #1
+        // TouchStart   @2 200, 200 #2
+        // TouchEnd     @1 100, 100 #1
+        // TouchEnd     @2 200, 200 #2
+        // TouchStart   @1 200, 200 #2
+    }
+
+    /*
+        basic-event = (raw-event | raw-switch-event + timed-combined-event)
+        complex-event = (basic-event + BTreeSet)
+
+        try complex-event as (pointer-event-kind + coords)
+            filter possible event builders
+                get event kinds in mapping by event + BTreeSet
+            check available events
+                CreateNode(node_id) + BTreeSet
+
+        try complex-event as (basic-event-kind)
+            filter possible event builders
+                get event kinds in mapping by event + BTreeSet
+            check available events
+                DeselectNodes(...) + BTreeSet
+
+        check overrides
+    */
+
+    //imm_events
+
+    //panic!();
 
     /*
         binding
@@ -370,13 +572,13 @@ fn raw_input_to_input_test() {
         raw-event + aggregated-timed-event-with-data > immediate-event
             switch? + kind? + num? + binding + timestamp
 
-        immediate-event | modified-state > event-with-modifiers
-            switch? + kind? + num? + binding + timestamp + modifiers
+        immediate-event | modified-state > event-with-BTreeSet
+            switch? + kind? + num? + binding + timestamp + BTreeSet
 
-        event-with-modifiers | app > filtered-event-with-modifiers
-            switch? + kind? + num? + binding + timestamp + modifiers + app-event-data
+        event-with-BTreeSet | app > filtered-event-with-BTreeSet
+            switch? + kind? + num? + binding + timestamp + BTreeSet + app-event-data
 
-        filtered-event-with-modifiers | helpers > filtered2-event-with-modifiers
+        filtered-event-with-BTreeSet | helpers > filtered2-event-with-BTreeSet
             app-event-data
 
         app-event-data | build > app-event
@@ -461,7 +663,7 @@ fn raw_input_to_input_test() {
 
         struct MappingWithCoords {
             binding: BindingWithCoords,
-            modifiers: HashSet<EventSwitch>,
+            BTreeSet: HashSet<EventSwitch>,
             event: AppEventKindWithCoords,
         }
     */
