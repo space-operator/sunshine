@@ -72,7 +72,14 @@ dependencies = [
 ]
 
 [[package]]
-name = "input-processor"
+name = "input-core"
+version = "0.1.0"
+dependencies = [
+ "thiserror",
+]
+
+[[package]]
+name = "input-more"
 version = "0.1.0"
 dependencies = [
  "thiserror",
@@ -130,7 +137,7 @@ dependencies = [
 name = "parse"
 version = "0.1.0"
 dependencies = [
- "input-processor",
+ "input-core",
  "nom",
  "pulldown-cmark",
  "regex",
@@ -268,7 +275,7 @@ version = "0.1.0"
 dependencies = [
  "derive_more",
  "escape8259",
- "input-processor",
+ "input-core",
  "lazy_static",
  "serde",
  "serde_json",

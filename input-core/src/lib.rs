@@ -23,39 +23,17 @@
 )]
 #![allow(clippy::module_name_repetitions)]
 
-//mod axis;
-//mod button;
-//mod combined;
-mod event;
-//mod from;
-//mod keyboard;
-//mod mapping;
 mod event_with_modifiers;
 mod event_with_modifiers_ext;
-//mod mouse;
-//mod processor;
-mod timed_event_ext;
-//mod raw;
-mod timed_event;
-//mod touch;
 mod result_with_context;
+mod timed_event;
+mod timed_event_ext;
 
-//pub use axis::*;
-//pub use button::*;
-//pub use combined::*;
-pub use event::*;
-//pub use from::*;
-//pub use keyboard::*;
-//pub use mapping::*;
 pub use event_with_modifiers::*;
 pub use event_with_modifiers_ext::*;
-//pub use mouse::*;
-//pub use processor::*;
-pub use timed_event_ext::*;
-//pub use raw::*;
-pub use timed_event::*;
-//pub use touch::*;
 pub use result_with_context::*;
+pub use timed_event::*;
+pub use timed_event_ext::*;
 
 /*
 dbl-click

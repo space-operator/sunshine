@@ -200,7 +200,7 @@ impl<Sw> TimedState<Sw> {
         }
     }
 
-    fn with_reset_click_count(mut self, switch: Sw) -> (Self, Result<(), WithResetClickCountError>)
+    pub fn with_reset_click_count(self, switch: Sw) -> (Self, Result<(), WithResetClickCountError>)
     where
         Sw: Eq + Hash,
     {

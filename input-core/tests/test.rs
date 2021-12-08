@@ -4,7 +4,7 @@ use std::collections::{BTreeSet, HashMap};
 
 #[test]
 fn raw_input_to_input_test() {
-    use input_processor::*;
+    use input_core::*;
     use std::collections::{BTreeMap, HashSet};
 
     type TimestampMs = u64;
@@ -254,8 +254,61 @@ fn raw_input_to_input_test() {
         last_timestamp: 0,
     };
 
+    let mut time = {
+        let mut iter = (10000..).step_by(200);
+        move || iter.next().unwrap()
+    };
     let raw_events = vec![
-        RawEvent::KeyboardDown("LeftCtrl", 10000),
+        //
+        RawEvent::MouseDown("LeftMouseButton", (0, 0), time()),
+        RawEvent::MouseUp("LeftMouseButton", (0, 0), time()),
+        //
+        RawEvent::KeyboardDown("LeftCtrl", time()),
+        RawEvent::MouseDown("LeftMouseButton", (0, 0), time()),
+        RawEvent::MouseUp("LeftMouseButton", (0, 0), time()),
+        RawEvent::KeyboardUp("LeftCtrl", time()),
+        //
+        RawEvent::KeyboardDown("LeftShift", time()),
+        RawEvent::MouseDown("LeftMouseButton", (0, 0), time()),
+        RawEvent::MouseUp("LeftMouseButton", (0, 0), time()),
+        RawEvent::KeyboardUp("LeftShift", time()),
+        //
+        RawEvent::KeyboardDown("LeftAlt", time()),
+        RawEvent::MouseDown("LeftMouseButton", (0, 0), time()),
+        RawEvent::MouseUp("LeftMouseButton", (0, 0), time()),
+        RawEvent::KeyboardUp("LeftAlt", time()),
+        //
+        RawEvent::KeyboardDown("LeftCtrl", time()),
+        RawEvent::KeyboardDown("LeftShift", time()),
+        RawEvent::MouseDown("LeftMouseButton", (0, 0), time()),
+        RawEvent::MouseUp("LeftMouseButton", (0, 0), time()),
+        RawEvent::KeyboardUp("LeftCtrl", time()),
+        RawEvent::KeyboardUp("LeftShift", time()),
+        //
+        RawEvent::KeyboardDown("LeftShift", time()),
+        RawEvent::KeyboardDown("LeftAlt", time()),
+        RawEvent::MouseDown("LeftMouseButton", (0, 0), time()),
+        RawEvent::MouseUp("LeftMouseButton", (0, 0), time()),
+        RawEvent::KeyboardUp("LeftShift", time()),
+        RawEvent::KeyboardUp("LeftAlt", time()),
+        //
+        RawEvent::KeyboardDown("LeftAlt", time()),
+        RawEvent::KeyboardDown("LeftCtrl", time()),
+        RawEvent::MouseDown("LeftMouseButton", (0, 0), time()),
+        RawEvent::MouseUp("LeftMouseButton", (0, 0), time()),
+        RawEvent::KeyboardUp("LeftAlt", time()),
+        RawEvent::KeyboardUp("LeftCtrl", time()),
+        //
+        RawEvent::KeyboardDown("LeftAlt", time()),
+        RawEvent::KeyboardDown("LeftCtrl", time()),
+        RawEvent::KeyboardDown("LeftShift", time()),
+        RawEvent::MouseDown("LeftMouseButton", (0, 0), time()),
+        RawEvent::MouseUp("LeftMouseButton", (0, 0), time()),
+        RawEvent::KeyboardUp("LeftAlt", time()),
+        RawEvent::KeyboardUp("LeftCtrl", time()),
+        RawEvent::KeyboardUp("LeftShift", time()),
+        //
+        /*RawEvent::KeyboardDown("LeftCtrl", 10000),
         RawEvent::KeyboardUp("LeftCtrl", 10500),
         RawEvent::KeyboardDown("LeftCtrl", 11000),
         RawEvent::KeyboardUp("LeftCtrl", 13000),
@@ -265,7 +318,7 @@ fn raw_input_to_input_test() {
         RawEvent::MouseDown("LeftMouseButton", (0, 0), 15300),
         RawEvent::MouseUp("LeftMouseButton", (0, 0), 15400),
         RawEvent::KeyboardUp("LeftCtrl", 18000),
-        RawEvent::MouseMove((0, 1000), 20000),
+        RawEvent::MouseMove((0, 1000), 20000),*/
     ];
 
     let mut imm_events = vec![];
@@ -361,9 +414,17 @@ fn raw_input_to_input_test() {
         RemoveNode(NodeId),
         SelectNode(NodeId),
         AddNodeToSelection(NodeId),
+        StartRectangleSelection(Coords),
+        MoveRectangleSelection(Coords),
+        EndRectangleSelection(Coords),
         RemoveSelectedNodes,
         DeselectNodes,
         SelectAllNodes,
+        DummyEvent1,
+        DummyEvent2,
+        DummyEvent3,
+        DummyEvent4,
+        DummyEvent5,
     }
 
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -372,6 +433,14 @@ fn raw_input_to_input_test() {
         RemoveNode,
         SelectNode,
         AddNodeToSelection,
+        StartRectangleSelection,
+        MoveRectangleSelection,
+        EndRectangleSelection,
+        DummyEvent1,
+        DummyEvent2,
+        DummyEvent3,
+        DummyEvent4,
+        DummyEvent5,
     }
 
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -385,9 +454,9 @@ fn raw_input_to_input_test() {
         BasicEventBinding,
         Vec<(BTreeSet<RawSwitch>, BasicAppEventKind)>,
     > = [
-        (
+        /*(
             BasicEventBinding::KeyboardTimed(
-                "delete",
+                "Delete",
                 TimedCombinedEvent::new(TimedCombinedEventKind::Click, 1),
             ),
             vec![(BTreeSet::new(), BasicAppEventKind::RemoveSelectedNodes)],
@@ -398,47 +467,94 @@ fn raw_input_to_input_test() {
                 TimedCombinedEvent::new(TimedCombinedEventKind::Click, 1),
             ),
             vec![(
-                [RawSwitch::Key("ctrl")].into_iter().collect(),
+                [RawSwitch::Key("LeftCtrl")].into_iter().collect(),
                 BasicAppEventKind::SelectAllNodes,
             )],
-        ),
+        ),*/
     ]
     .into_iter()
     .collect();
+
+    let lmb_click = PointerEventBinding::MouseTimed(
+        "LeftMouseButton",
+        TimedCombinedEvent::new(TimedCombinedEventKind::Click, 1),
+    );
 
     let pointer_event_mappings: HashMap<
         PointerEventBinding,
         Vec<(BTreeSet<RawSwitch>, PointerAppEventKind)>,
     > = [
-        (
-            PointerEventBinding::MouseTimed(
-                "left",
-                TimedCombinedEvent::new(TimedCombinedEventKind::Click, 1),
-            ),
+        /*(
+            lmb_click,
             vec![(BTreeSet::new(), PointerAppEventKind::SelectNode)],
         ),
         (
             PointerEventBinding::MouseTimed(
-                "left",
-                TimedCombinedEvent::new(TimedCombinedEventKind::Click, 1),
+                "LeftMouseButton",
+                TimedCombinedEvent::new(TimedCombinedEventKind::Click, 2),
             ),
             vec![(BTreeSet::new(), PointerAppEventKind::CreateNode)],
         ),
         (
-            PointerEventBinding::MouseTimed(
-                "left",
-                TimedCombinedEvent::new(TimedCombinedEventKind::Click, 1),
-            ),
+            lmb_click,
             vec![(
-                [RawSwitch::Key("shift")].into_iter().collect(),
+                [RawSwitch::Key("LeftShift")].into_iter().collect(),
                 PointerAppEventKind::AddNodeToSelection,
             )],
+        ),
+        (
+            PointerEventBinding::MouseDown("LeftMouseButton"),
+            vec![(
+                BTreeSet::new(),
+                PointerAppEventKind::StartRectangleSelection,
+            )],
+        ),
+        (
+            PointerEventBinding::MouseUp("LeftMouseButton"),
+            vec![(BTreeSet::new(), PointerAppEventKind::EndRectangleSelection)],
+        ),*/
+        (
+            lmb_click,
+            vec![
+                (
+                    [RawSwitch::Key("LeftShift"), RawSwitch::Key("LeftAlt")]
+                        .into_iter()
+                        .collect(),
+                    PointerAppEventKind::DummyEvent1,
+                ),
+                (
+                    [RawSwitch::Key("LeftShift"), RawSwitch::Key("LeftCtrl")]
+                        .into_iter()
+                        .collect(),
+                    PointerAppEventKind::DummyEvent2,
+                ),
+                (
+                    [RawSwitch::Key("LeftCtrl"), RawSwitch::Key("LeftAlt")]
+                        .into_iter()
+                        .collect(),
+                    PointerAppEventKind::DummyEvent3,
+                ),
+                (
+                    [RawSwitch::Key("LeftCtrl")].into_iter().collect(),
+                    PointerAppEventKind::DummyEvent3,
+                ),
+                (
+                    [RawSwitch::Key("LeftAlt")].into_iter().collect(),
+                    PointerAppEventKind::DummyEvent4,
+                ),
+                (
+                    [RawSwitch::Key("LeftAlt")].into_iter().collect(),
+                    PointerAppEventKind::DummyEvent5,
+                ),
+            ],
         ),
     ]
     .into_iter()
     .collect();
 
     for imm_event in imm_events {
+        println!("{:?}", imm_event);
+
         let mut app_events = Vec::new();
         let modifiers = imm_event.modifiers;
 
@@ -451,7 +567,7 @@ fn raw_input_to_input_test() {
                 .get(&binding)
                 .unwrap_or(DEFAULT_MAPPING);
             for (event_modifiers, app_event_kind) in mappings {
-                if !event_modifiers.is_superset(&modifiers) {
+                if !event_modifiers.is_subset(&modifiers) {
                     continue;
                 }
                 let app_event = match app_event_kind {
@@ -461,6 +577,20 @@ fn raw_input_to_input_test() {
                     PointerAppEventKind::AddNodeToSelection => {
                         AppEvent::AddNodeToSelection(coords.0 / 100)
                     }
+                    PointerAppEventKind::StartRectangleSelection => {
+                        AppEvent::StartRectangleSelection(coords)
+                    }
+                    PointerAppEventKind::MoveRectangleSelection => {
+                        AppEvent::MoveRectangleSelection(coords)
+                    }
+                    PointerAppEventKind::EndRectangleSelection => {
+                        AppEvent::EndRectangleSelection(coords)
+                    }
+                    PointerAppEventKind::DummyEvent1 => AppEvent::DummyEvent1,
+                    PointerAppEventKind::DummyEvent2 => AppEvent::DummyEvent2,
+                    PointerAppEventKind::DummyEvent3 => AppEvent::DummyEvent3,
+                    PointerAppEventKind::DummyEvent4 => AppEvent::DummyEvent4,
+                    PointerAppEventKind::DummyEvent5 => AppEvent::DummyEvent5,
                 };
                 app_events.push((app_event, event_modifiers));
             }
@@ -475,7 +605,7 @@ fn raw_input_to_input_test() {
                 .get(&binding)
                 .unwrap_or(DEFAULT_MAPPING);
             for (event_modifiers, app_event_kind) in mappings {
-                if !event_modifiers.is_superset(&modifiers) {
+                if !event_modifiers.is_subset(&modifiers) {
                     continue;
                 }
                 let app_event = match app_event_kind {
@@ -486,6 +616,32 @@ fn raw_input_to_input_test() {
                 app_events.push((app_event, event_modifiers));
             }
         }
+
+        let app_events_idxs: Vec<_> = app_events
+            .iter()
+            .enumerate()
+            .filter(|(j, event)| {
+                app_events
+                    .iter()
+                    .all(|other| event.1 == other.1 || !other.1.is_superset(event.1))
+            })
+            .map(|(j, _)| j)
+            .collect();
+
+        let mut modifiers_iter = app_events_idxs.iter().map(|&j| app_events[j].1);
+        let is_same_modifiers = modifiers_iter
+            .next()
+            .map_or(false, |first| modifiers_iter.all(|other| other == first));
+
+        let app_events_filtered: Vec<_> = if is_same_modifiers {
+            app_events_idxs.into_iter().map(|j| app_events[j]).collect()
+        } else {
+            vec![]
+        };
+
+        println!("{:?}", app_events);
+        println!("{:?}", app_events_filtered);
+        println!();
 
         // app_events
         // find longest app_events
@@ -517,6 +673,7 @@ fn raw_input_to_input_test() {
         // TouchEnd     @2 200, 200 #2
         // TouchStart   @1 200, 200 #2
     }
+    panic!();
 
     /*
         basic-event = (raw-event | raw-switch-event + timed-combined-event)
