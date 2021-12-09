@@ -4,7 +4,7 @@ use std::collections::{BTreeSet, HashMap};
 
 #[test]
 fn raw_input_to_input_test() {
-    use input_more::core::*;
+    use input_core::*;
     use input_more::*;
     use std::collections::{BTreeMap, HashSet};
 
@@ -109,10 +109,10 @@ fn raw_input_to_input_test() {
     enum BasicEvent {
         KeyboardDown(&'static str, TimestampMs),
         KeyboardUp(&'static str, TimestampMs),
-        KeyboardTimed(&'static str, TimedCombinedEvent, TimestampMs),
+        KeyboardTimed(&'static str, TimedCombinedEventData, TimestampMs),
         MouseDown(&'static str, Coords, TimestampMs),
         MouseUp(&'static str, Coords, TimestampMs),
-        MouseTimed(&'static str, TimedCombinedEvent, Coords, TimestampMs),
+        MouseTimed(&'static str, TimedCombinedEventData, Coords, TimestampMs),
         MouseMove(Coords, TimestampMs),
     }
 
@@ -142,8 +142,8 @@ fn raw_input_to_input_test() {
         }
     }
 
-    impl From<(RawSwitchEvent, TimedCombinedEvent)> for BasicEvent {
-        fn from((event, timed_event): (RawSwitchEvent, TimedCombinedEvent)) -> Self {
+    impl From<(RawSwitchEvent, TimedCombinedEventData)> for BasicEvent {
+        fn from((event, timed_event): (RawSwitchEvent, TimedCombinedEventData)) -> Self {
             match (event, timed_event) {
                 (RawSwitchEvent::KeyboardDown(a, b), t) => Self::KeyboardTimed(a, t, b),
                 (RawSwitchEvent::KeyboardUp(a, b), t) => Self::KeyboardTimed(a, t, b),
@@ -333,7 +333,7 @@ fn raw_input_to_input_test() {
     enum PointerEvent {
         MouseDown(&'static str, Coords, TimestampMs),
         MouseUp(&'static str, Coords, TimestampMs),
-        MouseTimed(&'static str, TimedCombinedEvent, Coords, TimestampMs),
+        MouseTimed(&'static str, TimedCombinedEventData, Coords, TimestampMs),
         MouseMove(Coords, TimestampMs),
     }
 
@@ -341,10 +341,10 @@ fn raw_input_to_input_test() {
     enum BasicEventBinding {
         KeyboardDown(&'static str),
         KeyboardUp(&'static str),
-        KeyboardTimed(&'static str, TimedCombinedEvent),
+        KeyboardTimed(&'static str, TimedCombinedEventData),
         MouseDown(&'static str),
         MouseUp(&'static str),
-        MouseTimed(&'static str, TimedCombinedEvent),
+        MouseTimed(&'static str, TimedCombinedEventData),
         MouseMove,
     }
 
@@ -352,7 +352,7 @@ fn raw_input_to_input_test() {
     enum PointerEventBinding {
         MouseDown(&'static str),
         MouseUp(&'static str),
-        MouseTimed(&'static str, TimedCombinedEvent),
+        MouseTimed(&'static str, TimedCombinedEventData),
         MouseMove,
     }
 
@@ -478,7 +478,7 @@ fn raw_input_to_input_test() {
 
     let lmb_click = PointerEventBinding::MouseTimed(
         "LeftMouseButton",
-        TimedCombinedEvent::new(TimedCombinedEventKind::Click, 1),
+        TimedCombinedEventData::new(TimedCombinedEventKind::Click, 1),
     );
 
     let pointer_event_mappings: HashMap<

@@ -25,5 +25,4 @@
 mod event;
 
 pub use event::*;
-
-pub use input_core as core;
+pub use input_core;

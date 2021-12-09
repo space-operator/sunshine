@@ -4,8 +4,8 @@ use thiserror::Error;
 
 use crate::*;
 
-pub type TimedDelayedEvent = TimedEvent<TimedDelayedEventKind>;
-pub type TimedCombinedEvent = TimedEvent<TimedCombinedEventKind>;
+pub type TimedDelayedEventData = TimedEventData<TimedDelayedEventKind>;
+pub type TimedCombinedEventData = TimedEventData<TimedCombinedEventKind>;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum TimedDelayedEventKind {
@@ -86,11 +86,11 @@ impl AllowFrom<TimedDelayedEventKind> for TimedCombinedEventKind {}
 impl AllowFrom<TimedLongPressEventKind> for TimedDelayedEventKind {}
 impl AllowFrom<TimedMultiClickEventKind> for TimedDelayedEventKind {}
 
-impl<Ki1> From<TimedEvent<Ki1>> for TimedCombinedEvent
+impl<Ki1> From<TimedEventData<Ki1>> for TimedCombinedEventData
 where
     TimedCombinedEventKind: From<Ki1> + AllowFrom<Ki1>,
 {
-    fn from(event: TimedEvent<Ki1>) -> Self {
+    fn from(event: TimedEventData<Ki1>) -> Self {
         Self {
             kind: event.kind.into(),
             num_possible_clicks: event.num_possible_clicks,
@@ -98,11 +98,11 @@ where
     }
 }
 
-impl<Ki1> From<TimedEvent<Ki1>> for TimedDelayedEvent
+impl<Ki1> From<TimedEventData<Ki1>> for TimedDelayedEventData
 where
     TimedDelayedEventKind: From<Ki1> + AllowFrom<Ki1>,
 {
-    fn from(event: TimedEvent<Ki1>) -> Self {
+    fn from(event: TimedEventData<Ki1>) -> Self {
         Self {
             kind: event.kind.into(),
             num_possible_clicks: event.num_possible_clicks,
@@ -133,7 +133,10 @@ pub trait TimedStateExt<Sw>: Sized {
         self,
         switch: Sw,
         request: TimedHandleRequest,
-    ) -> (Self, Option<Result<TimedDelayedEvent, TimedDelayedError>>)
+    ) -> (
+        Self,
+        Option<Result<TimedDelayedEventData, TimedDelayedError>>,
+    )
     where
         Sw: Eq + Hash;
 }
@@ -143,7 +146,10 @@ impl<Sw> TimedStateExt<Sw> for TimedState<Sw> {
         self,
         switch: Sw,
         request: TimedHandleRequest,
-    ) -> (Self, Option<Result<TimedDelayedEvent, TimedDelayedError>>)
+    ) -> (
+        Self,
+        Option<Result<TimedDelayedEventData, TimedDelayedError>>,
+    )
     where
         Sw: Eq + Hash,
     {
@@ -163,21 +169,21 @@ trait IntoDelayed<Sw> {
         self,
     ) -> (
         TimedState<Sw>,
-        Option<Result<TimedDelayedEvent, TimedDelayedError>>,
+        Option<Result<TimedDelayedEventData, TimedDelayedError>>,
     );
 }
 
 impl<Sw, T, E> IntoDelayed<Sw> for (TimedState<Sw>, Option<Result<T, E>>)
 where
     Sw: Eq + Hash,
-    TimedDelayedEvent: From<T>,
+    TimedDelayedEventData: From<T>,
     TimedDelayedError: From<E>,
 {
     fn into_delayed(
         self,
     ) -> (
         TimedState<Sw>,
-        Option<Result<TimedDelayedEvent, TimedDelayedError>>,
+        Option<Result<TimedDelayedEventData, TimedDelayedError>>,
     ) {
         (
             self.0,

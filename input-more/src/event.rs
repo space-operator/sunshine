@@ -1,21 +1,96 @@
 use core::hash::Hash;
 
+use input_core::TimedCombinedEventData;
+
+pub trait Event {
+    type Switch;
+    type SwitchEvent: SwitchEvent<Switch = Self::Switch>;
+    type TriggerEvent;
+
+    fn into_action_or_trigger(self) -> ActionOrTrigger<Self::SwitchEvent, Self::TriggerEvent>;
+}
+
+pub trait SwitchEvent {
+    type Switch: Eq + Hash + Ord;
+
+    fn switch(self) -> Self::Switch;
+}
+
+pub enum ActionOrTrigger<SwEv, TrEv> {
+    Action(Action<SwEv>),
+    Trigger(TrEv),
+}
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Action<T> {
     Press(T),
     Release(T),
 }
 
-pub trait Event {
-    type Switch: Eq + Hash + Ord;
-    type TriggerEvent;
-    type Timestamp;
-
-    fn switch(&self) -> Option<Action<Self::Switch>>;
-    fn timestamp(&self) -> Self::Timestamp;
-
-    fn to_trigger_event(&self) -> Option<TriggerEvent, press or release>;
+enum EventOrTimedEvent<Ev, Ti> {
+    Event(Ev),
+    TimedEvent(Ti),
 }
+
+struct TimedEvent<SwEv> {
+    event: SwEv,
+    timed: TimedCombinedEventData,
+}
+
+/*
+(x, y) of down or up
+each (x, y) <> (x, y)
+if
+    iter switches
+        filter only related
+            reset clicks
+    emit movement
+else
+    -
+
+(sys_id, x, y) of down or up
+on down or up
+    match our_id with sys_id
+on move
+    get our_id from sys_id map
+too much movement
+    iter switches
+        filter only related
+            reset
+
+*/
+
+// ====
+
+/*
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum Switch {
+    Keyboard(&'static str),
+    Mouse(&'static str),
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum SwitchEvent {
+    Keyboard(&'static str, TimestampMs),
+    Mouse(&'static str, Coords, TimestampMs),
+}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum TriggerEvent {
+    MouseMove(Coords, TimestampMs),
+}
+
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum RawEvent {
+    KeyboardDown(&'static str, TimestampMs),
+    KeyboardUp(&'static str, TimestampMs),
+    MouseDown(&'static str, Coords, TimestampMs),
+    MouseUp(&'static str, Coords, TimestampMs),
+    MouseMove(Coords, TimestampMs),
+}
+
+
 
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -25,6 +100,7 @@ enum RawEvent<KeSw, KeDa, MoSw, MoSwDa, MoTr, MoTrDa, Ti> {
     MouseSwitch(Action<MoSw>, MoSwDa, Ti),
     MouseTrigger(MoTr, MoTrDa, Ti),
 }
+
 
 raw -> timed -> raw | timed
 
@@ -61,7 +137,7 @@ pub trait AnotherEvent {
     type Data;
 
     fn data(&self) -> Self::Data;
-}
+}*/
 
 // ====
 

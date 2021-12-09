@@ -24,13 +24,13 @@
 #![allow(clippy::module_name_repetitions)]
 
 mod event_with_modifiers;
-mod event_with_modifiers_ext;
+mod pointer_event;
 mod result_with_context;
 mod timed_event;
 mod timed_event_ext;
 
 pub use event_with_modifiers::*;
-pub use event_with_modifiers_ext::*;
+pub use pointer_event::*;
 pub use result_with_context::*;
 pub use timed_event::*;
 pub use timed_event_ext::*;
