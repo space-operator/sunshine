@@ -1,3 +1,5 @@
+use core::hash::Hash;
+
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum Action<T> {
     Press(T),
@@ -6,23 +8,52 @@ pub enum Action<T> {
 
 pub trait Event {
     type Switch: Eq + Hash + Ord;
-    type MouseCoord;
-    type TouchCoord;
-    type TouchId;
+    type TriggerEvent;
     type Timestamp;
 
     fn switch(&self) -> Option<Action<Self::Switch>>;
-    fn device(&self) -> Device<Self::Coord, Self::TouchId>;
-    fn timestamp(&self) -> Timestamp;
+    fn timestamp(&self) -> Self::Timestamp;
+
+    fn to_trigger_event(&self) -> Option<TriggerEvent, press or release>;
 }
 
-pub enum Device<MouseCoord, TouchId, TouchCoord> {
-    Keyboard,
-    Mouse((MouseCoord, MouseCoord)),
-    Touch(TouchId, (TouchCoord, TouchCoord)),
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+enum RawEvent<KeSw, KeDa, MoSw, MoSwDa, MoTr, MoTrDa, Ti> {
+    KeyboardSwitch(Action<KeSw>, KeDa, Ti),
+    //
+    MouseSwitch(Action<MoSw>, MoSwDa, Ti),
+    MouseTrigger(MoTr, MoTrDa, Ti),
 }
 
-pub trait ToEventKind<T> {
+raw -> timed -> raw | timed
+
+MouseDown -> MouseTrigger
+MouseUp -> MouseTrigger
+MouseScroll -> None
+
+enum
+    Raw(MouseDown, MouseUp)
+    Timed(Mouse, data)
+
+pub trait Preprocess {
+    fn preprocess()
+}
+
+pub trait MouseEvent {
+    fn coords()
+}
+
+pub trait TouchEvent {
+    fn touch_id_and_coords()
+}
+
+impl Preprocess for MouseEvent {
+
+}
+
+
+pub trait EventKind<T> {
     fn to_event_kind(&self) -> Option<T>;
 }
 
@@ -31,17 +62,6 @@ pub trait AnotherEvent {
 
     fn data(&self) -> Self::Data;
 }
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-enum RawEvent {
-    KeyboardDown(&'static str, TimestampMs),
-    KeyboardUp(&'static str, TimestampMs),
-    MouseDown(&'static str, Coords, TimestampMs),
-    MouseUp(&'static str, Coords, TimestampMs),
-    MouseMove(Coords, TimestampMs),
-}
-
-impl ToEventKind<MouseEvent> {}
 
 // ====
 
@@ -84,6 +104,7 @@ impl ToEventKind<MouseEvent> {}
         shift+
 */
 
+/*
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum Event<Ke, Mo, To> {
     Keyboard(Ke),
@@ -110,7 +131,7 @@ pub enum TouchEvent<Sw, Tr> {
     Press(Sw),
     Release(Sw),
     Trigger(Tr),
-}
+}*/
 
 /*
 pub trait Coords {

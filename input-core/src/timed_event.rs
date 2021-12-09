@@ -38,6 +38,15 @@ pub struct TimedState<Sw> {
     switches: HashMap<Sw, SwitchState>,
 }
 
+impl<Sw> TimedState<Sw> {
+    pub fn iter_switches(&self) -> impl Iterator<Item = &Sw>
+    where
+        Sw: Eq + Hash,
+    {
+        self.switches.keys()
+    }
+}
+
 #[derive(Clone, Debug)]
 struct SwitchState {
     kind: SwitchStateKind,

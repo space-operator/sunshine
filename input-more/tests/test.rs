@@ -4,7 +4,8 @@ use std::collections::{BTreeSet, HashMap};
 
 #[test]
 fn raw_input_to_input_test() {
-    use input_core::*;
+    use input_more::core::*;
+    use input_more::*;
     use std::collections::{BTreeMap, HashSet};
 
     type TimestampMs = u64;
