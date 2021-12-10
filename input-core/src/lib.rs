@@ -36,6 +36,15 @@ pub use timed_event::*;
 pub use timed_event_ext::*;
 
 /*
+    optimize processing using filtering:
+        filter switch-used-in-event-or-modifiers | trigger-used-in-event
+        modifiers-processing
+        filter switch-used-in-event | trigger-used-in-event
+        if pointer-trigger-used-in-events then pointer-processing
+        if timed-trigger-used-in-events then timed-processing
+*/
+
+/*
 dbl-click
     create node at position
     enter to text mode
