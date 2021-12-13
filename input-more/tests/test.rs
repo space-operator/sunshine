@@ -156,7 +156,7 @@ fn raw_input_to_input_test() {
     #[derive(Clone, Debug)]
     struct State {
         timed_state: TimedState<RawSwitch>,
-        modified_state: ModifiedState<RawSwitch>,
+        modified_state: Modifiers<RawSwitch>,
         timeouts: BTreeMap<TimestampMs, (RawSwitchEvent, TimedHandleRequest)>,
         last_timestamp: TimestampMs,
     }
@@ -223,12 +223,12 @@ fn raw_input_to_input_test() {
             let (events, modified_state) = events.into_iter().fold(
                 (Vec::new(), self.modified_state),
                 |(mut events, state), event| {
-                    let event = match event.action() {
-                        Some(RawAction::Press(switch)) => state.with_press_event(event, switch),
-                        Some(RawAction::Release(switch)) => state.with_release_event(event, switch),
-                        None => state.with_trigger_event(event),
+                    let state = match event.action() {
+                        Some(RawAction::Press(switch)) => state.with_press_event(switch),
+                        Some(RawAction::Release(switch)) => state.with_release_event(switch),
+                        None => state,
                     };
-                    let state = event.to_state();
+                    let event = EventWithModifiers::new(event, state.clone());
                     events.push(event);
                     (events, state)
                 },
@@ -250,7 +250,7 @@ fn raw_input_to_input_test() {
 
     let mut state = State {
         timed_state: TimedState::new(),
-        modified_state: ModifiedState::new(),
+        modified_state: Modifiers::new(),
         timeouts: BTreeMap::new(),
         last_timestamp: 0,
     };
@@ -568,7 +568,7 @@ fn raw_input_to_input_test() {
                 .get(&binding)
                 .unwrap_or(DEFAULT_MAPPING);
             for (event_modifiers, app_event_kind) in mappings {
-                if !event_modifiers.is_subset(&modifiers) {
+                if !event_modifiers.is_subset(&modifiers.switches()) {
                     continue;
                 }
                 let app_event = match app_event_kind {
@@ -606,7 +606,7 @@ fn raw_input_to_input_test() {
                 .get(&binding)
                 .unwrap_or(DEFAULT_MAPPING);
             for (event_modifiers, app_event_kind) in mappings {
-                if !event_modifiers.is_subset(&modifiers) {
+                if !event_modifiers.is_subset(&modifiers.switches()) {
                     continue;
                 }
                 let app_event = match app_event_kind {

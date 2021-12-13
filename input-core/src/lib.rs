@@ -24,25 +24,18 @@
 #![allow(clippy::module_name_repetitions)]
 
 mod event_with_modifiers;
+mod modifiers;
 mod pointer_event;
 mod result_with_context;
 mod timed_event;
 mod timed_event_ext;
 
 pub use event_with_modifiers::*;
+pub use modifiers::*;
 pub use pointer_event::*;
 pub use result_with_context::*;
 pub use timed_event::*;
 pub use timed_event_ext::*;
-
-/*
-    optimize processing using filtering:
-        filter switch-used-in-event-or-modifiers | trigger-used-in-event
-        modifiers-processing
-        filter switch-used-in-event | trigger-used-in-event
-        if pointer-trigger-used-in-events then pointer-processing
-        if timed-trigger-used-in-events then timed-processing
-*/
 
 /*
 dbl-click

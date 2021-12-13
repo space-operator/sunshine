@@ -4,16 +4,20 @@ use input_core::TimedCombinedEventData;
 
 pub trait Event {
     type Switch;
+}
+
+pub trait ToActionOrTrigger<'a>: Event {
     type SwitchEvent: SwitchEvent<Switch = Self::Switch>;
     type TriggerEvent;
 
-    fn into_action_or_trigger(self) -> ActionOrTrigger<Self::SwitchEvent, Self::TriggerEvent>;
+    fn to_action_or_trigger(&'a self) -> ActionOrTrigger<Self::SwitchEvent, Self::TriggerEvent>;
 }
 
+#[allow(single_use_lifetimes)] // false positive
 pub trait SwitchEvent {
     type Switch: Eq + Hash + Ord;
 
-    fn switch(self) -> Self::Switch;
+    fn switch(&self) -> Self::Switch;
 }
 
 pub enum ActionOrTrigger<SwEv, TrEv> {

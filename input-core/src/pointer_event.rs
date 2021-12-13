@@ -11,34 +11,33 @@ use std::collections::HashMap;
     DragMoveEvent    Pressed Released
     DragEndEvent     Pressed Released
 
-    pressed(De, St, Co)
+    pressed(De, Sw, Co)
     move(De, Co)
-    released(De, St, Co)
+    released(De, Sw, Co)
 
     pointer-event
 
 */
 
 #[derive(Clone, Debug)]
-pub struct PointerState<De, St, Co, F> {
-    devices: HashMap<De, DeviceState<St, Co>>,
-    is_drag_fn: F,
+pub struct PointerState<De, Sw, Co> {
+    devices: HashMap<De, DeviceState<Sw, Co>>,
 }
 
 #[derive(Clone, Debug)]
-struct DeviceState<St, Co> {
-    states: HashMap<St, StateState<Co>>,
+struct DeviceState<Sw, Co> {
+    switches: HashMap<Sw, SwitchState<Co>>,
 }
 
 #[derive(Clone, Debug)]
-enum StateState<Co> {
+enum SwitchState<Co> {
     Changed(Co),
     Moving,
 }
 
 #[derive(Clone, Debug)]
-pub struct PointerEventData<St, Ki> {
-    pub state: St,
+pub struct PointerEventData<Sw, Ki> {
+    pub switch: Sw,
     pub kind: Ki,
 }
 
@@ -53,94 +52,83 @@ pub enum PointerMoveEventKind {
     DragMove,
 }
 
-pub type PointerChangeEventData<St> = PointerEventData<St, PointerChangeEventKind>;
-pub type PointerMoveEventData<St> = PointerEventData<St, PointerMoveEventKind>;
+pub type PointerChangeEventData<Sw> = PointerEventData<Sw, PointerChangeEventKind>;
+pub type PointerMoveEventData<Sw> = PointerEventData<Sw, PointerMoveEventKind>;
 
-impl<De, St, Co, F> PointerState<De, St, Co, F>
-where
-    F: FnMut(&Co, &Co) -> bool,
-{
-    pub fn new(is_drag_fn: F) -> Self {
-        Self {
-            devices: HashMap::new(),
-            is_drag_fn,
-        }
+impl<De, Sw, Co> PointerState<De, Sw, Co> {
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    pub fn with_change_event(
+    pub fn with_change_event<F>(
         self,
         device_id: De,
-        state: St,
+        switch: Sw,
         coords: Co,
+        is_drag_fn: F,
     ) -> (
         Self,
-        Vec<PointerMoveEventData<St>>,
-        Option<PointerChangeEventData<St>>,
+        Vec<PointerMoveEventData<Sw>>,
+        Option<PointerChangeEventData<Sw>>,
+        F,
     )
     where
         De: Eq + Hash,
-        St: Clone + Eq + Hash,
+        Sw: Clone + Eq + Hash,
+        F: FnMut(&Co, &Co) -> bool,
     {
         use std::collections::hash_map::Entry;
 
-        let (sm_state, move_events) = self.with_move_event(&device_id, &coords);
-        let is_drag_fn = sm_state.is_drag_fn;
-        let mut devices = sm_state.devices;
+        let (PointerState { mut devices }, move_events, is_drag_fn) =
+            self.with_move_event(&device_id, &coords, is_drag_fn);
         let device = devices.entry(device_id).or_default();
-        let event = match device.states.entry(state.clone()) {
+        let event = match device.switches.entry(switch.clone()) {
             Entry::Occupied(entry) => match entry.get() {
-                StateState::Changed(_) => None,
-                StateState::Moving => Some(PointerEventData {
-                    state,
+                SwitchState::Changed(_) => None,
+                SwitchState::Moving => Some(PointerEventData {
+                    switch,
                     kind: PointerChangeEventKind::DragEnd,
                 }),
             },
             Entry::Vacant(entry) => {
-                let _ = entry.insert(StateState::Changed(coords));
+                let _ = entry.insert(SwitchState::Changed(coords));
                 None
             }
         };
-        (
-            Self {
-                devices,
-                is_drag_fn,
-            },
-            move_events,
-            event,
-        )
+        (Self { devices }, move_events, event, is_drag_fn)
     }
 
-    pub fn with_move_event(
+    pub fn with_move_event<F>(
         self,
         device_id: &De,
         coords: &Co,
-    ) -> (Self, Vec<PointerMoveEventData<St>>)
+        mut is_drag_fn: F,
+    ) -> (Self, Vec<PointerMoveEventData<Sw>>, F)
     where
         De: Eq + Hash,
-        St: Clone + Eq + Hash,
+        Sw: Clone + Eq + Hash,
+        F: FnMut(&Co, &Co) -> bool,
     {
-        let mut is_drag_fn = self.is_drag_fn;
-
         let mut devices = self.devices;
         let device = devices.get_mut(device_id);
         let events = match device {
             Some(device) => device
-                .states
+                .switches
                 .iter_mut()
-                .filter_map(|(state, state_state)| match state_state {
-                    StateState::Changed(prev_coords) => {
+                .filter_map(|(switch, state)| match state {
+                    SwitchState::Changed(prev_coords) => {
                         if is_drag_fn(prev_coords, coords) {
-                            *state_state = StateState::Moving;
+                            *state = SwitchState::Moving;
                             Some(PointerMoveEventData {
-                                state: state.clone(),
+                                switch: switch.clone(),
                                 kind: PointerMoveEventKind::DragStart,
                             })
                         } else {
                             None
                         }
                     }
-                    StateState::Moving => Some(PointerMoveEventData {
-                        state: state.clone(),
+                    SwitchState::Moving => Some(PointerMoveEventData {
+                        switch: switch.clone(),
                         kind: PointerMoveEventKind::DragMove,
                     }),
                 })
@@ -148,29 +136,22 @@ where
             None => vec![],
         };
 
-        (
-            Self {
-                devices,
-                is_drag_fn,
-            },
-            events,
-        )
+        (Self { devices }, events, is_drag_fn)
     }
 }
 
-/*
-impl<De, St, Co> Default for PointerState<De, St, Co> {
+impl<De, Sw, Co> Default for PointerState<De, Sw, Co> {
     fn default() -> Self {
         Self {
             devices: HashMap::new(),
         }
     }
-}*/
+}
 
-impl<St, Co> Default for DeviceState<St, Co> {
+impl<Sw, Co> Default for DeviceState<Sw, Co> {
     fn default() -> Self {
         Self {
-            states: HashMap::new(),
+            switches: HashMap::new(),
         }
     }
 }
