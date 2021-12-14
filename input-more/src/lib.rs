@@ -22,6 +22,13 @@
     variant_size_differences
 )]
 
+/*
+    TODO:
+        Deal with pointer and non-pointer events in mapping
+        Ctrl+LMB (+coords)
+        Ctrl+Shift+LMB (-coords)
+*/
+
 mod event;
 mod mapping;
 mod state;
