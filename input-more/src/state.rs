@@ -31,35 +31,6 @@ pub struct State<De, Sw, Co> {
         if timed-trigger-used-in-events then timed-processing
 */
 
-trait SwitchMapping {
-    type Switch;
-    type Filtered: SwitchMappingFilteredBySwitch<Switch = Switch>;
-
-    pub fn filter_by_switch(&self, switch: Self::Switch) -> Option<Self::Filtered>;
-}
-
-trait SwitchMappingFilteredBySwitch {
-    type Switch;
-    type Filtered: SwitchMappingFilteredByModifiers<Switch = Switch>;
-
-    pub fn filter_by_modifiers(&self, modifiers: Modifiers<Self::Switch>)
-        -> Option<Self::Filtered>;
-}
-
-trait SwitchMappingFilteredByModifiers {
-    type Switch;
-    type Event;
-    type Binding: SwitchMappingBinding;
-
-    pub fn get_event(&self, event: Self::Source) -> Vec<(Modifiers<Self::Switch>, Self::Binding)>;
-}
-
-trait SwitchMappingBinding {
-    type Event;
-
-    pub fn build() -> Self::Event;
-}
-
 /*
 trait TriggerMapping {
     type Switch;

@@ -23,9 +23,11 @@
 )]
 
 mod event;
+mod mapping;
 mod state;
 
 pub use event::*;
+pub use mapping::*;
 pub use state::*;
 
 pub use input_core;
