@@ -4,28 +4,15 @@ use core::marker::PhantomData;
 
 use input_core::Modifiers;
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct ClickOrDragData;
+pub trait SwitchesMapping<'a, Da> {
+    type Switch;
+    type Filtered: SwitchesSwitchMapping<'a, Da>;
 
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct SwitchEventMore<Sw, Mo>(Sw, Modifiers<Mo>, ClickOrDragData);
-
-#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct TriggerEventMore<Tr, Mo>(Tr, Modifiers<Mo>, ClickOrDragData);
-
-pub trait SwitchMapping<'a, Sw, Mo, Da, Co> {
-    type Filtered: SwitchMappingFilteredBySwitch<'a, Sw, Mo, Da, Co>;
-
-    fn filter_by_switch(&'a self, switch: Sw) -> Option<Self::Filtered>;
+    fn filter_by_switch(&'a self, switch: Self::Switch) -> Option<Self::Filtered>;
 }
 
-pub trait SwitchMappingFilteredBySwitch<'a, Sw, Mo, Da, Co> {
-    type Filtered: SwitchMappingFilteredByModifiers<'a, Sw, Mo, Da, Co>;
-
-    fn filter_by_modifiers(&'a self, modifiers: Modifiers<Mo>) -> Option<Self::Filtered>;
-}
-
-pub trait SwitchMappingFilteredByModifiers<'a, Sw, Mo, Da, Co> {
+pub trait SwitchesSwitchMapping<'a, Da> {
+    type Switch;
     type Binding: SwitchBinding<'a, Da>;
     type BindingRef: Borrow<Self::Binding>;
     type Bindings: Iterator<Item = Self::BindingRef>;
@@ -33,16 +20,13 @@ pub trait SwitchMappingFilteredByModifiers<'a, Sw, Mo, Da, Co> {
     type Filtered: Iterator<Item = (Self::Modifiers, Self::Bindings)>;
     /*SwitchesSwitchModifiersMapping<'a, Switch = Self::Switch>;*/
 
-    fn get_coords(&'a self) -> Co;
-    fn is_drag_start(&'a self, lhs: Co, rhs: Co) -> bool;
-
-    fn filter_by_event(&'a self, event: SwitchEventMore<Sw, Mo>, data: Da) -> Self::Filtered;
+    fn filter_by_modifiers(&'a self, modifiers: Modifiers<Self::Switch>) -> Self::Filtered;
 }
 
-pub trait SwitchBinding {
+pub trait SwitchBinding<'a, Da> {
     type Event;
 
-    fn build(self) -> Self::Event;
+    fn build(&'a self, event: Da) -> Self::Event;
 }
 
 /*
@@ -161,9 +145,9 @@ fn test() {
     //type PointerMappingBySwitchFilter<'a> =
     //    MappingBySwitchFilter<'a, PointerSwitch, PointerBinding>;
 
-    impl<'a, Da, Sw: Eq + Hash, Bi: 'a> SwitchMapping<'a, Da> for Mapping<Sw, Bi>
+    impl<'a, Da, Sw: Eq + Hash, Bi: 'a> SwitchesMapping<'a, Da> for Mapping<Sw, Bi>
     where
-        MappingBySwitch<'a, Sw, Bi>: SwitchMappingFilteredBySwitch<'a, Da>,
+        MappingBySwitch<'a, Sw, Bi>: SwitchesSwitchMapping<'a, Da>,
     {
         type Switch = Sw;
         type Filtered = MappingBySwitch<'a, Sw, Bi>;
@@ -179,20 +163,20 @@ fn test() {
         }
     }
 
-    impl<'a, Da, Sw: Ord, Bi> SwitchMappingFilteredBySwitch<'a, Da> for MappingBySwitch<'a, Sw, Bi>
+    impl<'a, Da, Sw: Ord, Bi> SwitchesSwitchMapping<'a, Da> for MappingBySwitch<'a, Sw, Bi>
     where
         Bi: SwitchBinding<'a, Da>,
     {
-        type ModifiersSwitch = Switch;
+        type Switch = Switch;
         type Binding = Bi;
         type BindingRef = &'a Bi;
         type Bindings = slice::Iter<'a, Bi>;
-        type Modifiers = &'a Modifiers<Self::ModifiersSwitch>;
-        type Filtered = MappingBySwitchFilter<'a, Self::ModifiersSwitch, Bi>;
+        type Modifiers = &'a Modifiers<Self::Switch>;
+        type Filtered = MappingBySwitchFilter<'a, Self::Switch, Bi>;
 
         fn filter_by_modifiers(
             &'a self,
-            event_modifiers: Modifiers<Self::ModifiersSwitch>,
+            event_modifiers: Modifiers<Self::Switch>,
         ) -> Self::Filtered {
             MappingBySwitchFilter::new(self.0, event_modifiers)
         }
