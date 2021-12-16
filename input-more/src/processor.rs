@@ -26,33 +26,84 @@ fn test() {
     #[derive(Debug)]
     pub struct ModifiersProcessor;
 
-    #[derive(Debug)]
-    pub struct Tuplicator;
+    #[derive(Clone, Debug)]
+    pub struct ModifiersState(u32);
 
     #[derive(Clone, Debug)]
-    pub struct ModifiersState;
+    pub struct Switch(u32);
 
-    impl Processor<(u32, ModifiersState)> for ModifiersProcessor {
-        type Output = (u64, ModifiersState);
-        fn exec(input: (u32, ModifiersState)) -> Self::Output {
-            (input.0 as u64 + 123, input.1)
+    #[derive(Debug)]
+    pub struct TimedProcessor;
+
+    #[derive(Clone, Debug)]
+    pub struct TimedState(u32);
+
+    impl<T> Processor<(Switch, ModifiersState, T)> for ModifiersProcessor {
+        type Output = (Switch, ModifiersState, T);
+        fn exec(input: (Switch, ModifiersState, T)) -> Self::Output {
+            (
+                Switch(input.0 .0),
+                ModifiersState(input.1 .0 + input.0 .0),
+                input.2,
+            )
         }
     }
 
-    impl<T: Clone> Processor<T> for Tuplicator {
-        type Output = (T, T);
-        fn exec(input: T) -> Self::Output {
-            (input.clone(), input)
+    impl<T> Processor<(Switch, TimedState, T)> for TimedProcessor {
+        type Output = (u32, TimedState, T);
+        fn exec(input: (Switch, TimedState, T)) -> Self::Output {
+            (32, TimedState(input.1 .0 + input.0 .0), input.2)
         }
     }
 
-    type Chain = ((ModifiersProcessor, Tuplicator), (Tuplicator, ((), ())));
+    #[derive(Debug)]
+    pub struct FilterByModifiers;
 
-    println!("{:?}", Chain::exec((12, ModifiersState)));
+    impl Processor<(Switch, ModifiersState, (TimedState, (u32, u32)))> for FilterByModifiers {
+        type Output = (Switch, TimedState, (ModifiersState, (u32, u32)));
+        fn exec(input: (Switch, ModifiersState, (TimedState, (u32, u32)))) -> Self::Output {
+            (input.0, input.2 .0, (input.1, input.2 .1))
+        }
+    }
+
+    type Chain = ((ModifiersProcessor, FilterByModifiers), TimedProcessor);
+
+    println!(
+        "{:?}",
+        Chain::exec((
+            Switch(10),
+            ModifiersState(100),
+            (TimedState(1000), (123, 234))
+        ))
+    );
+
+    // let (state, events) = KeyboardChain::exec((ev, state, modifiers))
+    // let (state, events) = MouseChain::exec((ev, state, modifiers))
 
     // (((AdderWithInc(11), Tuplicator), (Tuplicator, ((), ()))), ((22, 22), (22, 22)))
     panic!();
 }
+
+/*
+    A: how much is done
+    B: how good is it
+
+    A       B
+     16%     70%
+     30%     70%
+     45%     70%
+     62%     40%
+     23%     80%
+     41%     80%
+     61%     80%
+     10%     90%
+     45%     90%
+     71%     90%
+     12%    132%
+     25%    132%
+      5%   1235%
+
+*/
 
 /*
 pub trait Processor<Input>: Sized {
