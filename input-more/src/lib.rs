@@ -30,11 +30,11 @@
 */
 
 mod event;
-mod mapping;
+mod processor;
 mod state;
 
 pub use event::*;
-pub use mapping::*;
+pub use processor::*;
 pub use state::*;
 
 pub use input_core;

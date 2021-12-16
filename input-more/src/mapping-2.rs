@@ -13,11 +13,69 @@ pub struct SwitchEventMore<Sw, Mo>(Sw, Modifiers<Mo>, ClickOrDragData);
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TriggerEventMore<Tr, Mo>(Tr, Modifiers<Mo>, ClickOrDragData);
 
+// ==
+
+/*
+    processor(ev: (&Mapping, &RawEvent))
+        (modifiers-state + ev) >> (modifiers-state, ev, modifiers-data)
+        ev join with modifiers-data
+
+
+    mapping
+    event1
+
+     processor, mapping1, event1
+        (mod-state, event1) >> (mod-state, event2)
+        (mapping1, event2) >> ([mapping2], event2b)
+
+        (timed-state, event2b) >> (timed-state, event3)
+        (mapping2, event3) >> ([mapping3], event3b)
+
+        (pointer-state, event3b) >> (pointer-state, event4)
+        (mapping3, event4) >> ([mapping4], event4b)
+
+        (_, mapping4) >> (_, [app-binding]*)
+        (app-binding, event4b) >> (app-event)
+
+
+    mapping1 = set of (event4, binding)
+    mapping2 = set of (event4, binding) filtered
+    mapping3 = set of (event4, binding) filtered
+    mapping4 = [(Ctrl+Shift+LMB : CreateNode), (Ctrl+LMB : SelectNode)]
+
+
+
+        event2 >> timed_state::with_event >> event3
+        event3 >> app filter using mapping >> [event3]
+
+
+        event3 >> pointer_state::with_event >> event4
+        event4 >> app filter using mapping >> [event4]
+
+        event4 >> app iter bindings >> (event4 + bindings + modifiers)
+*/
+
+/*
+    (mapping, event)
+
+    filter_by_switch
+    input_more_processor(mapping, event)
+
+
+    input_more_processor = (Modifiers, TimedEvent, PointerEvent)
+    Ev
+    Ev + Modifiers
+    Ev + Modifiers + TimedEvent
+    Ev + Modifiers + TimedEvent + PointerEvent
+*/
+
+/*
 pub trait SwitchMapping<'a, Sw, Mo, Co> {
     type Filtered: SwitchMappingSwitchSubset<'a, Sw, Mo, Co>;
 
     fn filter_by_switch(&'a self, switch: Sw) -> Option<Self::Filtered>;
 }
+*/
 
 pub trait SwitchMappingSwitchSubset<'a, Sw, Mo, Co> {
     type Filtered: SwitchMappingModifiersSubset<'a, Sw, Mo, Co> + MaybePointerEvent;
@@ -68,6 +126,13 @@ pub trait SwitchBinding<'a> {
 
 // show trick about unused generics for auto generics
 
+pub trait Processor<Ev>: Sized {
+    type Event;
+    fn apply(self, event: Ev) -> (Self, Self::Event);
+}
+
+// ====
+
 pub trait MaybePointerEvent {
     type Wrapper: PointerEventProcessing;
     fn pointer_event(self) -> Self::Wrapper;
@@ -106,6 +171,7 @@ impl<'a> PointerEvent<'a> for MappingSubset<MouseSwitch> {
     fn get_coords(&'a self) -> Self::Coords {
         (1, 2)
     }
+
     fn is_drag_start(&'a self, coords: Self::Coords) -> bool {
         false
     }
