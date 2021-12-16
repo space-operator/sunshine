@@ -13,36 +13,116 @@ pub struct SwitchEventMore<Sw, Mo>(Sw, Modifiers<Mo>, ClickOrDragData);
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct TriggerEventMore<Tr, Mo>(Tr, Modifiers<Mo>, ClickOrDragData);
 
-pub trait SwitchMapping<'a, Sw, Mo, Da, Co> {
-    type Filtered: SwitchMappingFilteredBySwitch<'a, Sw, Mo, Da, Co>;
+pub trait SwitchMapping<'a, Sw, Mo, Co> {
+    type Filtered: SwitchMappingSwitchSubset<'a, Sw, Mo, Co>;
 
     fn filter_by_switch(&'a self, switch: Sw) -> Option<Self::Filtered>;
 }
 
-pub trait SwitchMappingFilteredBySwitch<'a, Sw, Mo, Da, Co> {
-    type Filtered: SwitchMappingFilteredByModifiers<'a, Sw, Mo, Da, Co>;
+pub trait SwitchMappingSwitchSubset<'a, Sw, Mo, Co> {
+    type Filtered: SwitchMappingModifiersSubset<'a, Sw, Mo, Co> + MaybePointerEvent;
 
     fn filter_by_modifiers(&'a self, modifiers: Modifiers<Mo>) -> Option<Self::Filtered>;
 }
 
-pub trait SwitchMappingFilteredByModifiers<'a, Sw, Mo, Da, Co> {
-    type Binding: SwitchBinding<'a, Da>;
+// device + switch + coords
+// device + coords on move
+
+pub trait SwitchMappingModifiersSubset<'a, Sw, Mo, Co> {
+    type Binding: SwitchBinding<'a>;
     type BindingRef: Borrow<Self::Binding>;
     type Bindings: Iterator<Item = Self::BindingRef>;
-    type Modifiers: Borrow<Modifiers<Self::Switch>>;
+    type Modifiers: Borrow<Modifiers<Mo>>;
     type Filtered: Iterator<Item = (Self::Modifiers, Self::Bindings)>;
     /*SwitchesSwitchModifiersMapping<'a, Switch = Self::Switch>;*/
 
-    fn get_coords(&'a self) -> Co;
-    fn is_drag_start(&'a self, lhs: Co, rhs: Co) -> bool;
-
-    fn filter_by_event(&'a self, event: SwitchEventMore<Sw, Mo>, data: Da) -> Self::Filtered;
+    fn filter_by_event(&'a self, event: SwitchEventMore<Sw, Mo>) -> Self::Filtered;
 }
 
-pub trait SwitchBinding {
+pub trait SwitchBinding<'a> {
     type Event;
 
-    fn build(self) -> Self::Event;
+    fn build(&'a self) -> Self::Event;
+}
+
+/*
+    mapping
+    input_more
+        ....
+            mapping.filter_by_switch()
+            mapping.filter_by_modifiers()
+                SwitchMappingModifiersSubset
+                OptionalPointerProcessing
+                    NoPointerProcessing
+
+
+            mapping.filter_by_event()
+
+*/
+
+/*
+    trait IsPointerEvent {
+        const IS_POINTER_EVENT: bool;
+    }
+*/
+
+// show trick about unused generics for auto generics
+
+pub trait MaybePointerEvent {
+    type Wrapper: PointerEventProcessing;
+    fn pointer_event(self) -> Self::Wrapper;
+}
+
+pub trait PointerEventProcessing {
+    // implemented only in library
+    type PointerState;
+    fn with_change_event();
+}
+
+impl PointerEventProcessing for () {
+    type PointerState = ();
+    fn with_change_event() {}
+}
+
+impl<'a, T: PointerEvent<'a>> PointerEventProcessing for (T,) {
+    type PointerState = i32;
+    fn with_change_event() {
+        // do smth
+    }
+}
+
+pub trait PointerEvent<'a> {
+    type Coords;
+    fn get_coords(&'a self) -> Self::Coords;
+    fn is_drag_start(&'a self, coords: Self::Coords) -> bool;
+}
+
+struct MappingSubset<Sw>(Sw);
+struct KeyboardSwitch(i32);
+struct MouseSwitch(i8);
+
+impl<'a> PointerEvent<'a> for MappingSubset<MouseSwitch> {
+    type Coords = (u32, u32);
+    fn get_coords(&'a self) -> Self::Coords {
+        (1, 2)
+    }
+    fn is_drag_start(&'a self, coords: Self::Coords) -> bool {
+        false
+    }
+}
+
+impl MaybePointerEvent for MappingSubset<KeyboardSwitch> {
+    type Wrapper = ();
+    fn pointer_event(self) -> Self::Wrapper {
+        ()
+    }
+}
+
+impl MaybePointerEvent for MappingSubset<MouseSwitch> {
+    type Wrapper = (Self,);
+    fn pointer_event(self) -> Self::Wrapper {
+        (self,)
+    }
 }
 
 /*
@@ -63,6 +143,7 @@ pub trait SwitchesMappingBinding<'a> {
     fn build(&'a self) -> Self::Event;
 }*/
 
+/*
 #[test]
 fn test() {
     use core::slice;
@@ -352,3 +433,4 @@ fn test() {
             if timed-trigger-used-in-events then timed-processing
     */
 }
+*/
