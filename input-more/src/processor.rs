@@ -1,6 +1,6 @@
-pub trait Processor<Input>: Sized {
+pub trait Processor<Input> {
     type Output;
-    fn exec(input: Input) -> Self::Output;
+    fn exec(&self, input: Input) -> Self::Output;
 }
 
 impl<T, U, Input> Processor<Input> for (T, U)
@@ -9,38 +9,48 @@ where
     U: Processor<T::Output>,
 {
     type Output = U::Output;
-    fn exec(input: Input) -> Self::Output {
-        U::exec(T::exec(input))
+    fn exec(&self, input: Input) -> Self::Output {
+        self.1.exec(self.0.exec(input))
     }
 }
 
 impl<Input> Processor<Input> for () {
     type Output = Input;
-    fn exec(input: Input) -> Self::Output {
+    fn exec(&self, input: Input) -> Self::Output {
         input
+    }
+}
+
+impl<F, Input, Output> Processor<Input> for F
+where
+    F: Fn(Input) -> Output,
+{
+    type Output = Output;
+    fn exec(&self, input: Input) -> Self::Output {
+        self(input)
     }
 }
 
 #[test]
 fn test() {
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     pub struct ModifiersProcessor;
 
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, Default)]
     pub struct ModifiersState(u32);
 
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, Default)]
     pub struct Switch(u32);
 
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     pub struct TimedProcessor;
 
-    #[derive(Clone, Debug)]
+    #[derive(Clone, Debug, Default)]
     pub struct TimedState(u32);
 
     impl<T> Processor<(Switch, ModifiersState, T)> for ModifiersProcessor {
         type Output = (Switch, ModifiersState, T);
-        fn exec(input: (Switch, ModifiersState, T)) -> Self::Output {
+        fn exec(&self, input: (Switch, ModifiersState, T)) -> Self::Output {
             (
                 Switch(input.0 .0),
                 ModifiersState(input.1 .0 + input.0 .0),
@@ -51,17 +61,17 @@ fn test() {
 
     impl<T> Processor<(Switch, TimedState, T)> for TimedProcessor {
         type Output = (u32, TimedState, T);
-        fn exec(input: (Switch, TimedState, T)) -> Self::Output {
+        fn exec(&self, input: (Switch, TimedState, T)) -> Self::Output {
             (32, TimedState(input.1 .0 + input.0 .0), input.2)
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, Default)]
     pub struct FilterByModifiers;
 
     impl Processor<(Switch, ModifiersState, (TimedState, (u32, u32)))> for FilterByModifiers {
         type Output = (Switch, TimedState, (ModifiersState, (u32, u32)));
-        fn exec(input: (Switch, ModifiersState, (TimedState, (u32, u32)))) -> Self::Output {
+        fn exec(&self, input: (Switch, ModifiersState, (TimedState, (u32, u32)))) -> Self::Output {
             (input.0, input.2 .0, (input.1, input.2 .1))
         }
     }
@@ -70,7 +80,7 @@ fn test() {
 
     println!(
         "{:?}",
-        Chain::exec((
+        Chain::default().exec((
             Switch(10),
             ModifiersState(100),
             (TimedState(1000), (123, 234))

@@ -83,7 +83,6 @@ name = "input-more"
 version = "0.1.0"
 dependencies = [
  "input-core",
- "thiserror",
 ]
 
 [[package]]

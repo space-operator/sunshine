@@ -1,5 +1,4 @@
 use core::hash::Hash;
-use std::{collections::BTreeSet, sync::Arc};
 
 use crate::Modifiers;
 

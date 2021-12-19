@@ -3,8 +3,5 @@ name = "input-more"
 version = "0.1.0"
 edition = "2021"
 
-[dependencies]
-thiserror = "1.0.30"
-
 [dependencies.input-core]
 path = "../input-core"

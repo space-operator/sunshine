@@ -1,7 +1,7 @@
 use core::hash::Hash;
 use std::{collections::BTreeSet, sync::Arc};
 
-use crate::EventWithModifiers;
+use thiserror::Error;
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct Modifiers<Sw> {
@@ -17,26 +17,38 @@ impl<Sw> Modifiers<Sw> {
         &self.switches
     }
 
-    pub fn with_press_event(self, switch: Sw) -> Modifiers<Sw>
+    pub fn with_press_event(self, switch: Sw) -> (Self, Result<(), ModifiersPressError>)
     where
         Sw: Clone + Eq + Hash + Ord,
     {
         let mut switches = self.switches;
         let switches_mut = Arc::make_mut(&mut switches);
         let is_added = switches_mut.insert(switch);
-        assert!(is_added);
-        Modifiers { switches }
+        (
+            Self::from(switches),
+            if is_added {
+                Ok(())
+            } else {
+                Err(ModifiersPressError::AlreadyPressed)
+            },
+        )
     }
 
-    pub fn with_release_event(self, switch: Sw) -> Modifiers<Sw>
+    pub fn with_release_event(self, switch: Sw) -> (Self, Result<(), ModifiersReleaseError>)
     where
         Sw: Clone + Eq + Hash + Ord,
     {
         let mut switches = self.switches;
         let switches_mut = Arc::make_mut(&mut switches);
         let is_removed = switches_mut.remove(&switch);
-        assert!(is_removed);
-        Modifiers { switches }
+        (
+            Self::from(switches),
+            if is_removed {
+                Ok(())
+            } else {
+                Err(ModifiersReleaseError::AlreadyReleased)
+            },
+        )
     }
 }
 
@@ -48,10 +60,20 @@ impl<Sw> Default for Modifiers<Sw> {
     }
 }
 
-/*
-impl<T> From<T> for T {
-    fn from(t: T) -> T {
-        t
+impl<Sw> From<Arc<BTreeSet<Sw>>> for Modifiers<Sw> {
+    fn from(switches: Arc<BTreeSet<Sw>>) -> Self {
+        Self { switches }
     }
 }
-*/
+
+#[derive(Clone, Copy, Debug, Error)]
+pub enum ModifiersPressError {
+    #[error("Button is pressed while in Pressed state")]
+    AlreadyPressed,
+}
+
+#[derive(Clone, Copy, Debug, Error)]
+pub enum ModifiersReleaseError {
+    #[error("Button is released while in Released state")]
+    AlreadyReleased,
+}

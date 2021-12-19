@@ -1,32 +1,19 @@
 use nom::branch::alt;
 use nom::bytes::complete::is_not;
 use nom::bytes::complete::tag;
-use nom::bytes::complete::tag_no_case;
 use nom::bytes::complete::take;
 use nom::bytes::complete::take_until;
 use nom::character::complete::char as nom_char;
-use nom::character::complete::digit1;
-use nom::character::complete::hex_digit1;
-use nom::character::complete::none_of;
 use nom::character::complete::one_of;
-use nom::combinator::cond;
 use nom::combinator::fail;
-use nom::combinator::iterator;
 use nom::combinator::map;
 use nom::combinator::not;
-use nom::combinator::opt;
 use nom::combinator::peek;
 use nom::combinator::recognize;
-use nom::combinator::verify;
-use nom::error::Error as NomError;
-use nom::error::ParseError;
 use nom::multi::many0;
-use nom::multi::separated_list0;
 use nom::sequence::delimited;
-use nom::sequence::{pair, preceded, tuple};
+use nom::sequence::{pair, preceded};
 use nom::IResult;
-use regex::{Regex, RegexSet};
-use std::net::{IpAddr, Ipv6Addr};
 
 use crate::BlockId;
 

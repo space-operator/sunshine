@@ -5,6 +5,7 @@ use regex::Regex;
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct BlockId<'a>(pub &'a str);
 
+#[allow(dead_code)]
 #[derive(Clone, Debug, Default)]
 pub struct Block {
     span_text: String,

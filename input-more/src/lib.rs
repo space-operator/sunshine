@@ -22,19 +22,14 @@
     variant_size_differences
 )]
 
-/*
-    TODO:
-        Deal with pointer and non-pointer events in mapping
-        Ctrl+LMB (+coords)
-        Ctrl+Shift+LMB (-coords)
-*/
-
-mod event;
+mod modifiers;
 mod processor;
-mod state;
+mod timed_event;
+mod timed_event_scheduler;
 
-pub use event::*;
+pub use modifiers::*;
 pub use processor::*;
-pub use state::*;
+pub use timed_event::*;
+pub use timed_event_scheduler::*;
 
 pub use input_core;

@@ -6,7 +6,7 @@ use std::collections::{BTreeSet, HashMap};
 fn raw_input_to_input_test() {
     use input_core::*;
     use input_more::*;
-    use std::collections::{BTreeMap, HashSet};
+    use std::collections::BTreeMap;
 
     type TimestampMs = u64;
     type Coords = (u64, u64);
@@ -224,8 +224,16 @@ fn raw_input_to_input_test() {
                 (Vec::new(), self.modified_state),
                 |(mut events, state), event| {
                     let state = match event.action() {
-                        Some(RawAction::Press(switch)) => state.with_press_event(switch),
-                        Some(RawAction::Release(switch)) => state.with_release_event(switch),
+                        Some(RawAction::Press(switch)) => {
+                            let (state, result) = state.with_press_event(switch);
+                            result.unwrap();
+                            state
+                        }
+                        Some(RawAction::Release(switch)) => {
+                            let (state, result) = state.with_release_event(switch);
+                            result.unwrap();
+                            state
+                        }
                         None => state,
                     };
                     let event = EventWithModifiers::new(event, state.clone());

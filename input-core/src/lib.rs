@@ -29,6 +29,7 @@ mod pointer_event;
 mod result_with_context;
 mod timed_event;
 mod timed_event_ext;
+mod timed_event_scheduler;
 
 pub use event_with_modifiers::*;
 pub use modifiers::*;
@@ -36,6 +37,7 @@ pub use pointer_event::*;
 pub use result_with_context::*;
 pub use timed_event::*;
 pub use timed_event_ext::*;
+pub use timed_event_scheduler::*;
 
 /*
 dbl-click

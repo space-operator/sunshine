@@ -1,9 +1,8 @@
 #![feature(map_try_insert)]
 
-use core::marker::PhantomData;
 use std::borrow::Borrow;
 use std::collections::HashMap;
-use std::sync::{Arc, RwLock, RwLockReadGuard};
+use std::sync::{Arc, RwLock};
 use uuid::Uuid;
 
 trait Database {
@@ -63,8 +62,6 @@ impl Database for MockDatabase {
     }
 
     fn add_block(&mut self) -> &Self::BlockRef {
-        use std::collections::hash_map::Entry;
-
         let id = Uuid::new_v4();
         let block = MockBlock {
             id,
@@ -101,7 +98,7 @@ impl Block for MockBlock {
 
     fn set_spans_text<T: Into<String>>(&self, value: T) {
         let mut spans_text = self.spans_text.write().unwrap();
-        core::mem::replace(&mut *spans_text, Arc::new(value.into()));
+        let _ = core::mem::replace(&mut *spans_text, Arc::new(value.into()));
     }
 
     fn add_child(&self, child: Self::ChildRef) -> bool {
