@@ -1,5 +1,7 @@
+use core::borrow::Borrow;
 use core::hash::Hash;
-use std::{collections::BTreeSet, sync::Arc};
+use std::collections::BTreeSet;
+use std::sync::Arc;
 
 use thiserror::Error;
 
@@ -34,20 +36,27 @@ impl<Sw> Modifiers<Sw> {
         )
     }
 
-    pub fn with_release_event(self, switch: Sw) -> (Self, Result<(), ModifiersReleaseError>)
+    pub fn with_release_event<SwRef>(
+        self,
+        switch: SwRef,
+    ) -> (Self, (SwRef, Result<(), ModifiersReleaseError>))
     where
         Sw: Clone + Eq + Hash + Ord,
+        SwRef: Borrow<Sw>,
     {
         let mut switches = self.switches;
         let switches_mut = Arc::make_mut(&mut switches);
-        let is_removed = switches_mut.remove(&switch);
+        let is_removed = switches_mut.remove(switch.borrow());
         (
             Self::from(switches),
-            if is_removed {
-                Ok(())
-            } else {
-                Err(ModifiersReleaseError::AlreadyReleased)
-            },
+            (
+                switch,
+                if is_removed {
+                    Ok(())
+                } else {
+                    Err(ModifiersReleaseError::AlreadyReleased)
+                },
+            ),
         )
     }
 }

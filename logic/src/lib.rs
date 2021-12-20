@@ -1,6 +1,6 @@
 #![feature(map_try_insert)]
 
-use std::borrow::Borrow;
+use core::borrow::Borrow;
 use std::collections::HashMap;
 use std::sync::{Arc, RwLock};
 use uuid::Uuid;

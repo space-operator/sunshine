@@ -40,6 +40,18 @@ fn raw_input_to_input_test() {
         Button(&'static str),
     }
 
+    #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    pub struct EventWithModifiers<Ev, Sw> {
+        pub event: Ev,
+        pub modifiers: Modifiers<Sw>,
+    }
+
+    impl<Ev, Sw> EventWithModifiers<Ev, Sw> {
+        pub fn new(event: Ev, modifiers: Modifiers<Sw>) -> Self {
+            Self { event, modifiers }
+        }
+    }
+
     impl RawAction {
         fn switch(&self) -> &RawSwitch {
             match self {
@@ -230,7 +242,7 @@ fn raw_input_to_input_test() {
                             state
                         }
                         Some(RawAction::Release(switch)) => {
-                            let (state, result) = state.with_release_event(switch);
+                            let (state, (switch, result)) = state.with_release_event(&switch);
                             result.unwrap();
                             state
                         }
@@ -682,7 +694,6 @@ fn raw_input_to_input_test() {
         // TouchEnd     @2 200, 200 #2
         // TouchStart   @1 200, 200 #2
     }
-    panic!();
 
     /*
         basic-event = (raw-event | raw-switch-event + timed-combined-event)

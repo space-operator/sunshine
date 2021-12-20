@@ -1,3 +1,10 @@
+// Current structure used in processors:
+// ((state, data), (other_states_cons, event))
+// where:
+//   state: state for next input processor or state from prev input processor
+//   data: data for next input processor or data from prev input processor
+//   other_states_cons: cons list with states for next and prev processors
+
 pub trait Processor<Input> {
     type Output;
     fn exec(&self, input: Input) -> Self::Output;
@@ -91,7 +98,6 @@ fn test() {
     // let (state, events) = MouseChain::exec((ev, state, modifiers))
 
     // (((AdderWithInc(11), Tuplicator), (Tuplicator, ((), ()))), ((22, 22), (22, 22)))
-    panic!();
 }
 
 /*
