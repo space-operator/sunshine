@@ -36,7 +36,10 @@ impl<Ti, Re> SchedulerState<Ti, Re> {
         TiRef: Borrow<Ti>,
     {
         let mut scheduled = self.requests;
-        let requests = scheduled.split_off(time.borrow());
+        let mut requests = scheduled.split_off(time.borrow());
+        if let Some((key, value)) = requests.remove_entry(time.borrow()) {
+            scheduled.insert(key, value);
+        }
         (
             Self::from(requests),
             (time, scheduled.into_values().flatten().collect()),

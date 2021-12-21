@@ -210,6 +210,11 @@ fn test_chain() {
             (),
         ),
     );
+    /*
+        (original_data, ..., ...)
+            .before_modifiers()
+            .modifiers_press_processor()
+    */
 
     // Keyboard switch event
     let event = SwitchEvent {

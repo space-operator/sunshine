@@ -27,15 +27,15 @@ pub mod cons_ext;
 mod modifiers;
 mod processor;
 mod scheduler;
-//mod state;
+mod state;
 mod timed_event;
 
 //pub use event::*;
+pub use cons_ext::*;
 pub use modifiers::*;
 pub use processor::*;
 pub use scheduler::*;
-//pub use state::*;
-pub use cons_ext::*;
+pub use state::*;
 pub use timed_event::*;
 
 pub use input_core;

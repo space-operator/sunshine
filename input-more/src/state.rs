@@ -1,3 +1,53 @@
+use input_core::Modifiers;
+
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct State<Mo, Ti, Sh> {
+    modifiers: Mo,
+    timed_state: Ti,
+    scheduler_state: Sh,
+}
+
+impl<Mo, Ti, Sh> State<Mo, Ti, Sh> {
+    fn new(modifiers: Mo, timed_state: Ti, scheduler_state: Sh) -> Self {
+        Self {
+            modifiers: modifiers,
+            timed_state: timed_state,
+            scheduler_state: scheduler_state,
+        }
+    }
+}
+
+pub trait TakeModifiers<Sw> {
+    type Output;
+
+    fn take_modifiers(self) -> (Modifiers<Sw>, Self::Output);
+}
+
+pub trait StoreModifiers<Sw> {
+    type Output;
+
+    fn store_modifiers(self, modifiers: Modifiers<Sw>) -> Self::Output;
+}
+
+impl<Sw, Ti, Sh> TakeModifiers<Sw> for State<Modifiers<Sw>, Ti, Sh> {
+    type Output = State<(), Ti, Sh>;
+
+    fn take_modifiers(self) -> (Modifiers<Sw>, Self::Output) {
+        (
+            self.modifiers,
+            State::new((), self.timed_state, self.scheduler_state),
+        )
+    }
+}
+
+impl<Sw, Ti, Sh> StoreModifiers<Sw> for State<(), Ti, Sh> {
+    type Output = State<Modifiers<Sw>, Ti, Sh>;
+
+    fn store_modifiers(self, modifiers: Modifiers<Sw>) -> Self::Output {
+        State::new(modifiers, self.timed_state, self.scheduler_state)
+    }
+}
+
 /*use crate::{ConsWithLast, Processor};
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
