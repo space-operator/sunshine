@@ -231,5 +231,20 @@ fn test_chain() {
 
     let result = KeyboardDownProcessor::default().exec((state, event));
     println!("{:?}", result);
+
+    //
+
+    // let state = State::new(Modifiers::new(), TimedState::new(), SchedulerState::new());
+    // let event = todo();
+    // let context = Context::new(state, event);
+
+    // context
+    //  .with_modifiers_press_event()
+    //  .map_event(|(result, event)| +)
+    //  .with_timed_press_event()
+    //  .map_event(|(result, event)| +)
+    //  .with_scheduled_press_event()
+    //  .map_event(|(result, event)| +)
+
     panic!();
 }

@@ -1,3 +1,24 @@
+pub trait TakeSwitch {
+    type Switch;
+    type Rest;
+
+    fn take_switch(self) -> (Self::Switch, Self::Rest);
+}
+
+// of <Ev>
+pub trait TakeTime {
+    type Time;
+    type Rest;
+
+    fn take_time(self) -> (Self::Time, Self::Rest);
+}
+
+pub trait TakeRequest {
+    type Request;
+    type Rest;
+
+    fn take_request(self) -> (Self::Request, Self::Rest);
+}
 /*
 use core::fmt::Debug;
 

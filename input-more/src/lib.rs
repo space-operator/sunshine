@@ -23,15 +23,17 @@
 )]
 
 pub mod cons_ext;
-//mod event;
+mod context;
+mod event;
 mod modifiers;
 mod processor;
 mod scheduler;
 mod state;
 mod timed_event;
 
-//pub use event::*;
 pub use cons_ext::*;
+pub use context::*;
+pub use event::*;
 pub use modifiers::*;
 pub use processor::*;
 pub use scheduler::*;

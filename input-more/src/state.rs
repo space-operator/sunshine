@@ -1,14 +1,14 @@
-use input_core::Modifiers;
+use input_core::{Modifiers, SchedulerState, TimedState};
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct State<Mo, Ti, Sh> {
+pub struct State<Mo, Ts, Sh> {
     modifiers: Mo,
-    timed_state: Ti,
+    timed_state: Ts,
     scheduler_state: Sh,
 }
 
-impl<Mo, Ti, Sh> State<Mo, Ti, Sh> {
-    fn new(modifiers: Mo, timed_state: Ti, scheduler_state: Sh) -> Self {
+impl<Mo, Ts, Sh> State<Mo, Ts, Sh> {
+    fn new(modifiers: Mo, timed_state: Ts, scheduler_state: Sh) -> Self {
         Self {
             modifiers: modifiers,
             timed_state: timed_state,
@@ -17,22 +17,22 @@ impl<Mo, Ti, Sh> State<Mo, Ti, Sh> {
     }
 }
 
-pub trait TakeModifiers<Sw> {
-    type Output;
+pub trait TakeState<St> {
+    type Rest;
 
-    fn take_modifiers(self) -> (Modifiers<Sw>, Self::Output);
+    fn take_state(self) -> (St, Self::Rest);
 }
 
-pub trait StoreModifiers<Sw> {
+pub trait WithState<St> {
     type Output;
 
-    fn store_modifiers(self, modifiers: Modifiers<Sw>) -> Self::Output;
+    fn with_state(self, state: St) -> Self::Output;
 }
 
-impl<Sw, Ti, Sh> TakeModifiers<Sw> for State<Modifiers<Sw>, Ti, Sh> {
-    type Output = State<(), Ti, Sh>;
+impl<Ts, Sh, Sw> TakeState<Modifiers<Sw>> for State<Modifiers<Sw>, Ts, Sh> {
+    type Rest = State<(), Ts, Sh>;
 
-    fn take_modifiers(self) -> (Modifiers<Sw>, Self::Output) {
+    fn take_state(self) -> (Modifiers<Sw>, Self::Rest) {
         (
             self.modifiers,
             State::new((), self.timed_state, self.scheduler_state),
@@ -40,11 +40,49 @@ impl<Sw, Ti, Sh> TakeModifiers<Sw> for State<Modifiers<Sw>, Ti, Sh> {
     }
 }
 
-impl<Sw, Ti, Sh> StoreModifiers<Sw> for State<(), Ti, Sh> {
-    type Output = State<Modifiers<Sw>, Ti, Sh>;
+impl<Ts, Sh, Sw> WithState<Modifiers<Sw>> for State<(), Ts, Sh> {
+    type Output = State<Modifiers<Sw>, Ts, Sh>;
 
-    fn store_modifiers(self, modifiers: Modifiers<Sw>) -> Self::Output {
-        State::new(modifiers, self.timed_state, self.scheduler_state)
+    fn with_state(self, state: Modifiers<Sw>) -> Self::Output {
+        State::new(state, self.timed_state, self.scheduler_state)
+    }
+}
+
+impl<Mo, Sh, Sw> TakeState<TimedState<Sw>> for State<Mo, TimedState<Sw>, Sh> {
+    type Rest = State<Mo, (), Sh>;
+
+    fn take_state(self) -> (TimedState<Sw>, Self::Rest) {
+        (
+            self.timed_state,
+            State::new(self.modifiers, (), self.scheduler_state),
+        )
+    }
+}
+
+impl<Mo, Sh, Sw> WithState<TimedState<Sw>> for State<Mo, (), Sh> {
+    type Output = State<Mo, TimedState<Sw>, Sh>;
+
+    fn with_state(self, state: TimedState<Sw>) -> Self::Output {
+        State::new(self.modifiers, state, self.scheduler_state)
+    }
+}
+
+impl<Mo, Ts, Ti, Re> TakeState<SchedulerState<Ti, Re>> for State<Mo, Ts, SchedulerState<Ti, Re>> {
+    type Rest = State<Mo, Ts, ()>;
+
+    fn take_state(self) -> (SchedulerState<Ti, Re>, Self::Rest) {
+        (
+            self.scheduler_state,
+            State::new(self.modifiers, self.timed_state, ()),
+        )
+    }
+}
+
+impl<Mo, Ts, Ti, Re> WithState<SchedulerState<Ti, Re>> for State<Mo, Ts, ()> {
+    type Output = State<Mo, Ts, SchedulerState<Ti, Re>>;
+
+    fn with_state(self, state: SchedulerState<Ti, Re>) -> Self::Output {
+        State::new(self.modifiers, self.timed_state, state)
     }
 }
 
@@ -95,7 +133,7 @@ impl<Da, St, Re, Ar> Processor<(St, Da, Re, Ar)> for StoreState {
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct States {
     modifiers: Mo,
-    timed_state: Ti,
+    timed_state: Ts,
     scheduler_state: Sh,
 }
 
@@ -105,7 +143,7 @@ pub struct TakeModifiers;
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct StoreModifiers;
 
-impl<Da, Mo, Ti, Sh> Processor<((), Da, State<Mo, Ti, Sh>)> for TakeModifiers {
+impl<Da, Mo, Ts, Sh> Processor<((), Da, State<Mo, Ts, Sh>)> for TakeModifiers {
     type Output = (Mo);
     fn exec(&self, (modifiers, switch, args): (Modifiers<Sw>, Sw, Args)) -> Self::Output {
         let (modifiers, result) = modifiers.with_press_event(switch);
