@@ -8,7 +8,7 @@ pub struct State<Mo, Ts, Sh> {
 }
 
 impl<Mo, Ts, Sh> State<Mo, Ts, Sh> {
-    fn new(modifiers: Mo, timed_state: Ts, scheduler_state: Sh) -> Self {
+    pub fn new(modifiers: Mo, timed_state: Ts, scheduler_state: Sh) -> Self {
         Self {
             modifiers: modifiers,
             timed_state: timed_state,
@@ -27,6 +27,22 @@ pub trait WithState<St> {
     type Output;
 
     fn with_state(self, state: St) -> Self::Output;
+}
+
+impl<St> TakeState<St> for St {
+    type Rest = ();
+
+    fn take_state(self) -> (St, Self::Rest) {
+        (self, ())
+    }
+}
+
+impl<St> WithState<St> for () {
+    type Output = St;
+
+    fn with_state(self, state: St) -> Self::Output {
+        state
+    }
 }
 
 impl<Ts, Sh, Sw> TakeState<Modifiers<Sw>> for State<Modifiers<Sw>, Ts, Sh> {
@@ -67,10 +83,12 @@ impl<Mo, Sh, Sw> WithState<TimedState<Sw>> for State<Mo, (), Sh> {
     }
 }
 
-impl<Mo, Ts, Ti, Re> TakeState<SchedulerState<Ti, Re>> for State<Mo, Ts, SchedulerState<Ti, Re>> {
+impl<Mo, Ts, Ti, Sw, Re> TakeState<SchedulerState<Ti, Sw, Re>>
+    for State<Mo, Ts, SchedulerState<Ti, Sw, Re>>
+{
     type Rest = State<Mo, Ts, ()>;
 
-    fn take_state(self) -> (SchedulerState<Ti, Re>, Self::Rest) {
+    fn take_state(self) -> (SchedulerState<Ti, Sw, Re>, Self::Rest) {
         (
             self.scheduler_state,
             State::new(self.modifiers, self.timed_state, ()),
@@ -78,10 +96,10 @@ impl<Mo, Ts, Ti, Re> TakeState<SchedulerState<Ti, Re>> for State<Mo, Ts, Schedul
     }
 }
 
-impl<Mo, Ts, Ti, Re> WithState<SchedulerState<Ti, Re>> for State<Mo, Ts, ()> {
-    type Output = State<Mo, Ts, SchedulerState<Ti, Re>>;
+impl<Mo, Ts, Ti, Sw, Re> WithState<SchedulerState<Ti, Sw, Re>> for State<Mo, Ts, ()> {
+    type Output = State<Mo, Ts, SchedulerState<Ti, Sw, Re>>;
 
-    fn with_state(self, state: SchedulerState<Ti, Re>) -> Self::Output {
+    fn with_state(self, state: SchedulerState<Ti, Sw, Re>) -> Self::Output {
         State::new(self.modifiers, self.timed_state, state)
     }
 }

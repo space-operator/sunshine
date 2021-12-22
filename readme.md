@@ -109,3 +109,27 @@ Language/protocol where everything work at command line first, then we map some 
 
 take the all the character/strings
 event when it can't be parsed
+
+
+/*
+
+  {
+    "key": "Alt+d",
+    "command": "editor.action.moveSelectionToPreviousFindMatch",
+    "when": "editorHasSelection && !findInputFocussed"
+  },
+  {
+    "key": "Ctrl+Alt+d",
+    "command": "editor.action.addSelectionToPreviousFindMatch",
+  },
+  {
+    "key": "Alt+f",
+    "command": "editor.action.moveSelectionToNextFindMatch",
+    "when": "editorHasSelection && !findInputFocussed"
+  },
+  {
+    "key": "Ctrl+Alt+f",
+    "command": "editor.action.addSelectionToNextFindMatch",
+  },
+
+*/
