@@ -2,9 +2,9 @@ use input_core::{Modifiers, SchedulerState, TimedState};
 
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct State<Mo, Ts, Sh> {
-    modifiers: Mo,
-    timed_state: Ts,
-    scheduler_state: Sh,
+    pub modifiers: Mo,
+    pub timed_state: Ts,
+    pub scheduler_state: Sh,
 }
 
 impl<Mo, Ts, Sh> State<Mo, Ts, Sh> {

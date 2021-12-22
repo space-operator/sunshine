@@ -10,9 +10,9 @@ impl<St, Ev> Context<St, Ev> {
     where
         St: TakeState<SchedulerState<Ti, Sw, Rq>, Rest = Re>,
         Re: WithState<SchedulerState<Ti, Sw, Rq>>,
-        Ev: TakeTime<Time = Ti, Rest = Ev2>,
-        Ev2: TakeSwitch<Switch = Sw, Rest = Ev3>,
-        Ev3: TakeRequest<Request = Rq>,
+        Ev: TakeTime<Ti, Rest = Ev2>,
+        Ev2: TakeSwitch<Sw, Rest = Ev3>,
+        Ev3: TakeRequest<Rq>,
         Ti: Ord,
     {
         let (state, rest) = self.state.take_state();
@@ -25,13 +25,13 @@ impl<St, Ev> Context<St, Ev> {
 }
 
 impl<St, Ev> Context<St, Ev> {
-    pub fn with_schedule_taken<Re, Ev2, Ev3, Ti, TiRef, Sw, Rq>(
+    pub fn with_scheduled_taken<Re, Ti, TiRef, Sw, Rq>(
         self,
-    ) -> Context<Re::Output, ((TiRef, Vec<(Sw, Rq)>), Ev::Rest)>
+    ) -> Context<Re::Output, ((TiRef, Vec<(Ti, Vec<(Sw, Rq)>)>), Ev::Rest)>
     where
         St: TakeState<SchedulerState<Ti, Sw, Rq>, Rest = Re>,
         Re: WithState<SchedulerState<Ti, Sw, Rq>>,
-        Ev: TakeTime<Time = TiRef>,
+        Ev: TakeTime<TiRef>,
         Ti: Ord,
         TiRef: Borrow<Ti>,
     {
@@ -52,16 +52,16 @@ pub struct SchedulerProcessor;
 #[derive(Clone, Copy, Debug, Default, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct ScheduledProcessor;
 
-impl<Ti, Sw, Re, Args> Processor<((SchedulerState<Ti, Sw, Re>, (Ti, Sw, Re)), Args)>
+impl<Ti, Sw, Rq, Args> Processor<((SchedulerState<Ti, Sw, Rq>, (Ti, Sw, Rq)), Args)>
     for SchedulerProcessor
 where
     Ti: Ord,
 {
-    type Output = ((SchedulerState<Ti, Sw, Re>, ()), Args);
+    type Output = ((SchedulerState<Ti, Sw, Rq>, ()), Args);
     fn exec(
         &self,
         ((state, (time, switch, request)), args): (
-            (SchedulerState<Ti, Sw, Re>, (Ti, Sw, Re)),
+            (SchedulerState<Ti, Sw, Rq>, (Ti, Sw, Rq)),
             Args,
         ),
     ) -> Self::Output {
@@ -69,16 +69,22 @@ where
     }
 }
 
-impl<Ti, TiRef, Sw, Re, Args> Processor<((SchedulerState<Ti, Sw, Re>, TiRef), Args)>
+impl<Ti, TiRef, Sw, Rq, Args> Processor<((SchedulerState<Ti, Sw, Rq>, TiRef), Args)>
     for ScheduledProcessor
 where
     Ti: Ord,
     TiRef: Borrow<Ti>,
 {
-    type Output = ((SchedulerState<Ti, Sw, Re>, (TiRef, Vec<(Sw, Re)>)), Args);
+    type Output = (
+        (
+            SchedulerState<Ti, Sw, Rq>,
+            (TiRef, Vec<(Ti, Vec<(Sw, Rq)>)>),
+        ),
+        Args,
+    );
     fn exec(
         &self,
-        ((state, time), args): ((SchedulerState<Ti, Sw, Re>, TiRef), Args),
+        ((state, time), args): ((SchedulerState<Ti, Sw, Rq>, TiRef), Args),
     ) -> Self::Output {
         ((state.take_scheduled(time)), args)
     }

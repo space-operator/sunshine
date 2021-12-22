@@ -4,23 +4,23 @@ use std::collections::BTreeMap;
 use crate::{LongPressHandleRequest, MultiClickHandleRequest};
 
 #[derive(Clone, Debug)]
-pub struct SchedulerState<Ti, Sw, Re> {
-    requests: BTreeMap<Ti, Vec<(Sw, Re)>>,
+pub struct SchedulerState<Ti, Sw, Rq> {
+    requests: BTreeMap<Ti, Vec<(Sw, Rq)>>,
 }
 
 pub type LongPressSchedulerState<Ti, Sw> = SchedulerState<Ti, Sw, LongPressHandleRequest>;
 pub type MultiClickSchedulerState<Ti, Sw> = SchedulerState<Ti, Sw, MultiClickHandleRequest>;
 
-impl<Ti, Sw, Re> SchedulerState<Ti, Sw, Re> {
+impl<Ti, Sw, Rq> SchedulerState<Ti, Sw, Rq> {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn into_requests(self) -> BTreeMap<Ti, Vec<(Sw, Re)>> {
+    pub fn into_requests(self) -> BTreeMap<Ti, Vec<(Sw, Rq)>> {
         self.requests
     }
 
-    pub fn schedule(self, time: Ti, switch: Sw, request: Re) -> Self
+    pub fn schedule(self, time: Ti, switch: Sw, request: Rq) -> Self
     where
         Ti: Ord,
     {
@@ -30,7 +30,7 @@ impl<Ti, Sw, Re> SchedulerState<Ti, Sw, Re> {
         Self::from(requests)
     }
 
-    pub fn take_scheduled<TiRef>(self, time: TiRef) -> (Self, (TiRef, Vec<(Sw, Re)>))
+    pub fn take_scheduled<TiRef>(self, time: TiRef) -> (Self, (TiRef, Vec<(Ti, Vec<(Sw, Rq)>)>))
     where
         Ti: Ord,
         TiRef: Borrow<Ti>,
@@ -43,18 +43,18 @@ impl<Ti, Sw, Re> SchedulerState<Ti, Sw, Re> {
         }
         (
             Self::from(requests),
-            (time, scheduled.into_values().flatten().collect()),
+            (time, scheduled.into_iter().collect()),
         )
     }
 }
 
-impl<Ti, Sw, Re> From<BTreeMap<Ti, Vec<(Sw, Re)>>> for SchedulerState<Ti, Sw, Re> {
-    fn from(requests: BTreeMap<Ti, Vec<(Sw, Re)>>) -> Self {
+impl<Ti, Sw, Rq> From<BTreeMap<Ti, Vec<(Sw, Rq)>>> for SchedulerState<Ti, Sw, Rq> {
+    fn from(requests: BTreeMap<Ti, Vec<(Sw, Rq)>>) -> Self {
         Self { requests }
     }
 }
 
-impl<Ti, Sw, Re> Default for SchedulerState<Ti, Sw, Re> {
+impl<Ti, Sw, Rq> Default for SchedulerState<Ti, Sw, Rq> {
     fn default() -> Self {
         Self {
             requests: BTreeMap::default(),

@@ -16,7 +16,7 @@ impl<St, Ev> Context<St, Ev> {
     where
         St: TakeState<TimedState<Sw>, Rest = Re>,
         Re: WithState<TimedState<Sw>>,
-        Ev: TakeSwitch<Switch = Sw>,
+        Ev: TakeSwitch<Sw>,
         Sw: Hash + Ord,
     {
         let (state, rest) = self.state.take_state();
@@ -39,7 +39,7 @@ impl<St, Ev> Context<St, Ev> {
     where
         St: TakeState<TimedState<Sw>, Rest = Re>,
         Re: WithState<TimedState<Sw>>,
-        Ev: TakeSwitch<Switch = Sw>,
+        Ev: TakeSwitch<Sw>,
         Sw: Hash + Ord,
     {
         let (state, rest) = self.state.take_state();
@@ -62,8 +62,8 @@ impl<St, Ev> Context<St, Ev> {
     where
         St: TakeState<TimedState<Sw>, Rest = Re>,
         Re: WithState<TimedState<Sw>>,
-        Ev: TakeSwitch<Switch = Sw, Rest = Ev2>,
-        Ev2: TakeRequest<Request = LongPressHandleRequest>,
+        Ev: TakeSwitch<Sw, Rest = Ev2>,
+        Ev2: TakeRequest<LongPressHandleRequest>,
         Sw: Hash + Ord,
     {
         let (state, rest) = self.state.take_state();
@@ -87,8 +87,8 @@ impl<St, Ev> Context<St, Ev> {
     where
         St: TakeState<TimedState<Sw>, Rest = Re>,
         Re: WithState<TimedState<Sw>>,
-        Ev: TakeSwitch<Switch = Sw, Rest = Ev2>,
-        Ev2: TakeRequest<Request = MultiClickHandleRequest>,
+        Ev: TakeSwitch<Sw, Rest = Ev2>,
+        Ev2: TakeRequest<MultiClickHandleRequest>,
         Sw: Hash + Ord,
     {
         let (state, rest) = self.state.take_state();

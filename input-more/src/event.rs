@@ -1,24 +1,53 @@
-pub trait TakeSwitch {
-    type Switch;
+pub trait TakeSwitch<Sw> {
     type Rest;
 
-    fn take_switch(self) -> (Self::Switch, Self::Rest);
+    fn take_switch(self) -> (Sw, Self::Rest);
 }
 
-// of <Ev>
-pub trait TakeTime {
-    type Time;
+pub trait TakeTime<Ti> {
     type Rest;
 
-    fn take_time(self) -> (Self::Time, Self::Rest);
+    fn take_time(self) -> (Ti, Self::Rest);
 }
 
-pub trait TakeRequest {
-    type Request;
+pub trait TakeRequest<Rq> {
     type Rest;
 
-    fn take_request(self) -> (Self::Request, Self::Rest);
+    fn take_request(self) -> (Rq, Self::Rest);
 }
+
+impl<Sw> TakeSwitch<Sw> for Sw {
+    type Rest = ();
+
+    fn take_switch(self) -> (Sw, Self::Rest) {
+        (self, ())
+    }
+}
+
+impl<Ti> TakeTime<Ti> for Ti {
+    type Rest = ();
+
+    fn take_time(self) -> (Ti, Self::Rest) {
+        (self, ())
+    }
+}
+
+impl<Eq> TakeRequest<Eq> for Eq {
+    type Rest = ();
+
+    fn take_request(self) -> (Eq, Self::Rest) {
+        (self, ())
+    }
+}
+
+/*
+pub trait TakeRequestTime<Ti> {
+    type Rest;
+
+    fn take_request_time(self) -> (Ti, Self::Rest);
+}
+*/
+
 /*
 use core::fmt::Debug;
 

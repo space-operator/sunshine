@@ -9,6 +9,10 @@ impl<St, Ev> Context<St, Ev> {
         Self { state, event }
     }
 
+    pub fn split(self) -> (St, Ev) {
+        (self.state, self.event)
+    }
+
     pub fn map_state<F, St2>(self, func: F) -> Context<St2, Ev>
     where
         F: FnOnce(St) -> St2,

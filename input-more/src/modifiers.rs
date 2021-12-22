@@ -12,7 +12,7 @@ impl<St, Ev> Context<St, Ev> {
     where
         St: TakeState<Modifiers<Sw>, Rest = Re>,
         Re: WithState<Modifiers<Sw>>,
-        Ev: TakeSwitch<Switch = Sw>,
+        Ev: TakeSwitch<Sw>,
         Sw: Clone + Hash + Ord,
     {
         let (state, rest) = self.state.take_state();
@@ -29,7 +29,7 @@ impl<St, Ev> Context<St, Ev> {
     where
         St: TakeState<Modifiers<Sw>, Rest = Re>,
         Re: WithState<Modifiers<Sw>>,
-        Ev: TakeSwitch<Switch = SwRef>,
+        Ev: TakeSwitch<SwRef>,
         Sw: Clone + Eq + Hash + Ord,
         SwRef: Borrow<Sw>,
     {
