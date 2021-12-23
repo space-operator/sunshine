@@ -16,6 +16,18 @@ pub trait TakeRequest<Rq> {
     fn take_request(self) -> (Rq, Self::Rest);
 }
 
+pub trait TakeCoords<Co> {
+    type Rest;
+
+    fn take_coords(self) -> (Co, Self::Rest);
+}
+
+pub trait TakeIsDraggedFn<Dr> {
+    type Rest;
+
+    fn take_is_dragged_fn(self) -> (Dr, Self::Rest);
+}
+
 impl<Sw> TakeSwitch<Sw> for Sw {
     type Rest = ();
 
