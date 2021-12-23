@@ -7,93 +7,93 @@ use input_core::{
     TimedReleaseEventData, TimedState,
 };
 
-use crate::{Context, TakeRequest, TakeState, TakeSwitch, WithState};
+use crate::{Context, Split, TakeState, WithState};
 
 impl<St, Ev> Context<St, Ev> {
-    pub fn with_timed_press_event<Re, Sw>(
+    pub fn with_timed_press_event<Re, Ki1, Ev2, Sw>(
         self,
-    ) -> Context<Re::Output, (Result<LongPressHandleRequest, TimedPressError>, Ev::Rest)>
+    ) -> Context<Re::Output, (Result<LongPressHandleRequest, TimedPressError>, Ev2)>
     where
         St: TakeState<TimedState<Sw>, Rest = Re>,
         Re: WithState<TimedState<Sw>>,
-        Ev: TakeSwitch<Sw>,
+        Ev: Split<Sw, Ev2, Ki1>,
         Sw: Hash + Ord,
     {
         let (state, rest) = self.state.take_state();
-        let (switch, event) = self.event.take_switch();
+        let (switch, event) = self.event.split();
         let (state, result) = state.with_press_event(switch);
         Context::new(rest.with_state(state), (result, event))
     }
 }
 
 impl<St, Ev> Context<St, Ev> {
-    pub fn with_timed_release_event<Re, Sw>(
+    pub fn with_timed_release_event<Re, Ki1, Ev2, Sw>(
         self,
     ) -> Context<
         Re::Output,
         (
             Result<Option<(TimedReleaseEventData, MultiClickHandleRequest)>, TimedReleaseError>,
-            Ev::Rest,
+            Ev2,
         ),
     >
     where
         St: TakeState<TimedState<Sw>, Rest = Re>,
         Re: WithState<TimedState<Sw>>,
-        Ev: TakeSwitch<Sw>,
+        Ev: Split<Sw, Ev2, Ki1>,
         Sw: Hash + Ord,
     {
         let (state, rest) = self.state.take_state();
-        let (switch, event) = self.event.take_switch();
+        let (switch, event) = self.event.split();
         let (state, result) = state.with_release_event(switch);
         Context::new(rest.with_state(state), (result, event))
     }
 }
 
 impl<St, Ev> Context<St, Ev> {
-    pub fn with_long_press_event<Re, Ev2, Sw>(
+    pub fn with_long_press_event<Re, Ki1, Ev2, Ki2, Ev3, Sw>(
         self,
     ) -> Context<
         Re::Output,
         (
             Option<Result<TimedLongPressEventData, TimedLongClickError>>,
-            Ev2::Rest,
+            Ev3,
         ),
     >
     where
         St: TakeState<TimedState<Sw>, Rest = Re>,
         Re: WithState<TimedState<Sw>>,
-        Ev: TakeSwitch<Sw, Rest = Ev2>,
-        Ev2: TakeRequest<LongPressHandleRequest>,
+        Ev: Split<Sw, Ev2, Ki1>,
+        Ev2: Split<LongPressHandleRequest, Ev3, Ki2>,
         Sw: Hash + Ord,
     {
         let (state, rest) = self.state.take_state();
-        let (switch, event) = self.event.take_switch();
-        let (request, event) = event.take_request();
+        let (switch, event) = self.event.split();
+        let (request, event) = event.split();
         let (state, result) = state.with_long_press_event(switch, request);
         Context::new(rest.with_state(state), (result, event))
     }
 }
 
 impl<St, Ev> Context<St, Ev> {
-    pub fn with_multi_click_event<Re, Ev2, Sw>(
+    pub fn with_multi_click_event<Re, Ki1, Ev2, Ki2, Ev3, Sw>(
         self,
     ) -> Context<
         Re::Output,
         (
             Option<Result<TimedMultiClickEventData, TimedMultiClickError>>,
-            Ev2::Rest,
+            Ev3,
         ),
     >
     where
         St: TakeState<TimedState<Sw>, Rest = Re>,
         Re: WithState<TimedState<Sw>>,
-        Ev: TakeSwitch<Sw, Rest = Ev2>,
-        Ev2: TakeRequest<MultiClickHandleRequest>,
+        Ev: Split<Sw, Ev2, Ki1>,
+        Ev2: Split<MultiClickHandleRequest, Ev3, Ki2>,
         Sw: Hash + Ord,
     {
         let (state, rest) = self.state.take_state();
-        let (switch, event) = self.event.take_switch();
-        let (request, event) = event.take_request();
+        let (switch, event) = self.event.split();
+        let (request, event) = event.split();
         let (state, result) = state.with_multi_click_event(switch, request);
         Context::new(rest.with_state(state), (result, event))
     }

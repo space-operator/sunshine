@@ -1,3 +1,4 @@
+//#[cfg(feature = "qwdsadfrgsfg")]
 #[test]
 fn test_chain() {
     use core::fmt::Debug;
@@ -7,6 +8,21 @@ fn test_chain() {
 
     type TimestampMs = u64;
     type Coords = (u64, u64);
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    pub struct TimeMarker;
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    pub struct SwitchMarker;
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    pub struct RequestMarker;
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    pub struct CoordsMarker;
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    pub struct IsDraggedFnMarker;
 
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     enum Switch {
@@ -83,51 +99,40 @@ fn test_chain() {
         }
     }
 
-    impl<Ti, Sw, Co, Da> TakeTime<Ti> for SwitchEvent<Ti, Sw, Co, Da>
+    impl AllowSplitFromItself<TimeMarker> for TimestampMs {}
+
+    impl<Ti, Sw, Co, Da> Split<Ti, SwitchEvent<Ti, Sw, Co, Da>, TimeMarker>
+        for SwitchEvent<Ti, Sw, Co, Da>
     where
         Ti: Clone,
     {
-        type Rest = Self;
-
-        fn take_time(self) -> (Ti, Self::Rest) {
+        fn split(self) -> (Ti, SwitchEvent<Ti, Sw, Co, Da>) {
             (self.time.clone(), self)
         }
     }
 
-    /*impl<Ti, Sw, Co, Da> TakeRequestTime<Ti> for SwitchEvent<Ti, Sw, Co, Da>
-    where
-        Ti: Clone,
+    impl<Ti, Co, Da> Split<Switch, SwitchEvent<Ti, KeyboardSwitch, Co, Da>, SwitchMarker>
+        for SwitchEvent<Ti, KeyboardSwitch, Co, Da>
     {
-        type Rest = Self;
-
-        fn take_time(self) -> (Ti, Self::Rest) {
-            (self.time.clone(), self)
-        }
-    }*/
-
-    impl<Ti, Sw, Co, Da> TakeSwitch<Sw> for SwitchEvent<Ti, Sw, Co, Da>
-    where
-        Sw: Clone,
-    {
-        type Rest = Self;
-
-        fn take_switch(self) -> (Sw, Self::Rest) {
-            (self.switch.clone(), self)
-        }
-    }
-
-    impl<Ti, Co, Da> TakeSwitch<Switch> for SwitchEvent<Ti, KeyboardSwitch, Co, Da> {
-        type Rest = Self;
-
-        fn take_switch(self) -> (Switch, Self::Rest) {
+        fn split(self) -> (Switch, SwitchEvent<Ti, KeyboardSwitch, Co, Da>) {
             (Switch::Keyboard(self.switch.clone()), self)
         }
     }
 
-    impl<Ti, Sw, Co, Rq> TakeRequest<Rq> for SwitchEvent<Ti, Sw, Co, Rq> {
-        type Rest = SwitchEvent<Ti, Sw, Co, ()>;
+    impl<Ti, Sw, Co, Da> Split<Sw, SwitchEvent<Ti, Sw, Co, Da>, SwitchMarker>
+        for SwitchEvent<Ti, Sw, Co, Da>
+    where
+        Sw: Clone,
+    {
+        fn split(self) -> (Sw, SwitchEvent<Ti, Sw, Co, Da>) {
+            (self.switch.clone(), self)
+        }
+    }
 
-        fn take_request(self) -> (Rq, Self::Rest) {
+    impl<Ti, Sw, Co, Rq> Split<Rq, SwitchEvent<Ti, Sw, Co, ()>, RequestMarker>
+        for SwitchEvent<Ti, Sw, Co, Rq>
+    {
+        fn split(self) -> (Rq, SwitchEvent<Ti, Sw, Co, ()>) {
             (
                 self.data,
                 SwitchEvent::new(self.time, self.switch, self.coords),
@@ -135,10 +140,10 @@ fn test_chain() {
         }
     }
 
-    impl<Ti, Sw, Co, Rq, Da> TakeRequest<Rq> for SwitchEvent<Ti, Sw, Co, (Rq, Da)> {
-        type Rest = SwitchEvent<Ti, Sw, Co, Da>;
-
-        fn take_request(self) -> (Rq, Self::Rest) {
+    impl<Ti, Sw, Co, Da, Rq> Split<Rq, SwitchEvent<Ti, Sw, Co, Da>, RequestMarker>
+        for SwitchEvent<Ti, Sw, Co, (Rq, Da)>
+    {
+        fn split(self) -> (Rq, SwitchEvent<Ti, Sw, Co, Da>) {
             (
                 self.data.0,
                 SwitchEvent::new(self.time, self.switch, self.coords).with_data(self.data.1),

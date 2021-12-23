@@ -2,6 +2,50 @@
 
 
 
+    mod magic {
+        pub struct Marker1;
+        pub struct Marker2;
+        pub struct Marker3;
+
+        pub trait Split2<T1, T2> {
+            fn split(self) -> (T1, T2);
+        }
+
+        pub trait Split<T1, T2, T3> {
+            fn split(self) -> (T1, T2);
+        }
+
+        impl<T, T1, T2, T3> Split2<T1, T2> for T
+        where
+            T: Split<T1, T2, T3>,
+        {
+            fn split(self) -> (T1, T2) {
+                Split::split(self)
+            }
+        }
+
+        pub struct Container<T1, T2, T3>(T1, T2, T3);
+
+        impl<T1, T2, T3> Split<T1, (T2, T3), Marker1> for Container<T1, T2, T3> {
+            fn split(self) -> (T1, (T2, T3)) {
+                (self.0, (self.1, self.2))
+            }
+        }
+
+        impl<T1, T2, T3> Split<T2, (T1, T3), Marker2> for Container<T1, T2, T3> {
+            fn split(self) -> (T2, (T1, T3)) {
+                (self.1, (self.0, self.2))
+            }
+        }
+
+        fn test() {
+            let c = Container(1, 1.0, true);
+            let s: (i32, (f64, bool)) = c.split();
+
+            let c = Container(1, 1.0, true);
+            let s: (f64, (i32, bool)) = c.split();
+        }
+    }
 
 
 

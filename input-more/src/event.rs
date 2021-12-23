@@ -1,3 +1,111 @@
+pub trait Split<T1, T2, T3> {
+    fn split(self) -> (T1, T2);
+}
+
+pub trait AllowSplitFromItself<T> {}
+
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+struct Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+    time: Ti,
+    switch: Sw,
+    request: Rq,
+    coords: Co,
+    is_dragged_fn: Dr,
+    modifiers: Mo,
+    timed_data: Td,
+    pointer: Po,
+    data: Da,
+}
+
+impl<T1, T3> Split<T1, (), T3> for T1
+where
+    T1: AllowSplitFromItself<T3>,
+{
+    fn split(self) -> (T1, ()) {
+        (self, ())
+    }
+}
+
+impl Event<(), (), (), (), (), (), (), (), ()> {
+    pub fn new() -> Self {
+        Self {
+            time: (),
+            switch: (),
+            request: (),
+            coords: (),
+            is_dragged_fn: (),
+            modifiers: (),
+            timed_data: (),
+            pointer: (),
+            data: (),
+        }
+    }
+}
+
+macro_rules! impl_with {
+    ( $name:ident, ( $($before:ident),* ), ( $($after:ident),* ) ) => {
+        impl<$($before ,)* $($after),*> Event<$($before ,)* () $(, $after)*> {
+            pub fn $name<T>(self, value: T) -> Event<$($before ,)* T $(, $after)*> {
+                todo!();
+            }
+        }
+    }
+}
+
+/*
+macro_rules! impl_with {
+    ($sw_flag) => {
+        impl <
+            generic_or_nothing!($sw_flag, Sw)
+            generic_or_nothing!($sw_flag, Sw)
+            generic_or_nothing!($sw_flag, Sw)
+            generic_or_nothing!($sw_flag, Sw)
+            generic_or_nothing!($sw_flag, Sw)
+            generic_or_nothing!($sw_flag, Sw)
+            generic_or_nothing!($sw_flag, Sw)
+            generic_or_nothing!($sw_flag, Sw)
+            generic_or_nothing!($sw_flag, Sw)
+        >
+    }
+}
+
+macro_rules! generic_or_nothing {
+    (1, value) => value,
+    (0, value) => (),
+}
+*/
+
+//impl_with!(with_time, (1 0 0 0 0 0 0 0 0));
+//impl_with!(with_switch, (0 1 0 0 0 0 0 0 0));
+
+impl_with!(with_time, (), (Sw, Rq, Co, Dr, Mo, Td, Po, Da));
+impl_with!(with_switch, (Ti), (Rq, Co, Dr, Mo, Td, Po, Da));
+impl_with!(with_request, (Ti, Sw), (Co, Dr, Mo, Td, Po, Da));
+
+/*
+impl<Sw, Rq, Co, Dr, Mo, Td, Po, Da> Event<(), Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+    pub fn with_time<Ti>(self, time: Ti) -> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+        Event {
+            time,
+            switch: self.switch,
+            request: self.request,
+            coords: self.coords,
+            is_dragged_fn: self.is_dragged_fn,
+            modifiers: self.modifiers,
+            timed_data: self.timed_data,
+            pointer: self.pointer,
+            data: self.data,
+        }
+    }
+}*/
+
+/*
+pub trait Take<T> {
+    type Rest;
+
+    fn take(self) -> (T, Self::Rest);
+}
+
 pub trait TakeSwitch<Sw> {
     type Rest;
 
@@ -50,7 +158,7 @@ impl<Eq> TakeRequest<Eq> for Eq {
     fn take_request(self) -> (Eq, Self::Rest) {
         (self, ())
     }
-}
+}*/
 
 /*
 pub trait TakeRequestTime<Ti> {

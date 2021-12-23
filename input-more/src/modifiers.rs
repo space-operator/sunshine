@@ -3,38 +3,38 @@ use core::hash::Hash;
 
 use input_core::{Modifiers, ModifiersPressError, ModifiersReleaseError};
 
-use crate::{Context, TakeState, TakeSwitch, WithState};
+use crate::{Context, Split, TakeState, WithState};
 
 impl<St, Ev> Context<St, Ev> {
-    pub fn with_modifiers_press_event<Re, Sw>(
+    pub fn with_modifiers_press_event<Re, Ki1, Ev2, Sw>(
         self,
-    ) -> Context<Re::Output, (Result<(), ModifiersPressError>, Ev::Rest)>
+    ) -> Context<Re::Output, (Result<(), ModifiersPressError>, Ev2)>
     where
         St: TakeState<Modifiers<Sw>, Rest = Re>,
         Re: WithState<Modifiers<Sw>>,
-        Ev: TakeSwitch<Sw>,
+        Ev: Split<Sw, Ev2, Ki1>,
         Sw: Clone + Hash + Ord,
     {
         let (state, rest) = self.state.take_state();
-        let (switch, event) = self.event.take_switch();
+        let (switch, event) = self.event.split();
         let (state, result) = state.with_press_event(switch);
         Context::new(rest.with_state(state), (result, event))
     }
 }
 
 impl<St, Ev> Context<St, Ev> {
-    pub fn with_modifiers_release_event<Re, Sw, SwRef>(
+    pub fn with_modifiers_release_event<Re, Ki1, Ev2, Sw, SwRef>(
         self,
-    ) -> Context<Re::Output, ((SwRef, Result<(), ModifiersReleaseError>), Ev::Rest)>
+    ) -> Context<Re::Output, ((SwRef, Result<(), ModifiersReleaseError>), Ev2)>
     where
         St: TakeState<Modifiers<Sw>, Rest = Re>,
         Re: WithState<Modifiers<Sw>>,
-        Ev: TakeSwitch<SwRef>,
+        Ev: Split<SwRef, Ev2, Ki1>,
         Sw: Clone + Eq + Hash + Ord,
         SwRef: Borrow<Sw>,
     {
         let (state, rest) = self.state.take_state();
-        let (switch, event) = self.event.take_switch();
+        let (switch, event) = self.event.split();
         let (state, result) = state.with_release_event(switch);
         Context::new(rest.with_state(state), (result, event))
     }
