@@ -10,21 +10,6 @@ fn test_chain() {
     type Coords = (u64, u64);
 
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    pub struct TimeMarker;
-
-    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    pub struct SwitchMarker;
-
-    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    pub struct RequestMarker;
-
-    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    pub struct CoordsMarker;
-
-    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    pub struct IsDraggedFnMarker;
-
-    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     enum Switch {
         Keyboard(KeyboardSwitch),
         Mouse(MouseSwitch),
@@ -38,41 +23,44 @@ fn test_chain() {
 
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
     enum RawEvent {
-        KeyboardDown(SwitchEvent<KeyboardSwitch, TimestampMs, (), ()>),
-        KeyboardUp(SwitchEvent<KeyboardSwitch, TimestampMs, (), ()>),
-        MouseDown(SwitchEvent<MouseSwitch, TimestampMs, Coords, ()>),
-        MouseUp(SwitchEvent<MouseSwitch, TimestampMs, Coords, ()>),
+        KeyboardDown(KeyboardSwitchEvent),
+        KeyboardUp(KeyboardSwitchEvent),
+        MouseDown(MouseSwitchEvent),
+        MouseUp(MouseSwitchEvent),
         //MouseMove(Coords, TimestampMs),
     }
 
+    pub type KeyboardSwitchEvent = SwitchEvent<TimestampMs, KeyboardSwitch, (), ()>;
+    pub type MouseSwitchEvent = SwitchEvent<TimestampMs, MouseSwitch, Coords, ()>;
+
     #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-    struct SwitchEvent<Ti, Sw, Co, Da> {
+    struct SwitchEvent<Ti, Sw, Co, Mo> {
         time: Ti,
         switch: Sw,
         coords: Co,
-        data: Da,
+        modifiers: Mo,
     }
-
     impl<Ti, Sw, Co> SwitchEvent<Ti, Sw, Co, ()> {
         fn new(time: Ti, switch: Sw, coords: Co) -> Self {
             SwitchEvent {
                 time: time,
                 switch: switch,
                 coords: coords,
-                data: (),
+                modifiers: (),
             }
         }
 
-        fn with_data<Da>(self, data: Da) -> SwitchEvent<Ti, Sw, Co, Da> {
+        fn with_modifiers<Mo>(self, modifiers: Mo) -> SwitchEvent<Ti, Sw, Co, Mo> {
             SwitchEvent {
                 time: self.time,
                 switch: self.switch,
                 coords: self.coords,
-                data,
+                modifiers,
             }
         }
     }
 
+    /*
     impl<Ti, Sw, Co, Da> SwitchEvent<Ti, Sw, Co, Da> {
         fn take_data(self) -> (Da, SwitchEvent<Ti, Sw, Co, ()>) {
             (
@@ -98,7 +86,6 @@ fn test_chain() {
             }
         }
     }
-
     impl AllowSplitFromItself<TimeMarker> for TimestampMs {}
 
     impl<Ti, Sw, Co, Da> Split<Ti, SwitchEvent<Ti, Sw, Co, Da>, TimeMarker>
@@ -149,9 +136,29 @@ fn test_chain() {
                 SwitchEvent::new(self.time, self.switch, self.coords).with_data(self.data.1),
             )
         }
-    }
+    }*/
 
-    let state: State<
+    let modifiers: Modifiers<Switch> = Modifiers::new();
+    let timed_state: TimedState<KeyboardSwitch> = TimedState::new();
+    let scheduler: SchedulerState<TimestampMs, KeyboardSwitchEvent, LongPressHandleRequest> =
+        SchedulerState::new();
+
+    let event = SwitchEvent::new(1000, KeyboardSwitch("LeftCtrl"), ());
+
+    let (modifiers, result) = modifiers.with_press_event(Switch::Keyboard(event.switch));
+    result.unwrap();
+    event.with_modifiers(modifiers.clone());
+    let (timed_state, result) = timed_state.with_press_event(event.switch);
+    let request = result.unwrap();
+    let scheduler = scheduler.schedule(event.time, event, request);
+
+    println!("{:?}", modifiers);
+    println!("{:?}", timed_state);
+    println!("{:?}", scheduler);
+    println!("{:?}", event);
+    panic!();
+
+    /*let state: State<
         Modifiers<Switch>,
         TimedState<KeyboardSwitch>,
         SchedulerState<TimestampMs, KeyboardSwitch, LongPressHandleRequest>,
@@ -202,5 +209,5 @@ fn test_chain() {
 
     println!("{:?}", state);
 
-    panic!();
+    panic!();*/
 }

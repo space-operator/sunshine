@@ -142,7 +142,7 @@ impl<Sw> TimedState<Sw> {
         switch: Sw,
         callback: impl FnOnce(SwitchState) -> (Option<SwitchState>, Result<T, E>),
         err: E,
-    ) -> (Self, Option<Result<T, E>>)
+    ) -> (Self, Result<Option<T>, E>)
     where
         Sw: Eq + Hash,
     {
@@ -157,9 +157,9 @@ impl<Sw> TimedState<Sw> {
                 if let Some(state) = state {
                     let _ = switches.insert(switch, state);
                 }
-                (Self::from(switches), Some(result))
+                (Self::from(switches), result.map(Some))
             }
-            Entry::Vacant(_) => (Self::from(switches), Some(Err(err))),
+            Entry::Vacant(_) => (Self::from(switches), Err(err)),
         }
     }
 
@@ -169,7 +169,7 @@ impl<Sw> TimedState<Sw> {
         request: LongPressHandleRequest,
     ) -> (
         Self,
-        Option<Result<TimedLongPressEventData, TimedLongClickError>>,
+        Result<Option<TimedLongPressEventData>, TimedLongClickError>,
     )
     where
         Sw: Eq + Hash,
@@ -181,7 +181,7 @@ impl<Sw> TimedState<Sw> {
                 TimedLongClickError::Default,
             )
         } else {
-            (self, None)
+            (self, Ok(None))
         }
     }
 
@@ -191,7 +191,7 @@ impl<Sw> TimedState<Sw> {
         request: MultiClickHandleRequest,
     ) -> (
         Self,
-        Option<Result<TimedMultiClickEventData, TimedMultiClickError>>,
+        Result<Option<TimedMultiClickEventData>, TimedMultiClickError>,
     )
     where
         Sw: Eq + Hash,
@@ -203,7 +203,7 @@ impl<Sw> TimedState<Sw> {
                 TimedMultiClickError::Default,
             )
         } else {
-            (self, None)
+            (self, Ok(None))
         }
     }
 

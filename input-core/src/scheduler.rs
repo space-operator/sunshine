@@ -20,6 +20,10 @@ impl<Ti, Da, Rq> SchedulerState<Ti, Da, Rq> {
         self.requests
     }
 
+    pub fn next_scheduled(&self) -> Option<&Ti> {
+        self.requests.keys().next()
+    }
+
     pub fn schedule(self, time: Ti, data: Da, request: Rq) -> Self
     where
         Ti: Ord,

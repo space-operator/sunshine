@@ -1,10 +1,34 @@
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct TimeMarker;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct SwitchMarker;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct RequestMarker;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct CoordsMarker;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct IsDraggedFnMarker;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct ModifiersMarker;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct TimedDataMarker;
+
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+pub struct PointerMarker;
+
 pub trait Split<T1, T2, T3> {
     fn split(self) -> (T1, T2);
 }
 
 pub trait AllowSplitFromItself<T> {}
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Default, Eq, Hash, PartialEq)]
 struct Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
     time: Ti,
     switch: Sw,
@@ -26,8 +50,34 @@ where
     }
 }
 
+impl<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+    pub fn new(
+        time: Ti,
+        switch: Sw,
+        request: Rq,
+        coords: Co,
+        is_dragged_fn: Dr,
+        modifiers: Mo,
+        timed_data: Td,
+        pointer: Po,
+        data: Da,
+    ) -> Self {
+        Self {
+            time,
+            switch,
+            request,
+            coords,
+            is_dragged_fn,
+            modifiers,
+            timed_data,
+            pointer,
+            data,
+        }
+    }
+}
+
 impl Event<(), (), (), (), (), (), (), (), ()> {
-    pub fn new() -> Self {
+    pub fn empty() -> Self {
         Self {
             time: (),
             switch: (),
@@ -42,7 +92,352 @@ impl Event<(), (), (), (), (), (), (), (), ()> {
     }
 }
 
+/*
+impl<Sw, Rq, Co, Dr, Mo, Td, Po, Da> Event<(), Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+    pub fn with_time<Ti>(self, time: Ti) -> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+        Event {
+            time,
+            switch: self.switch,
+            request: self.request,
+            coords: self.coords,
+            is_dragged_fn: self.is_dragged_fn,
+            modifiers: self.modifiers,
+            timed_data: self.timed_data,
+            pointer: self.pointer,
+            data: self.data,
+        }
+    }
+}
+
+impl<Ti, Rq, Co, Dr, Mo, Td, Po, Da> Event<Ti, (), Rq, Co, Dr, Mo, Td, Po, Da> {
+    pub fn with_switch<Sw>(self, switch: Sw) -> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+        Event {
+            time: self.time,
+            switch,
+            request: self.request,
+            coords: self.coords,
+            is_dragged_fn: self.is_dragged_fn,
+            modifiers: self.modifiers,
+            timed_data: self.timed_data,
+            pointer: self.pointer,
+            data: self.data,
+        }
+    }
+}
+
+impl<Ti, Sw, Co, Dr, Mo, Td, Po, Da> Event<Ti, Sw, (), Co, Dr, Mo, Td, Po, Da> {
+    pub fn with_request<Rq>(self, request: Rq) -> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+        Event {
+            time: self.time,
+            switch: self.switch,
+            request,
+            coords: self.coords,
+            is_dragged_fn: self.is_dragged_fn,
+            modifiers: self.modifiers,
+            timed_data: self.timed_data,
+            pointer: self.pointer,
+            data: self.data,
+        }
+    }
+}
+
+impl<Ti, Sw, Rq, Dr, Mo, Td, Po, Da> Event<Ti, Sw, Rq, (), Dr, Mo, Td, Po, Da> {
+    pub fn with_coords<Co>(self, coords: Co) -> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+        Event {
+            time: self.time,
+            switch: self.switch,
+            request: self.request,
+            coords,
+            is_dragged_fn: self.is_dragged_fn,
+            modifiers: self.modifiers,
+            timed_data: self.timed_data,
+            pointer: self.pointer,
+            data: self.data,
+        }
+    }
+}
+
+impl<Ti, Sw, Rq, Co, Mo, Td, Po, Da> Event<Ti, Sw, Rq, Co, (), Mo, Td, Po, Da> {
+    pub fn with_is_dragged_fn<Dr>(
+        self,
+        is_dragged_fn: Dr,
+    ) -> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+        Event {
+            time: self.time,
+            switch: self.switch,
+            request: self.request,
+            coords: self.coords,
+            is_dragged_fn,
+            modifiers: self.modifiers,
+            timed_data: self.timed_data,
+            pointer: self.pointer,
+            data: self.data,
+        }
+    }
+}
+
+impl<Ti, Sw, Rq, Co, Dr, Td, Po, Da> Event<Ti, Sw, Rq, Co, Dr, (), Td, Po, Da> {
+    pub fn with_modifiers<Mo>(self, modifiers: Mo) -> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+        Event {
+            time: self.time,
+            switch: self.switch,
+            request: self.request,
+            coords: self.coords,
+            is_dragged_fn: self.is_dragged_fn,
+            modifiers,
+            timed_data: self.timed_data,
+            pointer: self.pointer,
+            data: self.data,
+        }
+    }
+}
+
+impl<Ti, Sw, Rq, Co, Dr, Mo, Po, Da> Event<Ti, Sw, Rq, Co, Dr, Mo, (), Po, Da> {
+    pub fn with_timed_data<Td>(self, timed_data: Td) -> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+        Event {
+            time: self.time,
+            switch: self.switch,
+            request: self.request,
+            coords: self.coords,
+            is_dragged_fn: self.is_dragged_fn,
+            modifiers: self.modifiers,
+            timed_data,
+            pointer: self.pointer,
+            data: self.data,
+        }
+    }
+}
+
+impl<Ti, Sw, Rq, Co, Dr, Mo, Td, Da> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, (), Da> {
+    pub fn with_pointer<Po>(self, pointer: Po) -> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+        Event {
+            time: self.time,
+            switch: self.switch,
+            request: self.request,
+            coords: self.coords,
+            is_dragged_fn: self.is_dragged_fn,
+            modifiers: self.modifiers,
+            timed_data: self.timed_data,
+            pointer,
+            data: self.data,
+        }
+    }
+}
+
+impl<Ti, Sw, Rq, Co, Dr, Mo, Td, Po> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, ()> {
+    pub fn with_data<Da>(self, data: Da) -> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+        Event {
+            time: self.time,
+            switch: self.switch,
+            request: self.request,
+            coords: self.coords,
+            is_dragged_fn: self.is_dragged_fn,
+            modifiers: self.modifiers,
+            timed_data: self.timed_data,
+            pointer: self.pointer,
+            data,
+        }
+    }
+}
+
+impl<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>
+    Split<Ti, Event<(), Sw, Rq, Co, Dr, Mo, Td, Po, Da>, TimeMarker>
+    for Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>
+{
+    fn split(self) -> (Ti, Event<(), Sw, Rq, Co, Dr, Mo, Td, Po, Da>) {
+        (
+            self.time,
+            Event {
+                time: (),
+                switch: self.switch,
+                request: self.request,
+                coords: self.coords,
+                is_dragged_fn: self.is_dragged_fn,
+                modifiers: self.modifiers,
+                timed_data: self.timed_data,
+                pointer: self.pointer,
+                data: self.data,
+            },
+        )
+    }
+}
+
+impl<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>
+    Split<Ti, Event<Ti, (), Rq, Co, Dr, Mo, Td, Po, Da>, SwitchMarker>
+    for Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>
+{
+    fn split(self) -> (Sw, Event<Ti, (), Rq, Co, Dr, Mo, Td, Po, Da>) {
+        (
+            self.switch,
+            Event {
+                time: self.time,
+                switch: (),
+                request: self.request,
+                coords: self.coords,
+                is_dragged_fn: self.is_dragged_fn,
+                modifiers: self.modifiers,
+                timed_data: self.timed_data,
+                pointer: self.pointer,
+                data: self.data,
+            },
+        )
+    }
+}
+
+impl<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>
+    Split<Ti, Event<Ti, Sw, (), Co, Dr, Mo, Td, Po, Da>, RequestMarker>
+    for Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>
+{
+    fn split(self) -> (Rq, Event<Ti, Sw, (), Co, Dr, Mo, Td, Po, Da>) {
+        (
+            self.request,
+            Event {
+                time: self.time,
+                switch: self.switch,
+                request: (),
+                coords: self.coords,
+                is_dragged_fn: self.is_dragged_fn,
+                modifiers: self.modifiers,
+                timed_data: self.timed_data,
+                pointer: self.pointer,
+                data: self.data,
+            },
+        )
+    }
+}
+
+impl<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>
+    Split<Ti, Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>, CoordsMarker>
+    for Event<Ti, Sw, Rq, (), Dr, Mo, Td, Po, Da>
+{
+    fn split(self) -> (Co, Event<Ti, Sw, Rq, (), Dr, Mo, Td, Po, Da>) {
+        (
+            self.coords,
+            Event {
+                time: self.time,
+                switch: self.switch,
+                request: self.request,
+                coords: (),
+                is_dragged_fn: self.is_dragged_fn,
+                modifiers: self.modifiers,
+                timed_data: self.timed_data,
+                pointer: self.pointer,
+                data: self.data,
+            },
+        )
+    }
+}
+
+impl<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>
+    Split<Ti, Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>, IsDraggedFnMarker>
+    for Event<Ti, Sw, Rq, Co, (), Mo, Td, Po, Da>
+{
+    fn split(self) -> (Dr, Event<Ti, Sw, Rq, Co, (), Mo, Td, Po, Da>) {
+        (
+            self.is_dragged_fn,
+            Event {
+                time: self.time,
+                switch: self.switch,
+                request: self.request,
+                coords: self.coords,
+                is_dragged_fn: (),
+                modifiers: self.modifiers,
+                timed_data: self.timed_data,
+                pointer: self.pointer,
+                data: self.data,
+            },
+        )
+    }
+}
+
+impl<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>
+    Split<Ti, Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>, ModifiersMarker>
+    for Event<Ti, Sw, Rq, Co, Dr, (), Td, Po, Da>
+{
+    fn split(self) -> (Mo, Event<Ti, Sw, Rq, Co, Dr, (), Td, Po, Da>) {
+        (
+            self.modifiers,
+            Event {
+                time: self.time,
+                switch: self.switch,
+                request: self.request,
+                coords: self.coords,
+                is_dragged_fn: self.is_dragged_fn,
+                modifiers: (),
+                timed_data: self.timed_data,
+                pointer: self.pointer,
+                data: self.data,
+            },
+        )
+    }
+}
+
+impl<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>
+    Split<Ti, Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>, TimedDataMarker>
+    for Event<Ti, Sw, Rq, Co, Dr, Mo, (), Po, Da>
+{
+    fn split(self) -> (Td, Event<Ti, Sw, Rq, Co, Dr, Mo, (), Po, Da>) {
+        (
+            self.timed_data,
+            Event {
+                time: self.time,
+                switch: self.switch,
+                request: self.request,
+                coords: self.coords,
+                is_dragged_fn: self.is_dragged_fn,
+                modifiers: self.modifiers,
+                timed_data: (),
+                pointer: self.pointer,
+                data: self.data,
+            },
+        )
+    }
+}
+
+impl<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>
+    Split<Ti, Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da>, PointerMarker>
+    for Event<Ti, Sw, Rq, Co, Dr, Mo, Td, (), Da>
+{
+    fn split(self) -> (Po, Event<Ti, Sw, Rq, Co, Dr, Mo, Td, (), Da>) {
+        (
+            self.pointer,
+            Event {
+                time: self.time,
+                switch: self.switch,
+                request: self.request,
+                coords: self.coords,
+                is_dragged_fn: self.is_dragged_fn,
+                modifiers: self.modifiers,
+                timed_data: self.timed_data,
+                pointer: (),
+                data: self.data,
+            },
+        )
+    }
+}
+*/
+
+/*
 macro_rules! impl_with {
+    ( $name:ident $ti:tt $sw:tt $rq:tt $co:tt $dr:tt $mo:tt $td:tt $po:tt $da:tt) => {
+        pub trait<
+            impl_with!( @impl arg Ti $ti )
+        > {}
+    };
+    ( @impl arg $arg:ident 0 ) => {
+
+    };
+    ( @impl arg $arg:ident 1 ) => {
+
+    }
+}
+
+// Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da
+
+impl_with!(with_time   1 0 0 0 0 0 0 0 0);
+impl_with!(with_switch 0 1 0 0 0 0 0 0 0);
+*/
+/*macro_rules! impl_with {
     ( $name:ident, ( $($before:ident),* ), ( $($after:ident),* ) ) => {
         impl<$($before ,)* $($after),*> Event<$($before ,)* () $(, $after)*> {
             pub fn $name<T>(self, value: T) -> Event<$($before ,)* T $(, $after)*> {
@@ -50,7 +445,7 @@ macro_rules! impl_with {
             }
         }
     }
-}
+}*/
 
 /*
 macro_rules! impl_with {
@@ -77,13 +472,13 @@ macro_rules! generic_or_nothing {
 
 //impl_with!(with_time, (1 0 0 0 0 0 0 0 0));
 //impl_with!(with_switch, (0 1 0 0 0 0 0 0 0));
-
+/*
 impl_with!(with_time, (), (Sw, Rq, Co, Dr, Mo, Td, Po, Da));
 impl_with!(with_switch, (Ti), (Rq, Co, Dr, Mo, Td, Po, Da));
 impl_with!(with_request, (Ti, Sw), (Co, Dr, Mo, Td, Po, Da));
-
+*/
 /*
-impl<Sw, Rq, Co, Dr, Mo, Td, Po, Da> Event<(), Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
+impl<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
     pub fn with_time<Ti>(self, time: Ti) -> Event<Ti, Sw, Rq, Co, Dr, Mo, Td, Po, Da> {
         Event {
             time,

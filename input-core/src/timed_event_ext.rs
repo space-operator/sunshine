@@ -135,7 +135,7 @@ pub trait TimedStateExt<Sw>: Sized {
         request: TimedHandleRequest,
     ) -> (
         Self,
-        Option<Result<TimedDelayedEventData, TimedDelayedError>>,
+        Result<Option<TimedDelayedEventData>, TimedDelayedError>,
     )
     where
         Sw: Eq + Hash;
@@ -148,7 +148,7 @@ impl<Sw> TimedStateExt<Sw> for TimedState<Sw> {
         request: TimedHandleRequest,
     ) -> (
         Self,
-        Option<Result<TimedDelayedEventData, TimedDelayedError>>,
+        Result<Option<TimedDelayedEventData>, TimedDelayedError>,
     )
     where
         Sw: Eq + Hash,
@@ -169,11 +169,11 @@ trait IntoDelayed<Sw> {
         self,
     ) -> (
         TimedState<Sw>,
-        Option<Result<TimedDelayedEventData, TimedDelayedError>>,
+        Result<Option<TimedDelayedEventData>, TimedDelayedError>,
     );
 }
 
-impl<Sw, T, E> IntoDelayed<Sw> for (TimedState<Sw>, Option<Result<T, E>>)
+impl<Sw, T, E> IntoDelayed<Sw> for (TimedState<Sw>, Result<Option<T>, E>)
 where
     Sw: Eq + Hash,
     TimedDelayedEventData: From<T>,
@@ -183,12 +183,12 @@ where
         self,
     ) -> (
         TimedState<Sw>,
-        Option<Result<TimedDelayedEventData, TimedDelayedError>>,
+        Result<Option<TimedDelayedEventData>, TimedDelayedError>,
     ) {
         (
             self.0,
             self.1
-                .map(|result| result.map_or_else(|err| Err(err.into()), |ok| Ok(ok.into()))),
+                .map_or_else(|err| Err(err.into()), |ok| Ok(ok.map(Into::into))),
         )
     }
 }
