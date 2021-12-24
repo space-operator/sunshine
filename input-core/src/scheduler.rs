@@ -1,7 +1,7 @@
 use core::borrow::Borrow;
 use std::collections::BTreeMap;
 
-use crate::{LongPressHandleRequest, MultiClickHandleRequest};
+use crate::{ClickExactHandleRequest, LongPressHandleRequest};
 
 #[derive(Clone, Debug)]
 pub struct SchedulerState<Ti, Da, Rq> {
@@ -9,7 +9,7 @@ pub struct SchedulerState<Ti, Da, Rq> {
 }
 
 pub type LongPressSchedulerState<Ti, Da> = SchedulerState<Ti, Da, LongPressHandleRequest>;
-pub type MultiClickSchedulerState<Ti, Da> = SchedulerState<Ti, Da, MultiClickHandleRequest>;
+pub type ClickExactSchedulerState<Ti, Da> = SchedulerState<Ti, Da, ClickExactHandleRequest>;
 
 impl<Ti, Da, Rq> SchedulerState<Ti, Da, Rq> {
     pub fn new() -> Self {

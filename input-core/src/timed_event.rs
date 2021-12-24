@@ -14,7 +14,7 @@ pub struct TimedEventData<Ki> {
 
 pub type TimedReleaseEventData = TimedEventData<TimedReleaseEventKind>;
 pub type TimedLongPressEventData = TimedEventData<TimedLongPressEventKind>;
-pub type TimedMultiClickEventData = TimedEventData<TimedMultiClickEventKind>;
+pub type TimedClickExactEventData = TimedEventData<TimedClickExactEventKind>;
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum TimedReleaseEventKind {
@@ -28,7 +28,7 @@ pub enum TimedLongPressEventKind {
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum TimedMultiClickEventKind {
+pub enum TimedClickExactEventKind {
     ClickExact,
     LongClickExact,
 }
@@ -56,7 +56,7 @@ enum SwitchStateKind {
 pub struct LongPressHandleRequest(Weak<()>);
 
 #[derive(Clone, Debug)]
-pub struct MultiClickHandleRequest(Weak<()>);
+pub struct ClickExactHandleRequest(Weak<()>);
 
 impl<Ki> TimedEventData<Ki> {
     #[must_use]
@@ -117,7 +117,7 @@ impl<Sw> TimedState<Sw> {
         switch: Sw,
     ) -> (
         Self,
-        Result<Option<(TimedReleaseEventData, MultiClickHandleRequest)>, TimedReleaseError>,
+        Result<Option<(TimedReleaseEventData, ClickExactHandleRequest)>, TimedReleaseError>,
     )
     where
         Sw: Eq + Hash,
@@ -185,13 +185,13 @@ impl<Sw> TimedState<Sw> {
         }
     }
 
-    pub fn with_multi_click_event(
+    pub fn with_click_exact_event(
         self,
         switch: Sw,
-        request: MultiClickHandleRequest,
+        request: ClickExactHandleRequest,
     ) -> (
         Self,
-        Result<Option<TimedMultiClickEventData>, TimedMultiClickError>,
+        Result<Option<TimedClickExactEventData>, TimedClickExactError>,
     )
     where
         Sw: Eq + Hash,
@@ -199,8 +199,8 @@ impl<Sw> TimedState<Sw> {
         if let Some(_) = request.0.upgrade() {
             self.with_timeout_event(
                 switch,
-                SwitchState::with_multi_click_event,
-                TimedMultiClickError::Default,
+                SwitchState::with_click_exact_event,
+                TimedClickExactError::Default,
             )
         } else {
             (self, Ok(None))
@@ -267,14 +267,14 @@ impl SwitchState {
         self,
     ) -> (
         Self,
-        Result<(TimedReleaseEventData, MultiClickHandleRequest), TimedReleaseError>,
+        Result<(TimedReleaseEventData, ClickExactHandleRequest), TimedReleaseError>,
     ) {
         use SwitchStateKind::{LongPressed, LongReleased, Pressed, Released};
 
         match self.kind {
             Pressed(_) => {
                 let tag = Arc::new(());
-                let request = MultiClickHandleRequest(Arc::downgrade(&tag));
+                let request = ClickExactHandleRequest(Arc::downgrade(&tag));
                 let state = Self::new(Released(tag), self.num_possible_clicks);
                 let event =
                     TimedEventData::new(TimedReleaseEventKind::Click, self.num_possible_clicks);
@@ -283,7 +283,7 @@ impl SwitchState {
 
             LongPressed => {
                 let tag = Arc::new(());
-                let request = MultiClickHandleRequest(Arc::downgrade(&tag));
+                let request = ClickExactHandleRequest(Arc::downgrade(&tag));
                 let state = Self::new(LongReleased(tag), self.num_possible_clicks);
                 let event =
                     TimedEventData::new(TimedReleaseEventKind::LongClick, self.num_possible_clicks);
@@ -318,27 +318,27 @@ impl SwitchState {
         }
     }
 
-    fn with_multi_click_event(
+    fn with_click_exact_event(
         self,
     ) -> (
         Option<Self>,
-        Result<TimedMultiClickEventData, TimedMultiClickError>,
+        Result<TimedClickExactEventData, TimedClickExactError>,
     ) {
         use SwitchStateKind::{LongPressed, LongReleased, Pressed, Released};
 
         match self.kind {
-            Pressed(_) => (Some(self), Err(TimedMultiClickError::Pressed)),
-            LongPressed => (Some(self), Err(TimedMultiClickError::LongPressed)),
+            Pressed(_) => (Some(self), Err(TimedClickExactError::Pressed)),
+            LongPressed => (Some(self), Err(TimedClickExactError::LongPressed)),
             Released(_) => {
-                let event = TimedMultiClickEventData::new(
-                    TimedMultiClickEventKind::ClickExact,
+                let event = TimedClickExactEventData::new(
+                    TimedClickExactEventKind::ClickExact,
                     self.num_possible_clicks,
                 );
                 (None, Ok(event))
             }
             LongReleased(_) => {
-                let event = TimedMultiClickEventData::new(
-                    TimedMultiClickEventKind::LongClickExact,
+                let event = TimedClickExactEventData::new(
+                    TimedClickExactEventKind::LongClickExact,
                     self.num_possible_clicks,
                 );
                 (None, Ok(event))
@@ -376,7 +376,7 @@ pub enum TimedLongClickError {
 }
 
 #[derive(Clone, Copy, Debug, Error)]
-pub enum TimedMultiClickError {
+pub enum TimedClickExactError {
     #[error("No handler calls requested for Default state")]
     Default,
     #[error("No handler calls requested for Pressed state")]

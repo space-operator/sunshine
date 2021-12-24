@@ -31,11 +31,11 @@ impl From<TimedLongPressEventKind> for TimedDelayedEventKind {
     }
 }
 
-impl From<TimedMultiClickEventKind> for TimedDelayedEventKind {
-    fn from(kind: TimedMultiClickEventKind) -> Self {
+impl From<TimedClickExactEventKind> for TimedDelayedEventKind {
+    fn from(kind: TimedClickExactEventKind) -> Self {
         match kind {
-            TimedMultiClickEventKind::ClickExact => Self::ClickExact,
-            TimedMultiClickEventKind::LongClickExact => Self::LongClickExact,
+            TimedClickExactEventKind::ClickExact => Self::ClickExact,
+            TimedClickExactEventKind::LongClickExact => Self::LongClickExact,
         }
     }
 }
@@ -57,11 +57,11 @@ impl From<TimedLongPressEventKind> for TimedCombinedEventKind {
     }
 }
 
-impl From<TimedMultiClickEventKind> for TimedCombinedEventKind {
-    fn from(kind: TimedMultiClickEventKind) -> Self {
+impl From<TimedClickExactEventKind> for TimedCombinedEventKind {
+    fn from(kind: TimedClickExactEventKind) -> Self {
         match kind {
-            TimedMultiClickEventKind::ClickExact => Self::ClickExact,
-            TimedMultiClickEventKind::LongClickExact => Self::LongClickExact,
+            TimedClickExactEventKind::ClickExact => Self::ClickExact,
+            TimedClickExactEventKind::LongClickExact => Self::LongClickExact,
         }
     }
 }
@@ -80,11 +80,11 @@ pub trait AllowFrom<T> {}
 
 impl AllowFrom<TimedReleaseEventKind> for TimedCombinedEventKind {}
 impl AllowFrom<TimedLongPressEventKind> for TimedCombinedEventKind {}
-impl AllowFrom<TimedMultiClickEventKind> for TimedCombinedEventKind {}
+impl AllowFrom<TimedClickExactEventKind> for TimedCombinedEventKind {}
 impl AllowFrom<TimedDelayedEventKind> for TimedCombinedEventKind {}
 
 impl AllowFrom<TimedLongPressEventKind> for TimedDelayedEventKind {}
-impl AllowFrom<TimedMultiClickEventKind> for TimedDelayedEventKind {}
+impl AllowFrom<TimedClickExactEventKind> for TimedDelayedEventKind {}
 
 impl<Ki1> From<TimedEventData<Ki1>> for TimedCombinedEventData
 where
@@ -113,7 +113,7 @@ where
 #[derive(Clone, Debug)]
 pub enum TimedHandleRequest {
     LongPress(LongPressHandleRequest),
-    MultiClick(MultiClickHandleRequest),
+    ClickExact(ClickExactHandleRequest),
 }
 
 impl From<LongPressHandleRequest> for TimedHandleRequest {
@@ -122,9 +122,9 @@ impl From<LongPressHandleRequest> for TimedHandleRequest {
     }
 }
 
-impl From<MultiClickHandleRequest> for TimedHandleRequest {
-    fn from(request: MultiClickHandleRequest) -> Self {
-        Self::MultiClick(request)
+impl From<ClickExactHandleRequest> for TimedHandleRequest {
+    fn from(request: ClickExactHandleRequest) -> Self {
+        Self::ClickExact(request)
     }
 }
 
@@ -157,8 +157,8 @@ impl<Sw> TimedStateExt<Sw> for TimedState<Sw> {
             TimedHandleRequest::LongPress(request) => {
                 IntoDelayed::into_delayed(self.with_long_press_event(switch, request))
             }
-            TimedHandleRequest::MultiClick(request) => {
-                IntoDelayed::into_delayed(self.with_multi_click_event(switch, request))
+            TimedHandleRequest::ClickExact(request) => {
+                IntoDelayed::into_delayed(self.with_click_exact_event(switch, request))
             }
         }
     }
@@ -198,7 +198,7 @@ pub enum TimedDelayedError {
     #[error(transparent)]
     LongClick(#[from] TimedLongClickError),
     #[error(transparent)]
-    MultiClick(#[from] TimedMultiClickError),
+    ClickExact(#[from] TimedClickExactError),
 }
 
 /*use crate::*;
