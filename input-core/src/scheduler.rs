@@ -1,4 +1,3 @@
-use core::borrow::Borrow;
 use std::collections::BTreeMap;
 
 use crate::{ClickExactHandleRequest, LongPressHandleRequest};
@@ -34,21 +33,17 @@ impl<Ti, Da, Rq> SchedulerState<Ti, Da, Rq> {
         Self::from(requests)
     }
 
-    pub fn take_scheduled<TiRef>(self, time: TiRef) -> (Self, (TiRef, Vec<(Ti, Vec<(Da, Rq)>)>))
+    pub fn take_scheduled<TiRef>(self, time: &Ti) -> (Self, Vec<(Ti, Vec<(Da, Rq)>)>)
     where
         Ti: Ord,
-        TiRef: Borrow<Ti>,
     {
         let mut scheduled = self.requests;
-        let mut requests = scheduled.split_off(time.borrow());
-        if let Some((key, value)) = requests.remove_entry(time.borrow()) {
+        let mut requests = scheduled.split_off(time);
+        if let Some((key, value)) = requests.remove_entry(time) {
             let prev = scheduled.insert(key, value);
             assert!(prev.is_none());
         }
-        (
-            Self::from(requests),
-            (time, scheduled.into_iter().collect()),
-        )
+        (Self::from(requests), scheduled.into_iter().collect())
     }
 }
 

@@ -36,27 +36,20 @@ impl<Sw> Modifiers<Sw> {
         )
     }
 
-    pub fn with_release_event<SwRef>(
-        self,
-        switch: SwRef,
-    ) -> (Self, (SwRef, Result<(), ModifiersReleaseError>))
+    pub fn with_release_event(self, switch: &Sw) -> (Self, Result<(), ModifiersReleaseError>)
     where
         Sw: Clone + Eq + Hash + Ord,
-        SwRef: Borrow<Sw>,
     {
         let mut switches = self.switches;
         let switches_mut = Arc::make_mut(&mut switches);
         let is_removed = switches_mut.remove(switch.borrow());
         (
             Self::from(switches),
-            (
-                switch,
-                if is_removed {
-                    Ok(())
-                } else {
-                    Err(ModifiersReleaseError::AlreadyReleased)
-                },
-            ),
+            if is_removed {
+                Ok(())
+            } else {
+                Err(ModifiersReleaseError::AlreadyReleased)
+            },
         )
     }
 }
