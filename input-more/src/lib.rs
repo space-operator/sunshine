@@ -22,7 +22,6 @@
     variant_size_differences
 )]
 
-mod cons_ext;
 mod event;
 mod global_mapping;
 mod global_state;
@@ -33,7 +32,6 @@ mod struct_take_and_with_field;
 mod struct_take_field;
 mod struct_with_field;
 
-pub use cons_ext::*;
 pub use event::*;
 pub use global_mapping::*;
 pub use global_state::*;

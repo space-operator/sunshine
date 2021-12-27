@@ -33,7 +33,7 @@ impl<Ti, Da, Rq> SchedulerState<Ti, Da, Rq> {
         Self::from(requests)
     }
 
-    pub fn take_scheduled<TiRef>(self, time: &Ti) -> (Self, Vec<(Ti, Vec<(Da, Rq)>)>)
+    pub fn take_scheduled(self, time: &Ti) -> (Self, Vec<(Ti, Vec<(Da, Rq)>)>)
     where
         Ti: Ord,
     {

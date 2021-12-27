@@ -1,10 +1,10 @@
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct SwitchEvent<Ti, Sw, Co, Mo, Td> {
-    time: Ti,
-    switch: Sw,
-    coords: Co,
-    modifiers: Mo,
-    timed_data: Td,
+    pub time: Ti,
+    pub switch: Sw,
+    pub coords: Co,
+    pub modifiers: Mo,
+    pub timed_data: Td,
 }
 
 impl<Ti, Sw, Co> SwitchEvent<Ti, Sw, Co, (), ()> {

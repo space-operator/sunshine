@@ -51,7 +51,7 @@ macro_rules! define_struct_with_field {
         { $( $next_fields:ident: $next_types:ident + $next_markers:ident ),* }
     ) => {
         impl< $( $types ),* > $crate::StructWithField<$type, $marker> for
-            $name< $( $prev_types, )* () $(, $next_types)* >
+            $name< $( $prev_types, )* ::core::marker::PhantomData<$type> $(, $next_types)* >
         {
             type Output = $name< $( $types ),* >;
 

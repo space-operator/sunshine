@@ -1,4 +1,4 @@
-use crate::{define_markers, define_struct_from_into_cons_and_take_put};
+use crate::{define_markers, define_struct_take_and_with_field};
 
 #[derive(Clone, Debug, Default)]
 pub struct GlobalMapping<KePe, KeRe, KeLo, KeCl> {
@@ -15,13 +15,12 @@ define_markers!(
     KeyboardClickExactMappingMarker,
 );
 
-define_struct_from_into_cons_and_take_put!(
-    GlobalMapping,
+define_struct_take_and_with_field!(GlobalMapping {
     keyboard_press: KePe + KeyboardPressMappingMarker,
     keyboard_release: KeRe + KeyboardReleaseMappingMarker,
     keyboard_long_press: KeLo + KeyboardLongPressMappingMarker,
     keyboard_click_exact: KeCl + KeyboardClickExactMappingMarker,
-);
+});
 
 impl<KePe, KeRe, KeLo, KeCl> GlobalMapping<KePe, KeRe, KeLo, KeCl> {
     pub fn new(

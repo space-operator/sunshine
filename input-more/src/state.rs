@@ -1,4 +1,4 @@
-use crate::{define_markers, define_struct_from_into_cons_and_take_put};
+use crate::{define_markers, define_struct_take_and_with_field};
 
 #[derive(Clone, Debug, Default)]
 pub struct State<Mo, Ts, Sh> {
@@ -9,12 +9,11 @@ pub struct State<Mo, Ts, Sh> {
 
 define_markers!(ModifiersMarker, TimedStateMarker, SchedulerMarker);
 
-define_struct_from_into_cons_and_take_put!(
-    State,
+define_struct_take_and_with_field!(State {
     modifiers: Mo + ModifiersMarker,
     timed_state: Ts + TimedStateMarker,
     scheduler: Sh + SchedulerMarker,
-);
+});
 
 impl<Mo, Ts, Sh> State<Mo, Ts, Sh> {
     pub fn new(modifiers: Mo, timed_state: Ts, scheduler: Sh) -> Self {
@@ -28,17 +27,17 @@ impl<Mo, Ts, Sh> State<Mo, Ts, Sh> {
 
 #[test]
 fn test() {
-    use crate::{Put, Take};
+    use crate::{StructTakeField, StructWithField};
     let state = State::new(1, false, "123");
 
-    let (modifiers, rest): (i32, _) = state.take();
-    let state: State<_, _, _> = rest.put(modifiers + 10);
+    let (modifiers, rest): (i32, _) = state.take_field();
+    let state: State<_, _, _> = rest.with_field(modifiers + 10);
 
-    let (timed, rest): (bool, _) = state.take();
-    let state: State<_, _, _> = rest.put(!timed);
+    let (timed, rest): (bool, _) = state.take_field();
+    let state: State<_, _, _> = rest.with_field(!timed);
 
-    let (scheduler, rest): (&str, _) = state.take();
-    let state: State<_, _, _> = rest.put(&scheduler[1..3]);
+    let (scheduler, rest): (&str, _) = state.take_field();
+    let state: State<_, _, _> = rest.with_field(&scheduler[1..3]);
 
     assert_eq!(state.modifiers, 11);
     assert_eq!(state.timed_state, true);

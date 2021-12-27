@@ -22,6 +22,18 @@ pub struct MappingByModifiers<'a, Mo, Ti, Bi>(
 #[derive(Clone, Debug)]
 pub struct MappingByTimed<'a, Mo, Bi>(HashMap<&'a Modifiers<Mo>, &'a MappingDataByTimed<Bi>>);
 
+impl<Sw, Mo, Ti, Bi> Mapping<Sw, Mo, Ti, Bi> {
+    pub fn new(data: MappingData<Sw, Mo, Ti, Bi>) -> Self {
+        Self(data)
+    }
+}
+
+impl<Sw, Mo, Ti, Bi> Default for Mapping<Sw, Mo, Ti, Bi> {
+    fn default() -> Self {
+        Self(HashMap::default())
+    }
+}
+
 impl<Sw, Mo, Ti, Bi> From<MappingData<Sw, Mo, Ti, Bi>> for Mapping<Sw, Mo, Ti, Bi> {
     fn from(data: MappingData<Sw, Mo, Ti, Bi>) -> Self {
         Self(data)

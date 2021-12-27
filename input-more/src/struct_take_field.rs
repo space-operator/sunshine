@@ -6,10 +6,9 @@ pub trait StructTakeField<T, U> {
 
 #[macro_export]
 macro_rules! define_struct_take_field {
-    ( $name:ident {} ) => {};
-    ( $name:ident { $($fields:ident: $types:ident + $markers:ident ),* $(,)? } ) => {
+    ( $name:ident { $( $fields:ident: $types:ident + $markers:ident ),* $(,)? } ) => {
         $crate::define_struct_take_field!(
-            @impl impl_for_next
+            @impl next
             $name
             { $( $types ),* }
             {}
@@ -17,7 +16,7 @@ macro_rules! define_struct_take_field {
         );
     };
     (
-        @impl impl_for_next
+        @impl next
         $name:ident
         { $( $types:ident ),* }
         { $( $prev_fields:ident: $prev_types:ident + $prev_markers:ident ),* }
@@ -27,7 +26,7 @@ macro_rules! define_struct_take_field {
         }
     ) => {
         $crate::define_struct_take_field!(
-            @impl impl_for_field
+            @impl field
             $name
             { $( $types ),* }
             { $( $prev_fields: $prev_types + $prev_markers ),* }
@@ -36,14 +35,14 @@ macro_rules! define_struct_take_field {
         );
     };
     (
-        @impl impl_for_next
+        @impl next
         $name:ident
         { $( $types:ident ),* }
         { $( $prev_fields:ident: $prev_types:ident + $prev_markers:ident ),* }
         {}
     ) => {};
     (
-        @impl impl_for_field
+        @impl field
         $name:ident
         { $( $types:ident ),* }
         { $( $prev_fields:ident: $prev_types:ident + $prev_markers:ident ),* }
@@ -52,14 +51,14 @@ macro_rules! define_struct_take_field {
     ) => {
         impl< $( $types ),* > $crate::StructTakeField<$type, $marker> for $name< $( $types ),* >
         {
-            type Rest = $name< $( $prev_types, )* () $(, $next_types)* >;
+            type Rest = $name< $( $prev_types, )* ::core::marker::PhantomData<$type> $(, $next_types)* >;
 
             fn take_field(self) -> ($type, Self::Rest) {
                 (
                     self.$field,
                     $name {
                         $( $prev_fields: self.$prev_fields, )*
-                        $field: (),
+                        $field: ::core::marker::PhantomData,
                         $( $next_fields: self.$next_fields, )*
                     },
                 )
@@ -67,7 +66,7 @@ macro_rules! define_struct_take_field {
         }
 
         $crate::define_struct_take_field!(
-            @impl impl_for_next
+            @impl next
             $name
             { $( $types ),* }
             {
@@ -79,5 +78,4 @@ macro_rules! define_struct_take_field {
             }
         );
     };
-    { $($tail:tt)* } => { compile_error!(stringify!($($tail)*)); };
 }
