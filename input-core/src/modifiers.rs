@@ -19,6 +19,10 @@ impl<Sw> Modifiers<Sw> {
         &self.switches
     }
 
+    pub fn into_switches(self) -> Arc<BTreeSet<Sw>> {
+        self.switches
+    }
+
     pub fn with_press_event(self, switch: Sw) -> (Self, Result<(), ModifiersPressError>)
     where
         Sw: Clone + Eq + Hash + Ord,

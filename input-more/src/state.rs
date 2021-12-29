@@ -1,4 +1,4 @@
-use crate::{define_markers, define_struct_take_and_with_field};
+use crate::{define_markers, define_struct_take_and_with_field, /*GlobalMapping, SwitchEvent*/};
 
 #[derive(Clone, Debug, Default)]
 pub struct State<Mo, Ts, Sh> {
@@ -23,6 +23,22 @@ impl<Mo, Ts, Sh> State<Mo, Ts, Sh> {
             scheduler,
         }
     }
+
+    /*pub fn with_press_event<Ti, Sw, Co, KePrMa, KeReMa, KeLoMa, KeClMa>(
+        self,
+        event: SwitchEvent<Ti, Sw, Co, (), ()>,
+        mapping: &GlobalMapping<KePrMa, KeReMa, KeLoMa, KeClMa>,
+    ) -> Self {
+        self
+    }
+
+    pub fn with_release_event<Ti, Sw, Co, KePrMa, KeReMa, KeLoMa, KeClMa>(
+        self,
+        event: SwitchEvent<Ti, Sw, Co, (), ()>,
+        mapping: &GlobalMapping<KePrMa, KeReMa, KeLoMa, KeClMa>,
+    ) -> Self {
+        self
+    }*/
 }
 
 #[test]
