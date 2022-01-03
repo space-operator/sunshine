@@ -1,5 +1,5 @@
 use core::hash::Hash;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 use input_core::Modifiers;
 
@@ -88,13 +88,20 @@ impl<'a, Mo, Ti, Ev> MappingBySwitch<'a, Mo, Ti, Ev> {
         modifiers: &Modifiers<Mo>,
     ) -> Option<MappingByModifiers<'a, Mo, Ti, Ev>>
     where
-        Mo: Eq + Hash,
+        Mo: Eq + Hash + Ord,
     {
-        // TODO: Fixme, partial cmp, longest modifiers, priority, cancellation
-        self.0
-            .get_key_value(modifiers)
-            .map(|(modifiers, filtered)| [(modifiers, filtered)].into_iter().collect())
-            .map(MappingByModifiers)
+        let bindings: HashMap<_, _> = self
+            .0
+            .iter()
+            .filter(|(binding_modifiers, _)| {
+                binding_modifiers.switches().is_subset(modifiers.switches())
+            })
+            .collect();
+        if bindings.is_empty() {
+            None
+        } else {
+            Some(MappingByModifiers(bindings))
+        }
     }
 }
 
@@ -125,5 +132,9 @@ impl<'a, Mo, Ti, Ev> MappingByModifiers<'a, Mo, Ti, Ev> {
 impl<'a, Mo, Ev> MappingByTimed<'a, Mo, Ev> {
     pub fn into_inner(self) -> HashMap<&'a Modifiers<Mo>, &'a MappingDataByTimed<Ev>> {
         self.0
+    }
+
+    pub fn inner(&self) -> &HashMap<&'a Modifiers<Mo>, &'a MappingDataByTimed<Ev>> {
+        &self.0
     }
 }

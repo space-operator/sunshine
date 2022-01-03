@@ -1,8 +1,6 @@
 use core::hash::Hash;
 use std::collections::HashSet;
 
-use input_core::Modifiers;
-
 use crate::Mapping;
 
 #[derive(Clone, Debug)]
