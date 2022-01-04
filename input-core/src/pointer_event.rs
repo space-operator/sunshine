@@ -37,18 +37,18 @@ pub struct PointerEventData<Sw, Ki> {
     pub kind: Ki,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PointerChangeEventKind {
     DragEnd,
 }
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub enum PointerMoveEventKind {
     DragStart,
     DragMove,
 }
 
-pub type PointerChangeEventData<Sw> = PointerEventData<Sw, PointerChangeEventKind>;
+//pub type PointerChangeEventData<Sw> = PointerEventData<Sw, PointerChangeEventKind>;
 pub type PointerMoveEventData<Sw> = PointerEventData<Sw, PointerMoveEventKind>;
 
 impl<Sw, Co> PointerState<Sw, Co> {
@@ -56,24 +56,17 @@ impl<Sw, Co> PointerState<Sw, Co> {
         Self::default()
     }
 
-    pub fn with_change_event(
-        self,
-        switch: Sw,
-        coords: Co,
-    ) -> (Self, Option<PointerChangeEventData<Sw>>)
+    pub fn with_change_event(self, switch: Sw, coords: Co) -> (Self, Option<PointerChangeEventKind>)
     where
-        Sw: Clone + Eq + Hash,
+        Sw: Eq + Hash,
     {
         use std::collections::hash_map::Entry;
 
         let mut switches = self.switches;
-        let event = match switches.entry(switch.clone()) {
+        let event = match switches.entry(switch) {
             Entry::Occupied(entry) => match entry.get() {
                 SwitchState::Changed(_) => None,
-                SwitchState::Moving => Some(PointerEventData {
-                    switch,
-                    kind: PointerChangeEventKind::DragEnd,
-                }),
+                SwitchState::Moving => Some(PointerChangeEventKind::DragEnd),
             },
             Entry::Vacant(entry) => {
                 let _ = entry.insert(SwitchState::Changed(coords));

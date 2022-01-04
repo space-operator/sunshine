@@ -33,6 +33,7 @@ mod state;
 mod struct_take_and_with_field;
 mod struct_take_field;
 mod struct_with_field;
+mod unwrap_or;
 
 pub use binding::*;
 pub use event::*;
@@ -45,5 +46,6 @@ pub use state::*;
 pub use struct_take_and_with_field::*;
 pub use struct_take_field::*;
 pub use struct_with_field::*;
+pub use unwrap_or::*;
 
 pub use input_core;
