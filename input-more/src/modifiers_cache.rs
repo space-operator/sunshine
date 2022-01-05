@@ -1,18 +1,18 @@
 use core::hash::Hash;
 use std::collections::HashSet;
 
-use crate::Mapping;
+use crate::SwitchMapping;
 
 #[derive(Clone, Debug)]
 pub struct ModifiersCache<Mo> {
     switches: HashSet<Mo>,
 }
 
-impl<'a, Sw, Mo, Td, Pd, Ev> From<&'a Mapping<Sw, Mo, Td, Pd, Ev>> for ModifiersCache<&'a Mo>
+impl<'a, Sw, Mo, Td, Pd, Ev> From<&'a SwitchMapping<Sw, Mo, Td, Pd, Ev>> for ModifiersCache<&'a Mo>
 where
     Mo: 'a + Eq + Hash,
 {
-    fn from(mapping: &'a Mapping<Sw, Mo, Td, Pd, Ev>) -> Self {
+    fn from(mapping: &'a SwitchMapping<Sw, Mo, Td, Pd, Ev>) -> Self {
         let switches = mapping
             .bindings()
             .iter()

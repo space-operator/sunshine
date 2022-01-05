@@ -3,7 +3,7 @@ use std::collections::HashMap;
 
 use input_core::Modifiers;
 
-use crate::Mapping;
+use crate::SwitchMapping;
 
 type MappingData<Sw, Mo, Td, Pd, Ev> = HashMap<Sw, MappingDataBySwitch<Mo, Td, Pd, Ev>>;
 type MappingDataBySwitch<Mo, Td, Pd, Ev> =
@@ -33,14 +33,15 @@ pub struct MappingByPointer<'a, Mo, Ev>(HashMap<&'a Modifiers<Mo>, &'a MappingDa
 
 pub type Bindings<'a, Mo, Ev> = MappingByPointer<'a, Mo, Ev>;
 
-impl<Sw, Mo, Td, Pd, Ev> From<Mapping<Sw, Mo, Td, Pd, Ev>> for MappingCache<Sw, Mo, Td, Pd, Ev>
+impl<Sw, Mo, Td, Pd, Ev> From<SwitchMapping<Sw, Mo, Td, Pd, Ev>>
+    for MappingCache<Sw, Mo, Td, Pd, Ev>
 where
     Sw: Eq + Hash,
     Mo: Eq + Hash,
     Td: Eq + Hash,
     Pd: Eq + Hash,
 {
-    fn from(mapping: Mapping<Sw, Mo, Td, Pd, Ev>) -> Self {
+    fn from(mapping: SwitchMapping<Sw, Mo, Td, Pd, Ev>) -> Self {
         let mut data: MappingData<Sw, Mo, Td, Pd, Ev> = HashMap::new();
         for binding in mapping.into_bindings() {
             let events: &mut _ = data

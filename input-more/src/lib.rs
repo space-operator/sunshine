@@ -23,6 +23,7 @@
 )]
 
 mod binding;
+mod device_mapping;
 mod event;
 mod global_state;
 mod mapping;

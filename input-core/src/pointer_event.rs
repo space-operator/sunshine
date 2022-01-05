@@ -1,24 +1,8 @@
 use core::fmt::Debug;
 use core::hash::Hash;
 use std::collections::HashMap;
-/*
-    TODO:
-        when to call with_reset_click_count
-        emit far-movement-while-pressed
-        emit far-movement-while-released
 
-    DragStartEvent   Pressed Released
-    DragMoveEvent    Pressed Released
-    DragEndEvent     Pressed Released
-
-    pressed(Sw, Co)
-    move(Co)
-    released(Sw, Co)
-
-    pointer-event
-
-
-*/
+use thiserror::Error;
 
 #[derive(Clone, Debug)]
 pub struct PointerState<Sw, Co> {
@@ -27,19 +11,8 @@ pub struct PointerState<Sw, Co> {
 
 #[derive(Clone, Debug)]
 enum SwitchState<Co> {
-    Changed(Co),
+    Pressed(Co),
     Moving,
-}
-
-#[derive(Clone, Debug)]
-pub struct PointerEventData<Sw, Ki> {
-    pub switch: Sw,
-    pub kind: Ki,
-}
-
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
-pub enum PointerChangeEventKind {
-    DragEnd,
 }
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
@@ -48,32 +21,59 @@ pub enum PointerMoveEventKind {
     DragMove,
 }
 
-//pub type PointerChangeEventData<Sw> = PointerEventData<Sw, PointerChangeEventKind>;
-pub type PointerMoveEventData<Sw> = PointerEventData<Sw, PointerMoveEventKind>;
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+pub enum PointerChangeEventData {
+    DragEnd,
+}
+
+#[derive(Clone, Debug)]
+pub struct PointerMoveEventData<Sw> {
+    pub switch: Sw,
+    pub kind: PointerMoveEventKind,
+}
 
 impl<Sw, Co> PointerState<Sw, Co> {
     pub fn new() -> Self {
         Self::default()
     }
 
-    pub fn with_change_event(self, switch: Sw, coords: Co) -> (Self, Option<PointerChangeEventKind>)
+    pub fn with_press_event(self, switch: Sw, coords: Co) -> (Self, Result<(), PointerPressError>)
     where
         Sw: Eq + Hash,
     {
         use std::collections::hash_map::Entry;
 
         let mut switches = self.switches;
-        let event = match switches.entry(switch) {
-            Entry::Occupied(entry) => match entry.get() {
-                SwitchState::Changed(_) => None,
-                SwitchState::Moving => Some(PointerChangeEventKind::DragEnd),
-            },
+        match switches.entry(switch) {
+            Entry::Occupied(_) => (Self { switches }, Err(PointerPressError::AlreadyPressed)),
             Entry::Vacant(entry) => {
-                let _ = entry.insert(SwitchState::Changed(coords));
-                None
+                let _ = entry.insert(SwitchState::Pressed(coords));
+                (Self { switches }, Ok(()))
             }
-        };
-        (Self { switches }, event)
+        }
+    }
+
+    pub fn with_release_event(
+        self,
+        switch: &Sw,
+    ) -> (
+        Self,
+        Result<Option<PointerChangeEventData>, PointerReleaseError>,
+    )
+    where
+        Sw: Eq + Hash,
+    {
+        let switches = self.switches;
+        match switches.get(switch) {
+            Some(state) => {
+                let data = match state {
+                    SwitchState::Pressed(_) => None,
+                    SwitchState::Moving => Some(PointerChangeEventData::DragEnd),
+                };
+                (Self { switches }, Ok(data))
+            }
+            None => (Self { switches }, Err(PointerReleaseError::AlreadyReleased)),
+        }
     }
 
     pub fn with_move_event<F>(
@@ -89,7 +89,7 @@ impl<Sw, Co> PointerState<Sw, Co> {
         let events = switches
             .iter_mut()
             .filter_map(|(switch, state)| match state {
-                SwitchState::Changed(coords) => {
+                SwitchState::Pressed(coords) => {
                     if is_dragged_fn(coords) {
                         *state = SwitchState::Moving;
                         Some(PointerMoveEventData {
@@ -119,22 +119,14 @@ impl<Sw, Co> Default for PointerState<Sw, Co> {
     }
 }
 
-/*
-    space-down
-    mouse-move
-    space-up
-    mouse-move
-    space-down
-    mouse-move
-    space-up
-        space-dbl-click
+#[derive(Clone, Copy, Debug, Error)]
+pub enum PointerPressError {
+    #[error("Button is pressed while in Pressed state")]
+    AlreadyPressed,
+}
 
-    Device -> PositionSincePressed | MovedWhilePressed | PositionSinceReleased | MovedWhileReleased | CachedPosition
-
-*/
-
-// Mouse
-// Mouse while LMB
-// Mouse while RMB
-// Mouse while LMB+RMB
-// Touch
+#[derive(Clone, Copy, Debug, Error)]
+pub enum PointerReleaseError {
+    #[error("Button is released while in Released state")]
+    AlreadyReleased,
+}

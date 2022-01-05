@@ -111,31 +111,26 @@ fn test_chain() {
     }*/
 
     pub type KeyboardPressMapping =
-        Mapping<KeyboardSwitch, Switch, (), Option<PointerChangeEventKind>, BasicAppEventBuilder>;
-    pub type KeyboardReleaseMapping = Mapping<
+        SwitchMapping<KeyboardSwitch, Switch, (), (), BasicAppEventBuilder>;
+    pub type KeyboardReleaseMapping = SwitchMapping<
         KeyboardSwitch,
         Switch,
         Option<TimedReleaseEventData>,
-        Option<PointerChangeEventKind>,
+        Option<PointerChangeEventData>,
         BasicAppEventBuilder,
     >;
     pub type KeyboardLongPressMapping =
-        Mapping<KeyboardSwitch, Switch, TimedLongPressEventData, (), BasicAppEventBuilder>;
+        SwitchMapping<KeyboardSwitch, Switch, TimedLongPressEventData, (), BasicAppEventBuilder>;
     pub type KeyboardClickExactMapping =
-        Mapping<KeyboardSwitch, Switch, TimedClickExactEventData, (), BasicAppEventBuilder>;
+        SwitchMapping<KeyboardSwitch, Switch, TimedClickExactEventData, (), BasicAppEventBuilder>;
 
-    pub type KeyboardPressMappingCache = MappingCache<
-        KeyboardSwitch,
-        Switch,
-        (),
-        Option<PointerChangeEventKind>,
-        BasicAppEventBuilder,
-    >;
+    pub type KeyboardPressMappingCache =
+        MappingCache<KeyboardSwitch, Switch, (), (), BasicAppEventBuilder>;
     pub type KeyboardReleaseMappingCache = MappingCache<
         KeyboardSwitch,
         Switch,
         Option<TimedReleaseEventData>,
-        Option<PointerChangeEventKind>,
+        Option<PointerChangeEventData>,
         BasicAppEventBuilder,
     >;
     pub type KeyboardLongPressMappingCache =
@@ -318,8 +313,9 @@ fn test_chain() {
                 );
             };
 
-            let (pointer_state, pointer_data) = pointer_state.with_change_event(event.switch, ());
-            let mapping = mapping.filter_by_pointer_data(&pointer_data);
+            let (pointer_state, result) = pointer_state.with_press_event(event.switch, ());
+            result.unwrap();
+            let mapping = mapping.filter_by_pointer_data(&());
             let mapping = if let Some(mapping) = mapping {
                 mapping
             } else {
@@ -440,7 +436,25 @@ fn test_chain() {
                 );
             };
 
-            let (pointer_state, pointer_data) = pointer_state.with_change_event(event.switch, ());
+            /*
+                press
+                    nothing to filter mapping
+                    if mapping for release, mouse-trigger
+                    call with_press_event
+                        possibly dragging later
+                trigger
+                    filter mapping
+                    with_move_event
+                        DragStart
+                        DragMove
+                release
+                    filter mapping
+                    with_release_event
+                        DragEnd
+            */
+
+            let (pointer_state, pointer_data) = pointer_state.with_release_event(&event.switch);
+            let pointer_data = pointer_data.unwrap();
             let mapping = mapping.filter_by_pointer_data(&pointer_data);
             let mapping = if let Some(mapping) = mapping {
                 mapping
@@ -657,31 +671,31 @@ fn test_chain() {
         }
     }
 
-    let keyboard_press_mapping = Mapping::new(
+    let keyboard_press_mapping = SwitchMapping::new(
         [
-            Binding {
+            SwitchBinding {
                 switch: KeyboardSwitch("LeftCtrl"),
                 modifiers: Modifiers::new(),
                 timed_data: (),
-                pointer_data: None,
+                pointer_data: (),
                 event: BasicAppEventBuilder::Undo(10),
             },
-            Binding {
+            SwitchBinding {
                 switch: KeyboardSwitch("LeftCtrl"),
                 modifiers: Modifiers::new()
                     .with_press_event(Switch::Keyboard(KeyboardSwitch("LeftShift")))
                     .0,
                 timed_data: (),
-                pointer_data: None,
+                pointer_data: (),
                 event: BasicAppEventBuilder::Undo(110),
             },
-            Binding {
+            SwitchBinding {
                 switch: KeyboardSwitch("LeftCtrl"),
                 modifiers: Modifiers::new()
                     .with_press_event(Switch::Keyboard(KeyboardSwitch("LeftAlt")))
                     .0,
                 timed_data: (),
-                pointer_data: None,
+                pointer_data: (),
                 event: BasicAppEventBuilder::Undo(120),
             },
         ]
@@ -689,16 +703,16 @@ fn test_chain() {
         .collect(),
     );
 
-    let keyboard_release_mapping = Mapping::new(
+    let keyboard_release_mapping = SwitchMapping::new(
         [
-            Binding {
+            SwitchBinding {
                 switch: KeyboardSwitch("LeftCtrl"),
                 modifiers: Modifiers::new(),
                 timed_data: None,
                 pointer_data: None,
                 event: BasicAppEventBuilder::Undo(20),
             },
-            Binding {
+            SwitchBinding {
                 switch: KeyboardSwitch("LeftCtrl"),
                 modifiers: Modifiers::new(),
                 timed_data: Some(TimedReleaseEventData {
@@ -708,7 +722,7 @@ fn test_chain() {
                 pointer_data: None,
                 event: BasicAppEventBuilder::Undo(30),
             },
-            Binding {
+            SwitchBinding {
                 switch: KeyboardSwitch("LeftCtrl"),
                 modifiers: Modifiers::new(),
                 timed_data: Some(TimedReleaseEventData {
@@ -726,8 +740,8 @@ fn test_chain() {
     let mapping = GlobalMapping {
         keyboard_press: keyboard_press_mapping,
         keyboard_release: keyboard_release_mapping,
-        keyboard_long_press: Mapping::default(),
-        keyboard_click_exact: Mapping::default(),
+        keyboard_long_press: SwitchMapping::default(),
+        keyboard_click_exact: SwitchMapping::default(),
     };
 
     let mapping_cache = GlobalMappingCache {
