@@ -2,7 +2,7 @@ use input_core::SchedulerState;
 
 use crate::{
     define_markers, define_struct_take_and_with_field, /*GlobalMapping, SwitchEvent*/
-    Bindings,
+    SwitchBindings,
 };
 
 #[derive(Clone, Debug, Default)]

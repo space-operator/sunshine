@@ -1,19 +1,30 @@
-use crate::*;
-use input_core::*;
+use std::collections::HashSet;
 
-pub type PressMapping<Sw, Mo, Pd, Bu> = SwitchMapping<Sw, Mo, (), Pd, Bu>;
-pub type ReleaseMapping<Sw, Mo, Pd, Bu> =
-    SwitchMapping<Sw, Mo, Option<TimedReleaseEventData>, Pd, Bu>;
-pub type LongPressMapping<Sw, Mo, Pd, Bu> = SwitchMapping<Sw, Mo, TimedLongPressEventData, Pd, Bu>;
-pub type ClickExactMapping<Sw, Mo, Pd, Bu> =
-    SwitchMapping<Sw, Mo, TimedClickExactEventData, Pd, Bu>;
+use crate::Binding;
 
 #[derive(Clone, Debug)]
-pub struct DeviceMapping<Sw, Mo, Pd, Bu> {
-    press: PressMapping<Sw, Mo, Pd, Bu>,
-    release: ReleaseMapping<Sw, Mo, Pd, Bu>,
-    long_press: LongPressMapping<Sw, Mo, Pd, Bu>,
-    click_exact: ClickExactMapping<Sw, Mo, Pd, Bu>,
-    // pointer-move-mapping
-    // trigger
+pub struct DeviceMapping<Sw, Tr, Mo, Ev> {
+    pub bindings: HashSet<Binding<Sw, Tr, Mo, Ev>>,
+}
+
+impl<Sw, Tr, Mo, Ev> DeviceMapping<Sw, Tr, Mo, Ev> {
+    pub fn new(bindings: HashSet<Binding<Sw, Tr, Mo, Ev>>) -> Self {
+        Self { bindings }
+    }
+
+    pub fn bindings(&self) -> &HashSet<Binding<Sw, Tr, Mo, Ev>> {
+        &self.bindings
+    }
+
+    pub fn into_bindings(self) -> HashSet<Binding<Sw, Tr, Mo, Ev>> {
+        self.bindings
+    }
+}
+
+impl<Sw, Tr, Mo, Ev> Default for DeviceMapping<Sw, Tr, Mo, Ev> {
+    fn default() -> Self {
+        Self {
+            bindings: HashSet::default(),
+        }
+    }
 }

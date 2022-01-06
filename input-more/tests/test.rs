@@ -110,40 +110,7 @@ fn test_chain() {
         }
     }*/
 
-    pub type KeyboardPressMapping =
-        SwitchMapping<KeyboardSwitch, Switch, (), (), BasicAppEventBuilder>;
-    pub type KeyboardReleaseMapping = SwitchMapping<
-        KeyboardSwitch,
-        Switch,
-        Option<TimedReleaseEventData>,
-        Option<PointerChangeEventData>,
-        BasicAppEventBuilder,
-    >;
-    pub type KeyboardLongPressMapping =
-        SwitchMapping<KeyboardSwitch, Switch, TimedLongPressEventData, (), BasicAppEventBuilder>;
-    pub type KeyboardClickExactMapping =
-        SwitchMapping<KeyboardSwitch, Switch, TimedClickExactEventData, (), BasicAppEventBuilder>;
-
-    pub type KeyboardPressMappingCache =
-        MappingCache<KeyboardSwitch, Switch, (), (), BasicAppEventBuilder>;
-    pub type KeyboardReleaseMappingCache = MappingCache<
-        KeyboardSwitch,
-        Switch,
-        Option<TimedReleaseEventData>,
-        Option<PointerChangeEventData>,
-        BasicAppEventBuilder,
-    >;
-    pub type KeyboardLongPressMappingCache =
-        MappingCache<KeyboardSwitch, Switch, TimedLongPressEventData, (), BasicAppEventBuilder>;
-    pub type KeyboardClickExactMappingCache =
-        MappingCache<KeyboardSwitch, Switch, TimedClickExactEventData, (), BasicAppEventBuilder>;
-
-    /*pub type GlobalMapping = input_more::GlobalMapping<
-        KeyboardPressMapping,
-        KeyboardReleaseMapping,
-        KeyboardLongPressMapping,
-        KeyboardClickExactMapping,
-    >;*/
+    pub type KeyboardMapping = DeviceMapping<KeyboardSwitch, (), Switch, BasicAppEventBuilder>;
 
     pub type KeyboardSwitchEvent = SwitchEvent<TimestampMs, KeyboardSwitch, (), (), ()>;
     pub type MouseSwitchEvent = SwitchEvent<TimestampMs, MouseSwitch, Coords, (), ()>;
@@ -192,7 +159,7 @@ fn test_chain() {
         ) -> (
             Self,
             Option<TimestampMs>,
-            Option<(Bindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
+            Option<(SwitchBindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
         );
     }
 
@@ -206,7 +173,7 @@ fn test_chain() {
             mapping: &'a GlobalMappingCache,
         ) -> (
             Self,
-            Vec<(Bindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
+            Vec<(SwitchBindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
         );
     }
 
@@ -221,7 +188,7 @@ fn test_chain() {
         ) -> (
             Self,
             Option<TimestampMs>,
-            Option<(Bindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
+            Option<(SwitchBindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
         ) {
             let State {
                 modifiers,
@@ -230,12 +197,12 @@ fn test_chain() {
                 pointer_state,
             } = self;
 
-            let keyboard_press_mapping = mapping.keyboard_press.filter_by_switch(&event.switch);
-            let keyboard_release_mapping = mapping.keyboard_release.filter_by_switch(&event.switch);
+            let keyboard_press_mapping = mapping.keyboard.press.filter_by_switch(&event.switch);
+            let keyboard_release_mapping = mapping.keyboard.release.filter_by_switch(&event.switch);
             let keyboard_long_press_mapping =
-                mapping.keyboard_long_press.filter_by_switch(&event.switch);
+                mapping.keyboard.long_press.filter_by_switch(&event.switch);
             let keyboard_click_exact_mapping =
-                mapping.keyboard_click_exact.filter_by_switch(&event.switch);
+                mapping.keyboard.click_exact.filter_by_switch(&event.switch);
 
             let is_used_as_modifier = mapping
                 .modifiers
@@ -345,7 +312,7 @@ fn test_chain() {
         ) -> (
             Self,
             Option<TimestampMs>,
-            Option<(Bindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
+            Option<(SwitchBindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
         ) {
             let State {
                 modifiers,
@@ -354,12 +321,12 @@ fn test_chain() {
                 pointer_state,
             } = self;
 
-            let keyboard_press_mapping = mapping.keyboard_press.filter_by_switch(&event.switch);
-            let keyboard_release_mapping = mapping.keyboard_release.filter_by_switch(&event.switch);
+            let keyboard_press_mapping = mapping.keyboard.press.filter_by_switch(&event.switch);
+            let keyboard_release_mapping = mapping.keyboard.release.filter_by_switch(&event.switch);
             let keyboard_long_press_mapping =
-                mapping.keyboard_long_press.filter_by_switch(&event.switch);
+                mapping.keyboard.long_press.filter_by_switch(&event.switch);
             let keyboard_click_exact_mapping =
-                mapping.keyboard_click_exact.filter_by_switch(&event.switch);
+                mapping.keyboard.click_exact.filter_by_switch(&event.switch);
 
             let is_used_as_modifier = mapping
                 .modifiers
@@ -475,7 +442,7 @@ fn test_chain() {
     }
 
     fn with_timeout_event<'a, Rq, Td>(
-        mapping: &'a MappingCache<
+        mapping: &'a SwitchMappingCache<
             KeyboardSwitch,
             Switch,
             TimedEventData<Td>,
@@ -493,7 +460,7 @@ fn test_chain() {
             -> (TimedState<KeyboardSwitch>, Option<TimedEventData<Td>>),
     ) -> (
         TimedState<KeyboardSwitch>,
-        Option<(Bindings<'a, Switch, BasicAppEventBuilder>, ())>,
+        Option<(SwitchBindings<'a, Switch, BasicAppEventBuilder>, ())>,
     )
     where
         Td: 'a + Eq + Hash,
@@ -529,7 +496,7 @@ fn test_chain() {
             mapping: &'a GlobalMappingCache,
         ) -> (
             Self,
-            Vec<(Bindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
+            Vec<(SwitchBindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
         ) {
             const KEYBOARD_LONG_PRESS_DURATION: DurationMs = 1000;
 
@@ -542,7 +509,7 @@ fn test_chain() {
             for (_, requests) in requests {
                 for (event, request) in requests {
                     let (new_timed_state, result) = with_timeout_event(
-                        &mapping.keyboard_long_press,
+                        &mapping.keyboard.long_press,
                         timed_state,
                         event,
                         request,
@@ -575,7 +542,7 @@ fn test_chain() {
             mapping: &'a GlobalMappingCache,
         ) -> (
             Self,
-            Vec<(Bindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
+            Vec<(SwitchBindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
         ) {
             // TODO: Better filtering
 
@@ -590,7 +557,7 @@ fn test_chain() {
             for (_, requests) in requests {
                 for (event, request) in requests {
                     let (new_timed_state, result) = with_timeout_event(
-                        &mapping.keyboard_click_exact,
+                        &mapping.keyboard.click_exact,
                         timed_state,
                         event,
                         request,
@@ -648,20 +615,14 @@ fn test_chain() {
         }
     }
 
-    #[derive(Clone, Debug)]
+    /*#[derive(Clone, Debug)]
     pub struct GlobalMapping {
-        keyboard_press: KeyboardPressMapping,
-        keyboard_release: KeyboardReleaseMapping,
-        keyboard_long_press: KeyboardLongPressMapping,
-        keyboard_click_exact: KeyboardClickExactMapping,
-    }
+        keyboard: KeyboardMapping,
+    }*/
 
     #[derive(Clone, Debug)]
     pub struct GlobalMappingCache<'a> {
-        keyboard_press: KeyboardPressMappingCache,
-        keyboard_release: KeyboardReleaseMappingCache,
-        keyboard_long_press: KeyboardLongPressMappingCache,
-        keyboard_click_exact: KeyboardClickExactMappingCache,
+        keyboard: DeviceMappingCache<KeyboardSwitch, (), Switch, BasicAppEventBuilder>,
         modifiers: ModifiersCache<&'a Switch>,
     }
 
@@ -671,16 +632,16 @@ fn test_chain() {
         }
     }
 
-    let keyboard_press_mapping = SwitchMapping::new(
+    let keyboard_mapping = KeyboardMapping::new(
         [
-            SwitchBinding {
+            Binding::Press(SwitchBinding {
                 switch: KeyboardSwitch("LeftCtrl"),
                 modifiers: Modifiers::new(),
                 timed_data: (),
                 pointer_data: (),
                 event: BasicAppEventBuilder::Undo(10),
-            },
-            SwitchBinding {
+            }),
+            Binding::Press(SwitchBinding {
                 switch: KeyboardSwitch("LeftCtrl"),
                 modifiers: Modifiers::new()
                     .with_press_event(Switch::Keyboard(KeyboardSwitch("LeftShift")))
@@ -688,8 +649,8 @@ fn test_chain() {
                 timed_data: (),
                 pointer_data: (),
                 event: BasicAppEventBuilder::Undo(110),
-            },
-            SwitchBinding {
+            }),
+            Binding::Press(SwitchBinding {
                 switch: KeyboardSwitch("LeftCtrl"),
                 modifiers: Modifiers::new()
                     .with_press_event(Switch::Keyboard(KeyboardSwitch("LeftAlt")))
@@ -697,22 +658,15 @@ fn test_chain() {
                 timed_data: (),
                 pointer_data: (),
                 event: BasicAppEventBuilder::Undo(120),
-            },
-        ]
-        .into_iter()
-        .collect(),
-    );
-
-    let keyboard_release_mapping = SwitchMapping::new(
-        [
-            SwitchBinding {
+            }),
+            Binding::Release(SwitchBinding {
                 switch: KeyboardSwitch("LeftCtrl"),
                 modifiers: Modifiers::new(),
                 timed_data: None,
                 pointer_data: None,
                 event: BasicAppEventBuilder::Undo(20),
-            },
-            SwitchBinding {
+            }),
+            Binding::Release(SwitchBinding {
                 switch: KeyboardSwitch("LeftCtrl"),
                 modifiers: Modifiers::new(),
                 timed_data: Some(TimedReleaseEventData {
@@ -721,8 +675,8 @@ fn test_chain() {
                 }),
                 pointer_data: None,
                 event: BasicAppEventBuilder::Undo(30),
-            },
-            SwitchBinding {
+            }),
+            Binding::Release(SwitchBinding {
                 switch: KeyboardSwitch("LeftCtrl"),
                 modifiers: Modifiers::new(),
                 timed_data: Some(TimedReleaseEventData {
@@ -731,34 +685,19 @@ fn test_chain() {
                 }),
                 pointer_data: None,
                 event: BasicAppEventBuilder::Undo(40),
-            },
+            }),
         ]
         .into_iter()
         .collect(),
     );
 
-    let mapping = GlobalMapping {
-        keyboard_press: keyboard_press_mapping,
-        keyboard_release: keyboard_release_mapping,
-        keyboard_long_press: SwitchMapping::default(),
-        keyboard_click_exact: SwitchMapping::default(),
-    };
+    /*let mapping = GlobalMapping {
+        keyboard: keyboard_mapping,
+    };*/
 
     let mapping_cache = GlobalMappingCache {
-        keyboard_press: MappingCache::from(mapping.keyboard_press.clone()),
-        keyboard_release: MappingCache::from(mapping.keyboard_release.clone()),
-        keyboard_long_press: MappingCache::from(mapping.keyboard_long_press.clone()),
-        keyboard_click_exact: MappingCache::from(mapping.keyboard_click_exact.clone()),
-        modifiers: [
-            ModifiersCache::from(&mapping.keyboard_press).switches(),
-            ModifiersCache::from(&mapping.keyboard_release).switches(),
-            ModifiersCache::from(&mapping.keyboard_long_press).switches(),
-            ModifiersCache::from(&mapping.keyboard_click_exact).switches(),
-        ]
-        .into_iter()
-        .flatten()
-        .copied()
-        .collect(),
+        keyboard: DeviceMappingCache::from_mapping(keyboard_mapping.clone()),
+        modifiers: ModifiersCache::from(&keyboard_mapping),
     };
 
     let mut global_state = GlobalState::default();
@@ -778,7 +717,7 @@ fn test_chain() {
     }
 
     fn build_bindings<'a, Bu, Co>(
-        bindings: Bindings<'a, Switch, Bu>,
+        bindings: SwitchBindings<'a, Switch, Bu>,
         coords: &Co,
     ) -> Option<HashMap<&'a Modifiers, Vec<AppEvent>>>
     where

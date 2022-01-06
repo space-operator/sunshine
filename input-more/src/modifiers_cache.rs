@@ -1,22 +1,22 @@
 use core::hash::Hash;
 use std::collections::HashSet;
 
-use crate::SwitchMapping;
+use crate::DeviceMapping;
 
 #[derive(Clone, Debug)]
 pub struct ModifiersCache<Mo> {
     switches: HashSet<Mo>,
 }
 
-impl<'a, Sw, Mo, Td, Pd, Ev> From<&'a SwitchMapping<Sw, Mo, Td, Pd, Ev>> for ModifiersCache<&'a Mo>
+impl<'a, Sw, Tr, Mo, Ev> From<&'a DeviceMapping<Sw, Tr, Mo, Ev>> for ModifiersCache<&'a Mo>
 where
     Mo: 'a + Eq + Hash,
 {
-    fn from(mapping: &'a SwitchMapping<Sw, Mo, Td, Pd, Ev>) -> Self {
+    fn from(mapping: &'a DeviceMapping<Sw, Tr, Mo, Ev>) -> Self {
         let switches = mapping
             .bindings()
             .iter()
-            .flat_map(|binding| binding.modifiers.switches().as_ref())
+            .flat_map(|binding| binding.modifiers().switches().as_ref())
             /*// TODO: without vec
             .flat_map(|binding| {
                 let switches: Vec<_> = binding.modifiers.switches().iter().collect();
@@ -27,6 +27,7 @@ where
     }
 }
 
+/*
 impl<Mo> FromIterator<Mo> for ModifiersCache<Mo>
 where
     Mo: Eq + Hash,
@@ -40,6 +41,7 @@ where
         }
     }
 }
+*/
 
 impl<Mo> ModifiersCache<Mo> {
     pub fn switches(&self) -> &HashSet<Mo> {
