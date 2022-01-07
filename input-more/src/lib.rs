@@ -24,13 +24,13 @@
 
 mod binding;
 mod device_mapping;
+mod device_state;
 mod event;
 mod global_mapping;
 mod global_state;
 mod mapping_cache;
+mod mapping_modifiers_cache;
 mod marker;
-mod modifiers_cache;
-mod state;
 mod struct_take_and_with_field;
 mod struct_take_field;
 mod struct_with_field;
@@ -39,13 +39,13 @@ mod unwrap_or;
 
 pub use binding::*;
 pub use device_mapping::*;
+pub use device_state::*;
 pub use event::*;
 pub use global_mapping::*;
 pub use global_state::*;
 pub use mapping_cache::*;
+pub use mapping_modifiers_cache::*;
 pub use marker::*;
-pub use modifiers_cache::*;
-pub use state::*;
 pub use struct_take_and_with_field::*;
 pub use struct_take_field::*;
 pub use struct_with_field::*;

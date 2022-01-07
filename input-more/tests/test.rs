@@ -22,6 +22,10 @@ fn test_chain() {
         4:
             State::with_press_event, State::with_release_event
         5:
+        >   Remain coords only in PointerMove event, but not in switchers
+        6:
+            Triggers and PointerMove
+        5:
             Mouse
         6:
             Move smth to library
@@ -44,6 +48,18 @@ fn test_chain() {
     enum Switch {
         Keyboard(KeyboardSwitch),
         Mouse(MouseSwitch),
+    }
+
+    impl From<KeyboardSwitch> for Switch {
+        fn from(switch: KeyboardSwitch) -> Self {
+            Self::Keyboard(switch)
+        }
+    }
+
+    impl From<MouseSwitch> for Switch {
+        fn from(switch: MouseSwitch) -> Self {
+            Self::Mouse(switch)
+        }
     }
 
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -111,21 +127,26 @@ fn test_chain() {
     }*/
 
     pub type KeyboardMapping = DeviceMapping<KeyboardSwitch, (), Switch, BasicAppEventBuilder>;
+    pub type MouseMapping = DeviceMapping<MouseSwitch, (), Switch, PointerAppEventBuilder>;
 
-    pub type KeyboardSwitchEvent = SwitchEvent<TimestampMs, KeyboardSwitch, (), (), ()>;
-    pub type MouseSwitchEvent = SwitchEvent<TimestampMs, MouseSwitch, Coords, (), ()>;
+    pub type KeyboardSwitchEvent = SwitchEvent<TimestampMs, KeyboardSwitch, ()>;
+    pub type MouseSwitchEvent = SwitchEvent<TimestampMs, MouseSwitch, Coords>;
 
     pub type Modifiers = input_core::Modifiers<Switch>;
     pub type KeyboardTimedState = TimedState<KeyboardSwitch>;
     pub type MouseTimedState = TimedState<MouseSwitch>;
 
-    pub type CustomState<Ts, Sh, Ps> = State<Modifiers, Ts, Sh, Ps>;
-    pub type CustomScheduler<Sw, Re> =
-        SchedulerState<TimestampMs, SwitchEvent<TimestampMs, Sw, (), Modifiers, ()>, Re>;
-    pub type KeyboardLongPressScheduler = CustomScheduler<KeyboardSwitch, LongPressHandleRequest>;
-    pub type KeyboardClickExactScheduler = CustomScheduler<KeyboardSwitch, ClickExactHandleRequest>;
-    pub type MouseLongPressScheduler = CustomScheduler<MouseSwitch, LongPressHandleRequest>;
-    pub type MouseClickExactScheduler = CustomScheduler<MouseSwitch, ClickExactHandleRequest>;
+    pub type CustomState<Ts, Sh, Ps> = DeviceState<Modifiers, Ts, Sh, Ps>;
+    pub type CustomScheduler<Sw, Re, Co> =
+        SchedulerState<TimestampMs, (SwitchEvent<TimestampMs, Sw, Co>, Modifiers), Re>;
+
+    pub type KeyboardLongPressScheduler =
+        CustomScheduler<KeyboardSwitch, LongPressHandleRequest, ()>;
+    pub type KeyboardClickExactScheduler =
+        CustomScheduler<KeyboardSwitch, ClickExactHandleRequest, ()>;
+    pub type MouseLongPressScheduler = CustomScheduler<MouseSwitch, LongPressHandleRequest, Coords>;
+    pub type MouseClickExactScheduler =
+        CustomScheduler<MouseSwitch, ClickExactHandleRequest, Coords>;
     pub type KeyboardPointerState = PointerState<KeyboardSwitch, ()>;
     pub type MousePointerState = PointerState<MouseSwitch, Coords>;
 
@@ -135,6 +156,13 @@ fn test_chain() {
         CustomState<KeyboardTimedState, KeyboardClickExactScheduler, KeyboardPointerState>;
     pub type KeyboardLongPressState = CustomState<MouseTimedState, (), ()>;
     pub type KeyboardClickExactState = CustomState<MouseTimedState, (), ()>;
+
+    pub type MousePressState =
+        CustomState<MouseTimedState, MouseLongPressScheduler, MousePointerState>;
+    pub type MouseReleaseState =
+        CustomState<MouseTimedState, MouseClickExactScheduler, MousePointerState>;
+    pub type MouseLongPressState = CustomState<MouseTimedState, (), ()>;
+    pub type MouseClickExactState = CustomState<MouseTimedState, (), ()>;
 
     pub type GlobalState = input_more::GlobalState<
         Modifiers,
@@ -177,443 +205,22 @@ fn test_chain() {
         );
     }
 
-    impl WithEvent<KeyboardSwitchEvent> for KeyboardPressState {
-        type EventBuilder = BasicAppEventBuilder;
-        type Coords = ();
-
-        fn with_event<'a>(
-            self,
-            event: KeyboardSwitchEvent,
-            mapping: &'a GlobalMappingCache,
-        ) -> (
-            Self,
-            Option<TimestampMs>,
-            Option<(SwitchBindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
-        ) {
-            let State {
-                modifiers,
-                timed_state,
-                scheduler,
-                pointer_state,
-            } = self;
-
-            let keyboard_press_mapping = mapping.keyboard.press.filter_by_switch(&event.switch);
-            let keyboard_release_mapping = mapping.keyboard.release.filter_by_switch(&event.switch);
-            let keyboard_long_press_mapping =
-                mapping.keyboard.long_press.filter_by_switch(&event.switch);
-            let keyboard_click_exact_mapping =
-                mapping.keyboard.click_exact.filter_by_switch(&event.switch);
-
-            let is_used_as_modifier = mapping
-                .modifiers
-                .switches()
-                .contains(&Switch::Keyboard(event.switch));
-
-            if keyboard_press_mapping.is_none()
-                && keyboard_release_mapping.is_none()
-                && keyboard_long_press_mapping.is_none()
-                && keyboard_click_exact_mapping.is_none()
-                && !is_used_as_modifier
-            {
-                return (
-                    Self::new(modifiers, timed_state, scheduler, pointer_state),
-                    None,
-                    None,
-                );
-            }
-
-            let modifiers = if is_used_as_modifier {
-                let (modifiers, result) =
-                    modifiers.with_press_event(Switch::Keyboard(event.switch));
-                result.unwrap();
-                modifiers
-            } else {
-                modifiers
-            };
-            let event = event.with_modifiers(modifiers.clone());
-
-            let keyboard_press_mapping = keyboard_press_mapping
-                .and_then(|mapping| mapping.filter_by_modifiers(&event.modifiers));
-            let keyboard_release_mapping = keyboard_release_mapping
-                .and_then(|mapping| mapping.filter_by_modifiers(&event.modifiers));
-            let keyboard_long_press_mapping = keyboard_long_press_mapping
-                .and_then(|mapping| mapping.filter_by_modifiers(&event.modifiers));
-            let keyboard_click_exact_mapping = keyboard_click_exact_mapping
-                .and_then(|mapping| mapping.filter_by_modifiers(&event.modifiers));
-
-            if keyboard_press_mapping.is_none()
-                && keyboard_release_mapping.is_none()
-                && keyboard_long_press_mapping.is_none()
-                && keyboard_click_exact_mapping.is_none()
-            {
-                return (
-                    Self::new(modifiers, timed_state, scheduler, pointer_state),
-                    None,
-                    None,
-                );
-            }
-
-            let (timed_state, result) = timed_state.with_press_event(event.switch);
-            let request = result.unwrap();
-
-            /*let (scheduler, next_scheduled) = if keyboard_release_mapping.is_some()
-                && keyboard_long_press_mapping.is_some()
-                && keyboard_click_exact_mapping.is_some()
-            {*/
-            let scheduler = scheduler.schedule(event.time, event.clone(), request);
-            let next_scheduled = scheduler.next_scheduled().copied();
-            //(scheduler, next_scheduled)
-            /*} else {
-                (scheduler, None)
-            };*/
-
-            let mapping =
-                keyboard_press_mapping.and_then(|mapping| mapping.filter_by_timed_data(&()));
-
-            let mapping = if let Some(mapping) = mapping {
-                mapping
-            } else {
-                return (
-                    Self::new(modifiers, timed_state, scheduler, pointer_state),
-                    next_scheduled,
-                    None,
-                );
-            };
-
-            let (pointer_state, result) = pointer_state.with_press_event(event.switch, ());
-            result.unwrap();
-            let mapping = mapping.filter_by_pointer_data(&());
-            let mapping = if let Some(mapping) = mapping {
-                mapping
-            } else {
-                return (
-                    Self::new(modifiers, timed_state, scheduler, pointer_state),
-                    next_scheduled,
-                    None,
-                );
-            };
-
-            (
-                Self::new(modifiers, timed_state, scheduler, pointer_state),
-                next_scheduled,
-                Some((mapping, event.coords)),
-            )
-        }
-    }
-
-    impl WithEvent<KeyboardSwitchEvent> for KeyboardReleaseState {
-        type EventBuilder = BasicAppEventBuilder;
-        type Coords = ();
-
-        fn with_event<'a>(
-            self,
-            event: KeyboardSwitchEvent,
-            mapping: &'a GlobalMappingCache,
-        ) -> (
-            Self,
-            Option<TimestampMs>,
-            Option<(SwitchBindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
-        ) {
-            let State {
-                modifiers,
-                timed_state,
-                scheduler,
-                pointer_state,
-            } = self;
-
-            let keyboard_press_mapping = mapping.keyboard.press.filter_by_switch(&event.switch);
-            let keyboard_release_mapping = mapping.keyboard.release.filter_by_switch(&event.switch);
-            let keyboard_long_press_mapping =
-                mapping.keyboard.long_press.filter_by_switch(&event.switch);
-            let keyboard_click_exact_mapping =
-                mapping.keyboard.click_exact.filter_by_switch(&event.switch);
-
-            let is_used_as_modifier = mapping
-                .modifiers
-                .switches()
-                .contains(&Switch::Keyboard(event.switch));
-
-            if keyboard_press_mapping.is_none()
-                && keyboard_release_mapping.is_none()
-                && keyboard_long_press_mapping.is_none()
-                && keyboard_click_exact_mapping.is_none()
-                && !is_used_as_modifier
-            {
-                return (
-                    Self::new(modifiers, timed_state, scheduler, pointer_state),
-                    None,
-                    None,
-                );
-            }
-
-            let modifiers = if is_used_as_modifier {
-                let (modifiers, result) =
-                    modifiers.with_release_event(&Switch::Keyboard(event.switch));
-                result.unwrap();
-                modifiers
-            } else {
-                modifiers
-            };
-
-            let event = event.with_modifiers(modifiers.clone());
-
-            let keyboard_press_mapping = keyboard_press_mapping
-                .and_then(|mapping| mapping.filter_by_modifiers(&event.modifiers));
-            let keyboard_release_mapping = keyboard_release_mapping
-                .and_then(|mapping| mapping.filter_by_modifiers(&event.modifiers));
-            let keyboard_long_press_mapping = keyboard_long_press_mapping
-                .and_then(|mapping| mapping.filter_by_modifiers(&event.modifiers));
-            let keyboard_click_exact_mapping = keyboard_click_exact_mapping
-                .and_then(|mapping| mapping.filter_by_modifiers(&event.modifiers));
-
-            if keyboard_press_mapping.is_none()
-                && keyboard_release_mapping.is_none()
-                && keyboard_long_press_mapping.is_none()
-                && keyboard_click_exact_mapping.is_none()
-            {
-                return (
-                    Self::new(modifiers, timed_state, scheduler, pointer_state),
-                    None,
-                    None,
-                );
-            }
-
-            let (timed_state, result) = timed_state.with_release_event(event.switch);
-            let data = result.unwrap();
-
-            let (timed_data, scheduler, next_scheduled) = if let Some((timed_data, request)) = data
-            {
-                let scheduler = scheduler.schedule(event.time, event.clone(), request);
-                let next_scheduled = scheduler.next_scheduled().copied();
-                (Some(timed_data), scheduler, next_scheduled)
-            } else {
-                (None, scheduler, None)
-            };
-
-            let mapping = keyboard_release_mapping
-                .and_then(|mapping| mapping.filter_by_timed_data(&timed_data));
-
-            let mapping = if let Some(mapping) = mapping {
-                mapping
-            } else {
-                return (
-                    Self::new(modifiers, timed_state, scheduler, pointer_state),
-                    next_scheduled,
-                    None,
-                );
-            };
-
-            /*
-                press
-                    nothing to filter mapping
-                    if mapping for release, mouse-trigger
-                    call with_press_event
-                        possibly dragging later
-                trigger
-                    filter mapping
-                    with_move_event
-                        DragStart
-                        DragMove
-                release
-                    filter mapping
-                    with_release_event
-                        DragEnd
-            */
-
-            let (pointer_state, pointer_data) = pointer_state.with_release_event(&event.switch);
-            let pointer_data = pointer_data.unwrap();
-            let mapping = mapping.filter_by_pointer_data(&pointer_data);
-            let mapping = if let Some(mapping) = mapping {
-                mapping
-            } else {
-                return (
-                    Self::new(modifiers, timed_state, scheduler, pointer_state),
-                    next_scheduled,
-                    None,
-                );
-            };
-
-            (
-                Self::new(modifiers, timed_state, scheduler, pointer_state),
-                next_scheduled,
-                Some((mapping, event.coords)),
-            )
-        }
-    }
-
-    fn with_timeout_event<'a, Rq, Td>(
-        mapping: &'a SwitchMappingCache<
-            KeyboardSwitch,
-            Switch,
-            TimedEventData<Td>,
-            (),
-            BasicAppEventBuilder,
-        >,
-        timed_state: TimedState<KeyboardSwitch>,
-        event: SwitchEvent<TimestampMs, KeyboardSwitch, (), Modifiers, ()>,
-        request: Rq,
-        timed_processing: impl FnOnce(
-            TimedState<KeyboardSwitch>,
-            KeyboardSwitch,
-            Rq,
-        )
-            -> (TimedState<KeyboardSwitch>, Option<TimedEventData<Td>>),
-    ) -> (
-        TimedState<KeyboardSwitch>,
-        Option<(SwitchBindings<'a, Switch, BasicAppEventBuilder>, ())>,
-    )
-    where
-        Td: 'a + Eq + Hash,
-    {
-        let mapping =
-            unwrap_or_return!(mapping.filter_by_switch(&event.switch), (timed_state, None));
-
-        let mapping = unwrap_or_return!(
-            mapping.filter_by_modifiers(&event.modifiers),
-            (timed_state, None)
-        );
-        //let (new_timed_state, result) = timed_state.with_long_press_event(event.switch, request);
-        let (timed_state, result) = timed_processing(timed_state, event.switch, request);
-
-        let timed_data = unwrap_or_return!(result, (timed_state, None));
-        let mapping = unwrap_or_return!(
-            mapping.filter_by_timed_data(&timed_data),
-            (timed_state, None)
-        );
-        let bindings = unwrap_or_return!(mapping.filter_by_pointer_data(&()), (timed_state, None));
-        let event = event.with_timed_data(timed_data);
-
-        (timed_state, Some((bindings, event.coords)))
-    }
-
-    impl WithTimeout for KeyboardPressState {
-        type EventBuilder = BasicAppEventBuilder;
-        type Coords = ();
-
-        fn with_timeout<'a>(
-            self,
-            time: TimestampMs,
-            mapping: &'a GlobalMappingCache,
-        ) -> (
-            Self,
-            Vec<(SwitchBindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
-        ) {
-            const KEYBOARD_LONG_PRESS_DURATION: DurationMs = 1000;
-
-            let mut timed_state = self.timed_state;
-            let (scheduler, requests) = self
-                .scheduler
-                .take_scheduled(&(time - KEYBOARD_LONG_PRESS_DURATION));
-            let pointer_state = self.pointer_state;
-            let mut delayed_bindings = Vec::new();
-            for (_, requests) in requests {
-                for (event, request) in requests {
-                    let (new_timed_state, result) = with_timeout_event(
-                        &mapping.keyboard.long_press,
-                        timed_state,
-                        event,
-                        request,
-                        |timed_state, switch, request| {
-                            let (timed_state, result) =
-                                timed_state.with_long_press_event(switch, request);
-                            (timed_state, result.unwrap())
-                        },
-                    );
-                    timed_state = new_timed_state;
-                    if let Some((bindings, coords)) = result {
-                        delayed_bindings.push((bindings, coords));
-                    }
-                }
-            }
-            (
-                Self::new(self.modifiers, timed_state, scheduler, pointer_state),
-                delayed_bindings,
-            )
-        }
-    }
-
-    impl WithTimeout for KeyboardReleaseState {
-        type EventBuilder = BasicAppEventBuilder;
-        type Coords = ();
-
-        fn with_timeout<'a>(
-            self,
-            time: TimestampMs,
-            mapping: &'a GlobalMappingCache,
-        ) -> (
-            Self,
-            Vec<(SwitchBindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
-        ) {
-            // TODO: Better filtering
-
-            const KEYBOARD_CLICK_EXACT_DURATION: DurationMs = 300;
-
-            let mut timed_state = self.timed_state;
-            let (scheduler, requests) = self
-                .scheduler
-                .take_scheduled(&(time - KEYBOARD_CLICK_EXACT_DURATION));
-            let pointer_state = self.pointer_state;
-            let mut delayed_bindings = Vec::new();
-            for (_, requests) in requests {
-                for (event, request) in requests {
-                    let (new_timed_state, result) = with_timeout_event(
-                        &mapping.keyboard.click_exact,
-                        timed_state,
-                        event,
-                        request,
-                        |timed_state, switch, request| {
-                            let (timed_state, result) =
-                                timed_state.with_click_exact_event(switch, request);
-                            (timed_state, result.unwrap())
-                        },
-                    );
-                    timed_state = new_timed_state;
-                    if let Some((bindings, coords)) = result {
-                        delayed_bindings.push((bindings, coords));
-                    }
-                    /*
-                    let mapping = mapping.keyboard_click_exact.filter_by_switch(&event.switch);
-                    let mapping = if let Some(mapping) = mapping {
-                        mapping
-                    } else {
-                        continue;
-                    };
-
-                    let mapping = mapping.filter_by_modifiers(&event.modifiers);
-                    let mapping = if let Some(mapping) = mapping {
-                        mapping
-                    } else {
-                        continue;
-                    };
-
-                    let (new_timed_state, result) =
-                        timed_state.with_click_exact_event(event.switch, request);
-                    timed_state = new_timed_state;
-
-                    let timed_data = result.unwrap();
-                    let timed_data = if let Some(timed_data) = timed_data {
-                        timed_data
-                    } else {
-                        continue;
-                    };
-
-                    let mapping = mapping.filter_by_timed_data(&timed_data);
-
-                    let event = event.with_timed_data(timed_data);
-
-                    //println!("Ev4: {:?}", event);
-                    if let Some(mapping) = mapping {
-                        //println!("Ma4: {:?}", mapping.inner());
-                        bindings.push((mapping, event.coords));
-                    }*/
-                }
-            }
-            (
-                Self::new(self.modifiers, timed_state, scheduler, pointer_state),
-                delayed_bindings,
-            )
-        }
-    }
+    /*
+        press
+            nothing to filter mapping
+            if mapping for release, mouse-trigger
+            call with_press_event
+                possibly dragging later
+        trigger
+            filter mapping
+            with_move_event
+                DragStart
+                DragMove
+        release
+            filter mapping
+            with_release_event
+                DragEnd
+    */
 
     /*#[derive(Clone, Debug)]
     pub struct GlobalMapping {
@@ -621,12 +228,13 @@ fn test_chain() {
     }*/
 
     #[derive(Clone, Debug)]
-    pub struct GlobalMappingCache<'a> {
+    pub struct GlobalMappingCache {
         keyboard: DeviceMappingCache<KeyboardSwitch, (), Switch, BasicAppEventBuilder>,
-        modifiers: ModifiersCache<&'a Switch>,
+        mouse: DeviceMappingCache<MouseSwitch, (), Switch, PointerAppEventBuilder>,
+        modifiers: MappingModifiersCache<Switch>,
     }
 
-    impl<'a> GlobalMappingCache<'a> {
+    impl GlobalMappingCache {
         fn contains(&self, switch: &Switch) -> bool {
             self.modifiers.switches().contains(switch)
         }
@@ -690,21 +298,38 @@ fn test_chain() {
         .into_iter()
         .collect(),
     );
+    let mouse_mapping = MouseMapping::new(
+        [Binding::Press(SwitchBinding {
+            switch: MouseSwitch("LeftMouseButton"),
+            modifiers: Modifiers::new(),
+            timed_data: (),
+            pointer_data: (),
+            event: PointerAppEventBuilder::CreateNode(10),
+        })]
+        .into_iter()
+        .collect(),
+    );
 
     /*let mapping = GlobalMapping {
-        keyboard: keyboard_mapping,
+        keyboard: mapping,
     };*/
 
     let mapping_cache = GlobalMappingCache {
-        keyboard: DeviceMappingCache::from_mapping(keyboard_mapping.clone()),
-        modifiers: ModifiersCache::from(&keyboard_mapping),
+        keyboard: DeviceMappingCache::from_bindings(keyboard_mapping.bindings()),
+        mouse: DeviceMappingCache::from_bindings(mouse_mapping.bindings()),
+        modifiers: MappingModifiersCache::from_bindings(
+            keyboard_mapping.bindings(), /* + mouse_mapping */
+        ),
     };
 
     let mut global_state = GlobalState::default();
 
+    #[derive(Clone, Debug)]
     enum RawEvent {
         KeyboardPress(KeyboardSwitchEvent),
         KeyboardRelease(KeyboardSwitchEvent),
+        MousePress(MouseSwitchEvent),
+        MouseRelease(MouseSwitchEvent),
     }
 
     impl RawEvent {
@@ -712,6 +337,8 @@ fn test_chain() {
             match self {
                 RawEvent::KeyboardPress(event) => event.time,
                 RawEvent::KeyboardRelease(event) => event.time,
+                RawEvent::MousePress(event) => event.time,
+                RawEvent::MouseRelease(event) => event.time,
             }
         }
     }
@@ -773,14 +400,14 @@ fn test_chain() {
             let global_state = self;
 
             let (state, global_state): (KeyboardPressState, _) = global_state.take_state();
-            let (state, press_bindings) = state.with_timeout(time, mapping);
+            let (state, press_bindings) = state.with_press_timeout(time, &mapping.keyboard);
             let global_state = global_state.with_state(state);
             let press_bindings = press_bindings
                 .into_iter()
                 .filter_map(|(bindings, coords)| build_bindings(bindings, &coords));
 
             let (state, global_state): (KeyboardReleaseState, _) = global_state.take_state();
-            let (state, release_bindings) = state.with_timeout(time, mapping);
+            let (state, release_bindings) = state.with_release_timeout(time, &mapping.keyboard);
             let global_state = global_state.with_state(state);
             let release_bindings = release_bindings
                 .into_iter()
@@ -806,7 +433,8 @@ fn test_chain() {
             let (global_state, scheduled, bindings) = match event {
                 RawEvent::KeyboardPress(event) => {
                     let (state, global_state): (KeyboardPressState, _) = global_state.take_state();
-                    let (state, scheduled, bindings) = state.with_event(event, &mapping);
+                    let (state, scheduled, bindings) =
+                        state.with_press_event(event, &mapping.keyboard, &mapping.modifiers);
                     let bindings =
                         bindings.and_then(|(bindings, coords)| build_bindings(bindings, &coords));
                     (global_state.with_state(state), scheduled, bindings)
@@ -814,7 +442,25 @@ fn test_chain() {
                 RawEvent::KeyboardRelease(event) => {
                     let (state, global_state): (KeyboardReleaseState, _) =
                         global_state.take_state();
-                    let (state, scheduled, bindings) = state.with_event(event, &mapping);
+                    let (state, scheduled, bindings) =
+                        state.with_release_event(event, &mapping.keyboard, &mapping.modifiers);
+                    let bindings =
+                        bindings.and_then(|(bindings, coords)| build_bindings(bindings, &coords));
+                    (global_state.with_state(state), scheduled, bindings)
+                }
+                RawEvent::MousePress(event) => {
+                    let (state, global_state): (MousePressState, _) = global_state.take_state();
+                    let (state, scheduled, bindings) =
+                        state.with_press_event(event, &mapping.mouse, &mapping.modifiers);
+                    let bindings =
+                        bindings.and_then(|(bindings, coords)| build_bindings(bindings, &coords));
+                    (global_state.with_state(state), scheduled, bindings)
+                }
+
+                RawEvent::MouseRelease(event) => {
+                    let (state, global_state): (MouseReleaseState, _) = global_state.take_state();
+                    let (state, scheduled, bindings) =
+                        state.with_release_event(event, &mapping.mouse, &mapping.modifiers);
                     let bindings =
                         bindings.and_then(|(bindings, coords)| build_bindings(bindings, &coords));
                     (global_state.with_state(state), scheduled, bindings)
@@ -887,9 +533,40 @@ fn test_chain() {
             KeyboardSwitch("LeftAlt"),
             (),
         )),
+        RawEvent::MousePress(MouseSwitchEvent::new(
+            4000,
+            MouseSwitch("LeftMouseButton"),
+            (150, 150),
+        )),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(
+            4100,
+            MouseSwitch("LeftMouseButton"),
+            (150, 150),
+        )),
+        RawEvent::MousePress(MouseSwitchEvent::new(
+            4200,
+            MouseSwitch("LeftMouseButton"),
+            (50, 50),
+        )),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(
+            4300,
+            MouseSwitch("LeftMouseButton"),
+            (50, 50),
+        )),
+        RawEvent::MousePress(MouseSwitchEvent::new(
+            4400,
+            MouseSwitch("LeftMouseButton"),
+            (150, 150),
+        )),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(
+            4500,
+            MouseSwitch("LeftMouseButton"),
+            (150, 150),
+        )),
     ];
 
     for event in events {
+        println!("Ev: {:?}", event);
         let (new_global_state, scheduled, delayed_bindings, bindings) =
             global_state.with_event(event, &mapping_cache);
         global_state = new_global_state;

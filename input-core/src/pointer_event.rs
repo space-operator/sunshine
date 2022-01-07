@@ -15,18 +15,18 @@ enum SwitchState<Co> {
     Moving,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum PointerMoveEventKind {
     DragStart,
     DragMove,
 }
 
-#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub enum PointerChangeEventData {
     DragEnd,
 }
 
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
 pub struct PointerMoveEventData<Sw> {
     pub switch: Sw,
     pub kind: PointerMoveEventKind,

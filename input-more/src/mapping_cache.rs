@@ -2,11 +2,13 @@ use core::hash::Hash;
 use core::marker::PhantomData;
 
 use input_core::{
-    PointerChangeEventData, TimedClickExactEventData, TimedLongPressEventData,
+    Modifiers, PointerChangeEventData, TimedClickExactEventData, TimedLongPressEventData,
     TimedReleaseEventData,
 };
 
-use crate::{Binding, DeviceMapping, SwitchMappingBySwitch, SwitchMappingCache};
+use crate::{
+    Binding, DeviceMapping, SwitchMappingByModifiers, SwitchMappingBySwitch, SwitchMappingCache,
+};
 
 #[derive(Clone, Debug)]
 pub struct MappingCache<Pr, Re, Lo, Cl, Tr, Mo> {
@@ -29,20 +31,27 @@ pub type DeviceMappingCache<Sw, Tr, Mo, Ev> = MappingCache<
 
 impl<Sw, Tr, Mo, Ev> DeviceMappingCache<Sw, Tr, Mo, Ev>
 where
-    Sw: Eq + Hash,
-    Mo: Eq + Hash,
+    Sw: Clone + Eq + Hash,
+    Mo: Clone + Eq + Hash,
+    Ev: Clone,
 {
-    pub fn from_mapping(mapping: DeviceMapping<Sw, Tr, Mo, Ev>) -> Self {
+    pub fn from_bindings<'a>(mapping: impl IntoIterator<Item = &'a Binding<Sw, Tr, Mo, Ev>>) -> Self
+    where
+        Sw: 'a,
+        Tr: 'a,
+        Ev: 'a,
+        Mo: 'a,
+    {
         let mut press = Vec::new();
         let mut release = Vec::new();
         let mut long_press = Vec::new();
         let mut click_exact = Vec::new();
-        for binding in mapping.into_bindings() {
+        for binding in mapping.into_iter() {
             match binding {
-                Binding::Press(binding) => press.push(binding),
-                Binding::Release(binding) => release.push(binding),
-                Binding::LongPress(binding) => long_press.push(binding),
-                Binding::ClickExact(binding) => click_exact.push(binding),
+                Binding::Press(binding) => press.push(binding.clone()),
+                Binding::Release(binding) => release.push(binding.clone()),
+                Binding::LongPress(binding) => long_press.push(binding.clone()),
+                Binding::ClickExact(binding) => click_exact.push(binding.clone()),
                 Binding::Trigger(_) => todo!(),
                 Binding::Move(_) => todo!(),
             }
@@ -58,34 +67,32 @@ where
     }
 }
 
-impl<Sw, Mo, TdPr, TdRe, TdLo, TdCl, PdPr, PdRe, PrLo, PrCl, Ev>
+impl<Sw, Tr, Mo, TdPr, TdRe, TdLo, TdCl, PdPr, PdRe, PrLo, PrCl, Ev>
     MappingCache<
         SwitchMappingCache<Sw, Mo, TdPr, PdPr, Ev>,
         SwitchMappingCache<Sw, Mo, TdRe, PdRe, Ev>,
         SwitchMappingCache<Sw, Mo, TdLo, PrLo, Ev>,
         SwitchMappingCache<Sw, Mo, TdCl, PrCl, Ev>,
-        (),
+        PhantomData<Tr>,
         (),
     >
-where
-    Sw: Eq + Hash,
-    Mo: Eq + Hash,
 {
-    pub fn filter_by_switch(
-        &self,
+    pub fn filter_by_switch<'a>(
+        &'a self,
         switch: &Sw,
     ) -> Option<
         MappingCache<
-            Option<SwitchMappingBySwitch<'_, Mo, TdPr, PdPr, Ev>>,
-            Option<SwitchMappingBySwitch<'_, Mo, TdRe, PdRe, Ev>>,
-            Option<SwitchMappingBySwitch<'_, Mo, TdLo, PrLo, Ev>>,
-            Option<SwitchMappingBySwitch<'_, Mo, TdCl, PrCl, Ev>>,
-            (),
+            Option<SwitchMappingBySwitch<'a, Mo, TdPr, PdPr, Ev>>,
+            Option<SwitchMappingBySwitch<'a, Mo, TdRe, PdRe, Ev>>,
+            Option<SwitchMappingBySwitch<'a, Mo, TdLo, PrLo, Ev>>,
+            Option<SwitchMappingBySwitch<'a, Mo, TdCl, PrCl, Ev>>,
+            PhantomData<Tr>,
             (),
         >,
     >
     where
         Sw: Eq + Hash,
+        Mo: Eq + Hash,
     {
         let press = self.press.filter_by_switch(switch);
         let release = self.release.filter_by_switch(switch);
@@ -98,7 +105,63 @@ where
                 release,
                 long_press,
                 click_exact,
-                trigger: (),
+                trigger: PhantomData,
+                moves: (),
+            }),
+        }
+    }
+}
+
+impl<'a, Tr, Mo, TdPr, TdRe, TdLo, TdCl, PdPr, PdRe, PrLo, PrCl, Ev>
+    MappingCache<
+        Option<SwitchMappingBySwitch<'a, Mo, TdPr, PdPr, Ev>>,
+        Option<SwitchMappingBySwitch<'a, Mo, TdRe, PdRe, Ev>>,
+        Option<SwitchMappingBySwitch<'a, Mo, TdLo, PrLo, Ev>>,
+        Option<SwitchMappingBySwitch<'a, Mo, TdCl, PrCl, Ev>>,
+        PhantomData<Tr>,
+        (),
+    >
+{
+    pub fn filter_by_modifiers(
+        &self,
+        modifiers: &Modifiers<Mo>,
+    ) -> Option<
+        MappingCache<
+            Option<SwitchMappingByModifiers<'a, Mo, TdPr, PdPr, Ev>>,
+            Option<SwitchMappingByModifiers<'a, Mo, TdRe, PdRe, Ev>>,
+            Option<SwitchMappingByModifiers<'a, Mo, TdLo, PrLo, Ev>>,
+            Option<SwitchMappingByModifiers<'a, Mo, TdCl, PrCl, Ev>>,
+            PhantomData<Tr>,
+            (),
+        >,
+    >
+    where
+        Mo: Eq + Hash + Ord,
+    {
+        let press = self
+            .press
+            .as_ref()
+            .and_then(|mapping| mapping.filter_by_modifiers(modifiers));
+        let release = self
+            .release
+            .as_ref()
+            .and_then(|mapping| mapping.filter_by_modifiers(modifiers));
+        let long_press = self
+            .long_press
+            .as_ref()
+            .and_then(|mapping| mapping.filter_by_modifiers(modifiers));
+        let click_exact = self
+            .click_exact
+            .as_ref()
+            .and_then(|mapping| mapping.filter_by_modifiers(modifiers));
+        match (&press, &release, &long_press, &click_exact) {
+            (None, None, None, None) => None,
+            _ => Some(MappingCache {
+                press,
+                release,
+                long_press,
+                click_exact,
+                trigger: PhantomData,
                 moves: (),
             }),
         }

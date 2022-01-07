@@ -1,7 +1,8 @@
 use core::marker::PhantomData;
 
 use crate::{
-    define_markers, define_struct_take_and_with_field, State, StructTakeField, StructWithField,
+    define_markers, define_struct_take_and_with_field, DeviceState, StructTakeField,
+    StructWithField,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -70,7 +71,7 @@ impl<Mo, TsKe, TsMo, ShKeLo, ShKeCl, ShMoLo, ShMoCl, PoKe, PoMo>
 
     pub fn take_state<Ts, Sh, Po, Re1, Ma1, Re2, Ma2, Re3, Ma3, Re4, Ma4>(
         self,
-    ) -> (State<Mo, Ts, Sh, Po>, Re4)
+    ) -> (DeviceState<Mo, Ts, Sh, Po>, Re4)
     where
         Self: StructTakeField<Mo, Ma1, Rest = Re1>,
         Re1: StructTakeField<Ts, Ma2, Rest = Re2>,
@@ -82,7 +83,7 @@ impl<Mo, TsKe, TsMo, ShKeLo, ShKeCl, ShMoLo, ShMoCl, PoKe, PoMo>
         let (scheduler, rest) = rest.take_field();
         let (pointer_state, rest) = rest.take_field();
         (
-            State::new(modifiers, timed_state, scheduler, pointer_state),
+            DeviceState::new(modifiers, timed_state, scheduler, pointer_state),
             rest,
         )
     }
@@ -93,7 +94,7 @@ impl<Mo, TsKe, TsMo, ShKeLo, ShKeCl, ShMoLo, ShMoCl, PoKe, PoMo>
 {
     pub fn with_state<Ts, Sh, Po, Re1, Ma1, Re2, Ma2, Re3, Ma3, Re4, Ma4>(
         self,
-        state: State<Mo, Ts, Sh, Po>,
+        state: DeviceState<Mo, Ts, Sh, Po>,
     ) -> Re4
     where
         Self: StructWithField<Mo, Ma1, Output = Re1>,
@@ -112,8 +113,9 @@ impl<Mo, TsKe, TsMo, ShKeLo, ShKeCl, ShMoLo, ShMoCl, PoKe, PoMo>
 fn test1() {
     let global_state = GlobalState::new(1, false, (), "123", (), (), (), (1, 2), ());
 
-    let (state, global_state): (State<i32, bool, &str, (u8, u8)>, _) = global_state.take_state();
-    let state = State {
+    let (state, global_state): (DeviceState<i32, bool, &str, (u8, u8)>, _) =
+        global_state.take_state();
+    let state = DeviceState {
         modifiers: state.modifiers + 10,
         timed_state: !state.timed_state,
         scheduler: &state.scheduler[1..3],
