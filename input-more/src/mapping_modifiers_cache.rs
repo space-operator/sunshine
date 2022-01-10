@@ -12,7 +12,13 @@ impl<Mo> MappingModifiersCache<Mo>
 where
     Mo: Clone + Eq + Hash,
 {
-    pub fn from_bindings<'a, Sw, Tr, Ev>(
+    pub fn from_switches(switches: impl IntoIterator<Item = Mo>) -> Self {
+        Self {
+            switches: switches.into_iter().collect(),
+        }
+    }
+
+    /*pub fn from_bindings<'a, Sw, Tr, Ev>(
         mapping: impl IntoIterator<Item = &'a Binding<Sw, Tr, Mo, Ev>>,
     ) -> Self
     where
@@ -32,7 +38,7 @@ where
             })*/
             .collect();
         Self { switches }
-    }
+    }*/
 }
 
 /*

@@ -1,8 +1,8 @@
 use core::hash::Hash;
 
 use input_core::{
-    ClickExactHandleRequest, LongPressHandleRequest, Modifiers, PointerState, SchedulerState,
-    TimedEventData, TimedState,
+    ClickExactHandleRequest, CoordsState, LongPressHandleRequest, Modifiers, PointerState,
+    SchedulerState, TimedEventData, TimedState,
 };
 
 use crate::{
@@ -11,8 +11,9 @@ use crate::{
 };
 
 #[derive(Clone, Debug, Default)]
-pub struct DeviceState<Mo, Ts, Sh, Po> {
+pub struct DeviceState<Mo, Cs, Ts, Sh, Po> {
     pub modifiers: Mo,
+    pub coords_state: Cs,
     pub timed_state: Ts,
     pub scheduler: Sh,
     pub pointer_state: Po,
@@ -20,6 +21,7 @@ pub struct DeviceState<Mo, Ts, Sh, Po> {
 
 define_markers!(
     ModifiersMarker,
+    CoordStateMarker,
     TimedStateMarker,
     SchedulerMarker,
     PointerMarker
@@ -27,15 +29,23 @@ define_markers!(
 
 define_struct_take_and_with_field!(DeviceState {
     modifiers: Mo + ModifiersMarker,
+    coords_state: Cs + CoordStateMarker,
     timed_state: Ts + TimedStateMarker,
     scheduler: Sh + SchedulerMarker,
     pointer_state: Po + PointerMarker,
 });
 
-impl<Mo, Ts, Sh, Po> DeviceState<Mo, Ts, Sh, Po> {
-    pub fn new(modifiers: Mo, timed_state: Ts, scheduler: Sh, pointer_state: Po) -> Self {
+impl<Mo, Cs, Ts, Sh, Po> DeviceState<Mo, Cs, Ts, Sh, Po> {
+    pub fn new(
+        modifiers: Mo,
+        coords_state: Cs,
+        timed_state: Ts,
+        scheduler: Sh,
+        pointer_state: Po,
+    ) -> Self {
         Self {
             modifiers,
+            coords_state,
             timed_state,
             scheduler,
             pointer_state,
@@ -46,17 +56,18 @@ impl<Mo, Ts, Sh, Po> DeviceState<Mo, Ts, Sh, Po> {
 impl<Sw, Mo, Ti, Co>
     DeviceState<
         Modifiers<Mo>,
+        CoordsState<Co>,
         TimedState<Sw>,
-        SchedulerState<Ti, (SwitchEvent<Ti, Sw, Co>, Modifiers<Mo>), LongPressHandleRequest>,
+        SchedulerState<Ti, (SwitchEvent<Ti, Sw>, Modifiers<Mo>, Co), LongPressHandleRequest>,
         PointerState<Sw, Co>,
     >
 {
-    pub fn with_press_event<'a, Tr, Bi>(
+    pub fn with_press_event<'a, Tr, EvPr, EvRe, EvLo, EvCl>(
         mut self,
-        event: SwitchEvent<Ti, Sw, Co>,
-        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Bi>,
+        event: SwitchEvent<Ti, Sw>,
+        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl>,
         mapping_modifiers: &MappingModifiersCache<Mo>,
-    ) -> (Self, Option<Ti>, Option<(SwitchBindings<'a, Mo, Bi>, Co)>)
+    ) -> (Self, Option<Ti>, Option<(SwitchBindings<'a, Mo, EvPr>, Co)>)
     where
         Sw: Clone + Eq + Hash,
         Mo: Clone + Eq + From<Sw> + Hash + Ord,
@@ -96,14 +107,20 @@ impl<Sw, Mo, Ti, Co>
         self = rest.with_field(timed_state);
 
         let (scheduler, rest): (
-            SchedulerState<Ti, (SwitchEvent<Ti, Sw, Co>, Modifiers<Mo>), LongPressHandleRequest>,
+            SchedulerState<Ti, (SwitchEvent<Ti, Sw>, Modifiers<Mo>, Co), LongPressHandleRequest>,
             _,
         ) = self.take_field();
+        let (coords_state, rest): (CoordsState<Co>, _) = rest.take_field();
         let scheduler = scheduler.schedule(
             event.time.clone(),
-            (event.clone(), modifiers.clone()),
+            (
+                event.clone(),
+                modifiers.clone(),
+                coords_state.coords().clone(),
+            ),
             request,
         );
+        let rest = rest.with_field(coords_state);
         let next_scheduled = scheduler.next_scheduled().cloned();
         self = rest.with_field(scheduler);
 
@@ -115,23 +132,29 @@ impl<Sw, Mo, Ti, Co>
         //let mapping = unwrap_or_return!(mapping, (self, next_scheduled, None)); // FIXME
 
         let (pointer_state, rest): (PointerState<Sw, Co>, _) = self.take_field();
+        let (coords_state, rest): (CoordsState<Co>, _) = rest.take_field();
         let (pointer_state, result) =
-            pointer_state.with_press_event(event.switch, event.coords.clone());
+            pointer_state.with_press_event(event.switch, coords_state.coords().clone());
         //result.unwrap(); // FIXME
+        let rest = rest.with_field(coords_state);
         self = rest.with_field(pointer_state);
         let mapping = unwrap_or_return!(mapping, (self, next_scheduled, None)); // FIXME
 
         let mapping = mapping.filter_by_pointer_data(&());
         let mapping = mapping.expect("filtering should never fails");
 
-        (self, next_scheduled, Some((mapping, event.coords)))
+        let (coords_state, rest): (CoordsState<Co>, _) = self.take_field();
+        let coords = coords_state.coords().clone();
+        self = rest.with_field(coords_state);
+
+        (self, next_scheduled, Some((mapping, coords)))
     }
 
-    pub fn with_press_timeout<'a, Tr, Bi>(
-        mut self,
+    pub fn with_press_timeout<'a, Tr, EvPr, EvRe, EvLo, EvCl>(
+        self,
         time_minus_long_press_duration: Ti, // TODO: Time at Long press handling event already happend for time before that
-        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Bi>,
-    ) -> (Self, Vec<(SwitchBindings<'a, Mo, Bi>, Co)>)
+        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl>,
+    ) -> (Self, Vec<(SwitchBindings<'a, Mo, EvLo>, Co)>)
     where
         Sw: Eq + Hash,
         Mo: Eq + Hash + Ord,
@@ -142,7 +165,7 @@ impl<Sw, Mo, Ti, Co>
         let (mut timed_state, rest): (TimedState<Sw>, _) = self.take_field();
 
         let (scheduler, rest): (
-            SchedulerState<Ti, (SwitchEvent<Ti, Sw, Co>, Modifiers<Mo>), LongPressHandleRequest>,
+            SchedulerState<Ti, (SwitchEvent<Ti, Sw>, Modifiers<Mo>, Co), LongPressHandleRequest>,
             _,
         ) = rest.take_field();
         let (pointer_state, rest): (PointerState<Sw, Co>, _) = rest.take_field();
@@ -152,12 +175,13 @@ impl<Sw, Mo, Ti, Co>
 
         let mut delayed_bindings = Vec::new();
         for (_, requests) in requests {
-            for ((event, modifiers), request) in requests {
+            for ((event, modifiers, coords), request) in requests {
                 let (new_timed_state, result) = with_timeout_event(
                     &mapping.long_press,
                     timed_state,
                     event,
                     modifiers,
+                    coords,
                     request,
                     |timed_state, switch, request| {
                         let (timed_state, result) =
@@ -178,17 +202,18 @@ impl<Sw, Mo, Ti, Co>
 impl<Sw, Mo, Ti, Co>
     DeviceState<
         Modifiers<Mo>,
+        CoordsState<Co>,
         TimedState<Sw>,
-        SchedulerState<Ti, (SwitchEvent<Ti, Sw, Co>, Modifiers<Mo>), ClickExactHandleRequest>,
+        SchedulerState<Ti, (SwitchEvent<Ti, Sw>, Modifiers<Mo>, Co), ClickExactHandleRequest>,
         PointerState<Sw, Co>,
     >
 {
-    pub fn with_release_event<'a, Tr, Bi>(
+    pub fn with_release_event<'a, Tr, EvPr, EvRe, EvLo, EvCl>(
         mut self,
-        event: SwitchEvent<Ti, Sw, Co>,
-        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Bi>,
+        event: SwitchEvent<Ti, Sw>,
+        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl>,
         mapping_modifiers: &MappingModifiersCache<Mo>,
-    ) -> (Self, Option<Ti>, Option<(SwitchBindings<'a, Mo, Bi>, Co)>)
+    ) -> (Self, Option<Ti>, Option<(SwitchBindings<'a, Mo, EvRe>, Co)>)
     where
         Sw: Clone + Eq + Hash,
         Mo: Clone + Eq + From<Sw> + Hash + Ord,
@@ -233,17 +258,23 @@ impl<Sw, Mo, Ti, Co>
                 let (scheduler, rest): (
                     SchedulerState<
                         Ti,
-                        (SwitchEvent<Ti, Sw, Co>, Modifiers<Mo>),
+                        (SwitchEvent<Ti, Sw>, Modifiers<Mo>, Co),
                         ClickExactHandleRequest,
                     >,
                     _,
                 ) = self.take_field();
+                let (coords_state, rest): (CoordsState<Co>, _) = rest.take_field();
                 let scheduler = scheduler.schedule(
                     event.time.clone(),
-                    (event.clone(), modifiers.clone()),
+                    (
+                        event.clone(),
+                        modifiers.clone(),
+                        coords_state.coords().clone(),
+                    ),
                     request,
                 );
                 let next_scheduled = scheduler.next_scheduled().cloned();
+                let rest = rest.with_field(coords_state);
                 self = rest.with_field(scheduler);
                 (Some(timed_data), next_scheduled)
             }
@@ -266,14 +297,18 @@ impl<Sw, Mo, Ti, Co>
         let mapping = mapping.filter_by_pointer_data(&pointer_data);
         let mapping = unwrap_or_return!(mapping, (self, next_scheduled, None));
 
-        (self, next_scheduled, Some((mapping, event.coords)))
+        let (coords_state, rest): (CoordsState<Co>, _) = self.take_field();
+        let coords = coords_state.coords().clone();
+        self = rest.with_field(coords_state);
+
+        (self, next_scheduled, Some((mapping, coords)))
     }
 
-    pub fn with_release_timeout<'a, Tr, Bi>(
-        mut self,
+    pub fn with_release_timeout<'a, Tr, EvPr, EvRe, EvLo, EvCl>(
+        self,
         time_minus_click_exact_duration: Ti, // TODO: Time at Long press handling event already happend for time before that
-        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Bi>,
-    ) -> (Self, Vec<(SwitchBindings<'a, Mo, Bi>, Co)>)
+        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl>,
+    ) -> (Self, Vec<(SwitchBindings<'a, Mo, EvCl>, Co)>)
     where
         Sw: Eq + Hash,
         Mo: Eq + Hash + Ord,
@@ -284,7 +319,7 @@ impl<Sw, Mo, Ti, Co>
         let (mut timed_state, rest): (TimedState<Sw>, _) = self.take_field();
 
         let (scheduler, rest): (
-            SchedulerState<Ti, (SwitchEvent<Ti, Sw, Co>, Modifiers<Mo>), ClickExactHandleRequest>,
+            SchedulerState<Ti, (SwitchEvent<Ti, Sw>, Modifiers<Mo>, Co), ClickExactHandleRequest>,
             _,
         ) = rest.take_field();
         let (pointer_state, rest): (PointerState<Sw, Co>, _) = rest.take_field();
@@ -294,12 +329,13 @@ impl<Sw, Mo, Ti, Co>
 
         let mut delayed_bindings = Vec::new();
         for (_, requests) in requests {
-            for ((event, modifiers), request) in requests {
+            for ((event, modifiers, coords), request) in requests {
                 let (new_timed_state, result) = with_timeout_event(
                     &mapping.click_exact,
                     timed_state,
                     event,
                     modifiers,
+                    coords,
                     request,
                     |timed_state, switch, request| {
                         let (timed_state, result) =
@@ -320,8 +356,9 @@ impl<Sw, Mo, Ti, Co>
 fn with_timeout_event<'a, Sw, Mo, Ti, Co, Rq, Td, Bi>(
     mapping: &'a SwitchMappingCache<Sw, Mo, TimedEventData<Td>, (), Bi>,
     timed_state: TimedState<Sw>,
-    event: SwitchEvent<Ti, Sw, Co>,
+    event: SwitchEvent<Ti, Sw>,
     modifiers: Modifiers<Mo>,
+    coords: Co,
     request: Rq,
     timed_processing: impl FnOnce(
         TimedState<Sw>,
@@ -349,7 +386,7 @@ where
     );
     let bindings = unwrap_or_return!(mapping.filter_by_pointer_data(&()), (timed_state, None));
 
-    (timed_state, Some((bindings, event.coords)))
+    (timed_state, Some((bindings, coords)))
 }
 /*pub fn with_press_event<Ti, Sw, Co, KePrMa, KeReMa, KeLoMa, KeClMa>(
     self,
@@ -370,16 +407,16 @@ pub fn with_release_event<Ti, Sw, Co, KePrMa, KeReMa, KeLoMa, KeClMa>(
 #[test]
 fn test() {
     use crate::{StructTakeField, StructWithField};
-    let state = DeviceState::new(1, false, "123", (1, 2));
+    let state = DeviceState::new(1, (false,), false, "123", (1, 2));
 
     let (modifiers, rest): (i32, _) = state.take_field();
-    let state: DeviceState<_, _, _, _> = rest.with_field(modifiers + 10);
+    let state: DeviceState<_, _, _, _, _> = rest.with_field(modifiers + 10);
 
     let (timed, rest): (bool, _) = state.take_field();
-    let state: DeviceState<_, _, _, _> = rest.with_field(!timed);
+    let state: DeviceState<_, _, _, _, _> = rest.with_field(!timed);
 
     let (scheduler, rest): (&str, _) = state.take_field();
-    let state: DeviceState<_, _, _, _> = rest.with_field(&scheduler[1..3]);
+    let state: DeviceState<_, _, _, _, _> = rest.with_field(&scheduler[1..3]);
 
     assert_eq!(state.modifiers, 11);
     assert_eq!(state.timed_state, true);

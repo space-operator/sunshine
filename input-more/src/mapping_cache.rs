@@ -6,9 +6,7 @@ use input_core::{
     TimedReleaseEventData,
 };
 
-use crate::{
-    Binding, DeviceMapping, SwitchMappingByModifiers, SwitchMappingBySwitch, SwitchMappingCache,
-};
+use crate::{Binding, SwitchMappingByModifiers, SwitchMappingBySwitch, SwitchMappingCache};
 
 #[derive(Clone, Debug)]
 pub struct MappingCache<Pr, Re, Lo, Cl, Tr, Mo> {
@@ -20,26 +18,36 @@ pub struct MappingCache<Pr, Re, Lo, Cl, Tr, Mo> {
     pub moves: Mo,
 }
 
-pub type DeviceMappingCache<Sw, Tr, Mo, Ev> = MappingCache<
-    SwitchMappingCache<Sw, Mo, (), (), Ev>,
-    SwitchMappingCache<Sw, Mo, Option<TimedReleaseEventData>, Option<PointerChangeEventData>, Ev>,
-    SwitchMappingCache<Sw, Mo, TimedLongPressEventData, (), Ev>,
-    SwitchMappingCache<Sw, Mo, TimedClickExactEventData, (), Ev>,
+pub type DeviceMappingCache<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl> = MappingCache<
+    SwitchMappingCache<Sw, Mo, (), (), EvPr>,
+    SwitchMappingCache<Sw, Mo, Option<TimedReleaseEventData>, Option<PointerChangeEventData>, EvRe>,
+    SwitchMappingCache<Sw, Mo, TimedLongPressEventData, (), EvLo>,
+    SwitchMappingCache<Sw, Mo, TimedClickExactEventData, (), EvCl>,
     PhantomData<Tr>,
     (),
 >;
 
-impl<Sw, Tr, Mo, Ev> DeviceMappingCache<Sw, Tr, Mo, Ev>
+impl<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl> DeviceMappingCache<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl>
 where
     Sw: Clone + Eq + Hash,
     Mo: Clone + Eq + Hash,
-    Ev: Clone,
+    EvPr: Clone,
+    EvRe: Clone,
+    EvLo: Clone,
+    EvCl: Clone,
 {
-    pub fn from_bindings<'a>(mapping: impl IntoIterator<Item = &'a Binding<Sw, Tr, Mo, Ev>>) -> Self
+    pub fn from_bindings<'a, EvTr, EvCo>(
+        mapping: impl IntoIterator<Item = &'a Binding<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl, EvTr, EvCo>>,
+    ) -> Self
     where
         Sw: 'a,
         Tr: 'a,
-        Ev: 'a,
+        EvPr: 'a,
+        EvRe: 'a,
+        EvLo: 'a,
+        EvCl: 'a,
+        EvTr: 'a,
+        EvCo: 'a,
         Mo: 'a,
     {
         let mut press = Vec::new();
@@ -67,12 +75,12 @@ where
     }
 }
 
-impl<Sw, Tr, Mo, TdPr, TdRe, TdLo, TdCl, PdPr, PdRe, PrLo, PrCl, Ev>
+impl<Sw, Tr, Mo, TdPr, TdRe, TdLo, TdCl, PdPr, PdRe, PrLo, PrCl, EvPr, EvRe, EvLo, EvCl>
     MappingCache<
-        SwitchMappingCache<Sw, Mo, TdPr, PdPr, Ev>,
-        SwitchMappingCache<Sw, Mo, TdRe, PdRe, Ev>,
-        SwitchMappingCache<Sw, Mo, TdLo, PrLo, Ev>,
-        SwitchMappingCache<Sw, Mo, TdCl, PrCl, Ev>,
+        SwitchMappingCache<Sw, Mo, TdPr, PdPr, EvPr>,
+        SwitchMappingCache<Sw, Mo, TdRe, PdRe, EvRe>,
+        SwitchMappingCache<Sw, Mo, TdLo, PrLo, EvLo>,
+        SwitchMappingCache<Sw, Mo, TdCl, PrCl, EvCl>,
         PhantomData<Tr>,
         (),
     >
@@ -82,10 +90,10 @@ impl<Sw, Tr, Mo, TdPr, TdRe, TdLo, TdCl, PdPr, PdRe, PrLo, PrCl, Ev>
         switch: &Sw,
     ) -> Option<
         MappingCache<
-            Option<SwitchMappingBySwitch<'a, Mo, TdPr, PdPr, Ev>>,
-            Option<SwitchMappingBySwitch<'a, Mo, TdRe, PdRe, Ev>>,
-            Option<SwitchMappingBySwitch<'a, Mo, TdLo, PrLo, Ev>>,
-            Option<SwitchMappingBySwitch<'a, Mo, TdCl, PrCl, Ev>>,
+            Option<SwitchMappingBySwitch<'a, Mo, TdPr, PdPr, EvPr>>,
+            Option<SwitchMappingBySwitch<'a, Mo, TdRe, PdRe, EvRe>>,
+            Option<SwitchMappingBySwitch<'a, Mo, TdLo, PrLo, EvLo>>,
+            Option<SwitchMappingBySwitch<'a, Mo, TdCl, PrCl, EvCl>>,
             PhantomData<Tr>,
             (),
         >,
@@ -112,12 +120,12 @@ impl<Sw, Tr, Mo, TdPr, TdRe, TdLo, TdCl, PdPr, PdRe, PrLo, PrCl, Ev>
     }
 }
 
-impl<'a, Tr, Mo, TdPr, TdRe, TdLo, TdCl, PdPr, PdRe, PrLo, PrCl, Ev>
+impl<'a, Tr, Mo, TdPr, TdRe, TdLo, TdCl, PdPr, PdRe, PrLo, PrCl, EvPr, EvRe, EvLo, EvCl>
     MappingCache<
-        Option<SwitchMappingBySwitch<'a, Mo, TdPr, PdPr, Ev>>,
-        Option<SwitchMappingBySwitch<'a, Mo, TdRe, PdRe, Ev>>,
-        Option<SwitchMappingBySwitch<'a, Mo, TdLo, PrLo, Ev>>,
-        Option<SwitchMappingBySwitch<'a, Mo, TdCl, PrCl, Ev>>,
+        Option<SwitchMappingBySwitch<'a, Mo, TdPr, PdPr, EvPr>>,
+        Option<SwitchMappingBySwitch<'a, Mo, TdRe, PdRe, EvRe>>,
+        Option<SwitchMappingBySwitch<'a, Mo, TdLo, PrLo, EvLo>>,
+        Option<SwitchMappingBySwitch<'a, Mo, TdCl, PrCl, EvCl>>,
         PhantomData<Tr>,
         (),
     >
@@ -127,10 +135,10 @@ impl<'a, Tr, Mo, TdPr, TdRe, TdLo, TdCl, PdPr, PdRe, PrLo, PrCl, Ev>
         modifiers: &Modifiers<Mo>,
     ) -> Option<
         MappingCache<
-            Option<SwitchMappingByModifiers<'a, Mo, TdPr, PdPr, Ev>>,
-            Option<SwitchMappingByModifiers<'a, Mo, TdRe, PdRe, Ev>>,
-            Option<SwitchMappingByModifiers<'a, Mo, TdLo, PrLo, Ev>>,
-            Option<SwitchMappingByModifiers<'a, Mo, TdCl, PrCl, Ev>>,
+            Option<SwitchMappingByModifiers<'a, Mo, TdPr, PdPr, EvPr>>,
+            Option<SwitchMappingByModifiers<'a, Mo, TdRe, PdRe, EvRe>>,
+            Option<SwitchMappingByModifiers<'a, Mo, TdLo, PrLo, EvLo>>,
+            Option<SwitchMappingByModifiers<'a, Mo, TdCl, PrCl, EvCl>>,
             PhantomData<Tr>,
             (),
         >,

@@ -33,6 +33,22 @@ fn test_chain() {
             hooray
     */
 
+    /*
+        switch without coords
+        mousemove without switch
+
+        switch
+        trigger
+        coords
+
+        state
+            co
+        touch with coords
+        touchmove with coords
+        switch without coords
+        untouch without coords
+    */
+
     use core::fmt::Debug;
     use core::hash::Hash;
     use std::collections::HashMap;
@@ -129,16 +145,19 @@ fn test_chain() {
     pub type KeyboardMapping = DeviceMapping<KeyboardSwitch, (), Switch, BasicAppEventBuilder>;
     pub type MouseMapping = DeviceMapping<MouseSwitch, (), Switch, PointerAppEventBuilder>;
 
-    pub type KeyboardSwitchEvent = SwitchEvent<TimestampMs, KeyboardSwitch, ()>;
-    pub type MouseSwitchEvent = SwitchEvent<TimestampMs, MouseSwitch, Coords>;
+    pub type KeyboardSwitchEvent = SwitchEvent<TimestampMs, KeyboardSwitch>;
+    pub type MouseSwitchEvent = SwitchEvent<TimestampMs, MouseSwitch>;
 
     pub type Modifiers = input_core::Modifiers<Switch>;
     pub type KeyboardTimedState = TimedState<KeyboardSwitch>;
     pub type MouseTimedState = TimedState<MouseSwitch>;
 
-    pub type CustomState<Ts, Sh, Ps> = DeviceState<Modifiers, Ts, Sh, Ps>;
+    pub type KeyboardCoordsState = CoordsState<()>;
+    pub type MouseCoordsState = CoordsState<Coords>;
+
+    pub type CustomState<Ts, Cs, Sh, Ps> = DeviceState<Modifiers, Cs, Ts, Sh, Ps>;
     pub type CustomScheduler<Sw, Re, Co> =
-        SchedulerState<TimestampMs, (SwitchEvent<TimestampMs, Sw, Co>, Modifiers), Re>;
+        SchedulerState<TimestampMs, (SwitchEvent<TimestampMs, Sw>, Modifiers, Co), Re>;
 
     pub type KeyboardLongPressScheduler =
         CustomScheduler<KeyboardSwitch, LongPressHandleRequest, ()>;
@@ -150,22 +169,32 @@ fn test_chain() {
     pub type KeyboardPointerState = PointerState<KeyboardSwitch, ()>;
     pub type MousePointerState = PointerState<MouseSwitch, Coords>;
 
-    pub type KeyboardPressState =
-        CustomState<KeyboardTimedState, KeyboardLongPressScheduler, KeyboardPointerState>;
-    pub type KeyboardReleaseState =
-        CustomState<KeyboardTimedState, KeyboardClickExactScheduler, KeyboardPointerState>;
-    pub type KeyboardLongPressState = CustomState<MouseTimedState, (), ()>;
-    pub type KeyboardClickExactState = CustomState<MouseTimedState, (), ()>;
+    pub type KeyboardPressState = CustomState<
+        KeyboardTimedState,
+        KeyboardCoordsState,
+        KeyboardLongPressScheduler,
+        KeyboardPointerState,
+    >;
+    pub type KeyboardReleaseState = CustomState<
+        KeyboardTimedState,
+        KeyboardCoordsState,
+        KeyboardClickExactScheduler,
+        KeyboardPointerState,
+    >;
+    pub type KeyboardLongPressState = CustomState<MouseTimedState, KeyboardCoordsState, (), ()>;
+    pub type KeyboardClickExactState = CustomState<MouseTimedState, KeyboardCoordsState, (), ()>;
 
     pub type MousePressState =
-        CustomState<MouseTimedState, MouseLongPressScheduler, MousePointerState>;
+        CustomState<MouseTimedState, MouseCoordsState, MouseLongPressScheduler, MousePointerState>;
     pub type MouseReleaseState =
-        CustomState<MouseTimedState, MouseClickExactScheduler, MousePointerState>;
-    pub type MouseLongPressState = CustomState<MouseTimedState, (), ()>;
-    pub type MouseClickExactState = CustomState<MouseTimedState, (), ()>;
+        CustomState<MouseTimedState, MouseCoordsState, MouseClickExactScheduler, MousePointerState>;
+    pub type MouseLongPressState = CustomState<MouseTimedState, MouseCoordsState, (), ()>;
+    pub type MouseClickExactState = CustomState<MouseTimedState, MouseCoordsState, (), ()>;
 
     pub type GlobalState = input_more::GlobalState<
         Modifiers,
+        KeyboardCoordsState,
+        MouseCoordsState,
         KeyboardTimedState,
         MouseTimedState,
         KeyboardLongPressScheduler,
@@ -322,7 +351,19 @@ fn test_chain() {
         ),
     };
 
-    let mut global_state = GlobalState::default();
+    let mut global_state = GlobalState::new(
+        Modifiers::default(),
+        KeyboardCoordsState::with_coords(()),
+        MouseCoordsState::with_coords((0, 0)),
+        KeyboardTimedState::default(),
+        MouseTimedState::default(),
+        KeyboardLongPressScheduler::default(),
+        KeyboardClickExactScheduler::default(),
+        MouseLongPressScheduler::default(),
+        MouseClickExactScheduler::default(),
+        KeyboardPointerState::default(),
+        MousePointerState::default(),
+    );
 
     #[derive(Clone, Debug)]
     enum RawEvent {
@@ -496,72 +537,72 @@ fn test_chain() {
         RawEvent::KeyboardPress(KeyboardSwitchEvent::new(
             1000,
             KeyboardSwitch("LeftShift"),
-            (),
+            //(),
         )),
         RawEvent::KeyboardPress(KeyboardSwitchEvent::new(
             1100,
             KeyboardSwitch("LeftAlt"),
-            (),
+            //(),
         )),
         RawEvent::KeyboardPress(KeyboardSwitchEvent::new(
             2000,
             KeyboardSwitch("LeftCtrl"),
-            (),
+            //(),
         )),
         RawEvent::KeyboardRelease(KeyboardSwitchEvent::new(
             2100,
             KeyboardSwitch("LeftCtrl"),
-            (),
+            //(),
         )),
         RawEvent::KeyboardPress(KeyboardSwitchEvent::new(
             2200,
             KeyboardSwitch("LeftCtrl"),
-            (),
+            //(),
         )),
         RawEvent::KeyboardRelease(KeyboardSwitchEvent::new(
             2300,
             KeyboardSwitch("LeftCtrl"),
-            (),
+            //(),
         )),
         RawEvent::KeyboardPress(KeyboardSwitchEvent::new(
             3000,
             KeyboardSwitch("LeftShift"),
-            (),
+            //(),
         )),
         RawEvent::KeyboardPress(KeyboardSwitchEvent::new(
             3100,
             KeyboardSwitch("LeftAlt"),
-            (),
+            //(),
         )),
         RawEvent::MousePress(MouseSwitchEvent::new(
             4000,
             MouseSwitch("LeftMouseButton"),
-            (150, 150),
+            //(150, 150),
         )),
         RawEvent::MouseRelease(MouseSwitchEvent::new(
             4100,
             MouseSwitch("LeftMouseButton"),
-            (150, 150),
+            //(150, 150),
         )),
         RawEvent::MousePress(MouseSwitchEvent::new(
             4200,
             MouseSwitch("LeftMouseButton"),
-            (50, 50),
+            //(50, 50),
         )),
         RawEvent::MouseRelease(MouseSwitchEvent::new(
             4300,
             MouseSwitch("LeftMouseButton"),
-            (50, 50),
+            //(50, 50),
         )),
         RawEvent::MousePress(MouseSwitchEvent::new(
             4400,
             MouseSwitch("LeftMouseButton"),
-            (150, 150),
+            //(150, 150),
         )),
         RawEvent::MouseRelease(MouseSwitchEvent::new(
             4500,
             MouseSwitch("LeftMouseButton"),
-            (150, 150),
+            //(150, 150),
         )),
     ];
 
