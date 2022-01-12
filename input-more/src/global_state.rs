@@ -193,30 +193,17 @@ impl<Mo, Ti, KeSw, MsSw, KeCo, MsCo>
         PointerState<MsSw, MsCo>,
     >
 {
-    pub fn with_timeout<
-        'a,
-        KeTr,
-        MsTr,
-        MsMa,
-        KeEvPr,
-        KeEvRe,
-        KeEvLo,
-        KeEvCl,
-        MsEvPr,
-        MsEvRe,
-        MsEvLo,
-        MsEvCl,
-    >(
+    pub fn with_timeout<'a, KeTr, MsTr, MsMa, KeEv, MsEv>(
         self,
         time: Ti,
         mapping: &'a GlobalMappingCache<
-            DeviceMappingCache<KeSw, KeTr, Mo, KeEvPr, KeEvRe, KeEvLo, KeEvCl>,
-            DeviceMappingCache<MsSw, MsTr, Mo, MsEvPr, MsEvRe, MsEvLo, MsEvCl>,
+            DeviceMappingCache<KeSw, KeTr, Mo, KeEv>,
+            DeviceMappingCache<MsSw, MsTr, Mo, MsEv>,
             MappingModifiersCache<Mo>,
         >,
         time_minus_long_press_duration: Ti,
         time_minus_click_exact_duration: Ti,
-    ) -> GlobalStateWithTimeoutResult<'a, Self, Mo, KeEvLo, KeEvCl, KeCo, MsEvLo, MsEvCl, MsCo>
+    ) -> GlobalStateWithTimeoutResult<'a, Self, Mo, KeEv, KeCo, MsEv, MsCo>
     where
         KeSw: Eq + Hash,
         MsSw: Eq + Hash,
@@ -282,15 +269,15 @@ impl<Mo, Ti, Sw, Co, CsMs, TsMs, ShMsLo, ShMsCl, PoMs>
         PoMs,
     >
 {
-    pub fn with_keyboard_event<'a, Tr, MsMa, EvPr, EvRe, EvLo, EvCl>(
+    pub fn with_keyboard_event<'a, Tr, MsMa, Ev>(
         self,
         event: SwitchEvent<Ti, Sw>,
         mapping: &'a GlobalMappingCache<
-            DeviceMappingCache<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl>,
+            DeviceMappingCache<Sw, Tr, Mo, Ev>,
             MsMa,
             MappingModifiersCache<Mo>,
         >,
-    ) -> GlobalStateWithEventResult<'a, Self, Ti, Mo, EvPr, Co>
+    ) -> GlobalStateWithEventResult<'a, Self, Ti, Mo, Ev, Co>
     where
         Sw: Clone + Eq + Hash,
         Mo: Clone + Eq + From<Sw> + Hash + Ord,
@@ -334,15 +321,15 @@ impl<Mo, Ti, Sw, Co, CsKe, TsKe, ShKeLo, ShKeCl, PoKe>
         PointerState<Sw, Co>,
     >
 {
-    pub fn with_mouse_event<'a, Tr, KeMa, EvPr, EvRe, EvLo, EvCl>(
+    pub fn with_mouse_event<'a, Tr, KeMa, Ev>(
         self,
         event: SwitchEvent<Ti, Sw>,
         mapping: &'a GlobalMappingCache<
             KeMa,
-            DeviceMappingCache<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl>,
+            DeviceMappingCache<Sw, Tr, Mo, Ev>,
             MappingModifiersCache<Mo>,
         >,
-    ) -> GlobalStateWithEventResult<'a, Self, Ti, Mo, EvPr, Co>
+    ) -> GlobalStateWithEventResult<'a, Self, Ti, Mo, Ev, Co>
     where
         Sw: Clone + Eq + Hash,
         Mo: Clone + Eq + From<Sw> + Hash + Ord,
@@ -379,12 +366,12 @@ pub struct GlobalStateWithEventResult<'a, Gl, Ti, Mo, Ev, Co> {
 }
 
 #[derive(Clone, Debug)]
-pub struct GlobalStateWithTimeoutResult<'a, Gl, Mo, KeEvLo, KeEvCl, KeCo, MsEvLo, MsEvCl, MsCo> {
+pub struct GlobalStateWithTimeoutResult<'a, Gl, Mo, KeEv, KeCo, MsEv, MsCo> {
     pub state: Gl,
-    pub keyboard_long_press: Vec<(SwitchBindings<'a, Mo, KeEvLo>, KeCo)>,
-    pub keyboard_click_exact: Vec<(SwitchBindings<'a, Mo, KeEvCl>, KeCo)>,
-    pub mouse_long_press: Vec<(SwitchBindings<'a, Mo, MsEvLo>, MsCo)>,
-    pub mouse_click_exact: Vec<(SwitchBindings<'a, Mo, MsEvCl>, MsCo)>,
+    pub keyboard_long_press: Vec<(SwitchBindings<'a, Mo, KeEv>, KeCo)>,
+    pub keyboard_click_exact: Vec<(SwitchBindings<'a, Mo, KeEv>, KeCo)>,
+    pub mouse_long_press: Vec<(SwitchBindings<'a, Mo, MsEv>, MsCo)>,
+    pub mouse_click_exact: Vec<(SwitchBindings<'a, Mo, MsEv>, MsCo)>,
 }
 
 #[test]

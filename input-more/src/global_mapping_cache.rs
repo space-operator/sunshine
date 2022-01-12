@@ -24,43 +24,23 @@ impl<Ke, Ms, Mo> GlobalMappingCache<Ke, Ms, Mo> {
     }
 }
 
-impl<
-        Mo,
-        KeSw,
-        KeTr,
-        KeEvPr,
-        KeEvRe,
-        KeEvLo,
-        KeEvCl,
-        MsSw,
-        MsTr,
-        MsEvPr,
-        MsEvRe,
-        MsEvLo,
-        MsEvCl,
-    >
+impl<Mo, KeSw, KeTr, KeEv, MsSw, MsTr, MsEv>
     GlobalMappingCache<
-        DeviceMappingCache<KeSw, KeTr, Mo, KeEvPr, KeEvRe, KeEvLo, KeEvCl>,
-        DeviceMappingCache<MsSw, MsTr, Mo, MsEvPr, MsEvRe, MsEvLo, MsEvCl>,
+        DeviceMappingCache<KeSw, KeTr, Mo, KeEv>,
+        DeviceMappingCache<MsSw, MsTr, Mo, MsEv>,
         MappingModifiersCache<Mo>,
     >
 where
     Mo: Clone + Eq + Hash,
     KeSw: Clone + Eq + Hash,
     MsSw: Clone + Eq + Hash,
-    KeEvPr: Clone,
-    KeEvRe: Clone,
-    KeEvLo: Clone,
-    KeEvCl: Clone,
-    MsEvPr: Clone,
-    MsEvRe: Clone,
-    MsEvLo: Clone,
-    MsEvCl: Clone,
+    KeEv: Clone,
+    MsEv: Clone,
 {
     pub fn from_mapping<KeEvTr, KeEvCo, MsEvTr, MsEvCo>(
         mapping: GlobalMapping<
-            DeviceMapping<KeSw, KeTr, Mo, KeEvPr, KeEvRe, KeEvLo, KeEvCl, KeEvTr, KeEvCo>,
-            DeviceMapping<MsSw, MsTr, Mo, MsEvPr, MsEvRe, MsEvLo, MsEvCl, MsEvTr, MsEvCo>,
+            DeviceMapping<KeSw, KeTr, Mo, KeEv>,
+            DeviceMapping<MsSw, MsTr, Mo, MsEv>,
         >,
     ) -> Self {
         let keyboard_modifiers = mapping

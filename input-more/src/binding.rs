@@ -4,15 +4,15 @@ use input_core::{
 };
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum Binding<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl, EvTr, EvCo> {
-    Press(SwitchBinding<Sw, Mo, (), (), EvPr>),
+pub enum Binding<Sw, Tr, Mo, Ev> {
+    Press(SwitchBinding<Sw, Mo, (), (), Ev>),
     Release(
-        SwitchBinding<Sw, Mo, Option<TimedReleaseEventData>, Option<PointerChangeEventData>, EvRe>,
+        SwitchBinding<Sw, Mo, Option<TimedReleaseEventData>, Option<PointerChangeEventData>, Ev>,
     ),
-    LongPress(SwitchBinding<Sw, Mo, TimedLongPressEventData, (), EvLo>),
-    ClickExact(SwitchBinding<Sw, Mo, TimedClickExactEventData, (), EvCl>),
-    Trigger(TriggerBinding<Tr, Mo, EvTr>),
-    Move(MoveBinding<Mo, PointerMoveEventData<Sw>, EvCo>),
+    LongPress(SwitchBinding<Sw, Mo, TimedLongPressEventData, (), Ev>),
+    ClickExact(SwitchBinding<Sw, Mo, TimedClickExactEventData, (), Ev>),
+    Trigger(TriggerBinding<Tr, Mo, Ev>),
+    Move(MoveBinding<Mo, PointerMoveEventData<Sw>, Ev>),
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -38,9 +38,7 @@ pub struct MoveBinding<Mo, Pd, Ev> {
     pub event: Ev,
 }
 
-impl<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl, EvTr, EvCo>
-    Binding<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl, EvTr, EvCo>
-{
+impl<Sw, Tr, Mo, Ev> Binding<Sw, Tr, Mo, Ev> {
     pub fn modifiers(&self) -> &Modifiers<Mo> {
         match self {
             Self::Press(binding) => &binding.modifiers,

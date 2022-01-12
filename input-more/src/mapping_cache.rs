@@ -18,36 +18,26 @@ pub struct MappingCache<Pr, Re, Lo, Cl, Tr, Mo> {
     pub moves: Mo,
 }
 
-pub type DeviceMappingCache<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl> = MappingCache<
-    SwitchMappingCache<Sw, Mo, (), (), EvPr>,
-    SwitchMappingCache<Sw, Mo, Option<TimedReleaseEventData>, Option<PointerChangeEventData>, EvRe>,
-    SwitchMappingCache<Sw, Mo, TimedLongPressEventData, (), EvLo>,
-    SwitchMappingCache<Sw, Mo, TimedClickExactEventData, (), EvCl>,
+pub type DeviceMappingCache<Sw, Tr, Mo, Ev> = MappingCache<
+    SwitchMappingCache<Sw, Mo, (), (), Ev>,
+    SwitchMappingCache<Sw, Mo, Option<TimedReleaseEventData>, Option<PointerChangeEventData>, Ev>,
+    SwitchMappingCache<Sw, Mo, TimedLongPressEventData, (), Ev>,
+    SwitchMappingCache<Sw, Mo, TimedClickExactEventData, (), Ev>,
     PhantomData<Tr>,
     (),
 >;
 
-impl<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl> DeviceMappingCache<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl>
+impl<Sw, Tr, Mo, Ev> DeviceMappingCache<Sw, Tr, Mo, Ev>
 where
     Sw: Clone + Eq + Hash,
     Mo: Clone + Eq + Hash,
-    EvPr: Clone,
-    EvRe: Clone,
-    EvLo: Clone,
-    EvCl: Clone,
+    Ev: Clone,
 {
-    pub fn from_bindings<'a, EvTr, EvCo>(
-        mapping: impl IntoIterator<Item = &'a Binding<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl, EvTr, EvCo>>,
-    ) -> Self
+    pub fn from_bindings<'a>(mapping: impl IntoIterator<Item = &'a Binding<Sw, Tr, Mo, Ev>>) -> Self
     where
         Sw: 'a,
         Tr: 'a,
-        EvPr: 'a,
-        EvRe: 'a,
-        EvLo: 'a,
-        EvCl: 'a,
-        EvTr: 'a,
-        EvCo: 'a,
+        Ev: 'a,
         Mo: 'a,
     {
         let mut press = Vec::new();

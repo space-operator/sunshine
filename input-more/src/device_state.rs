@@ -71,12 +71,12 @@ impl<Sw, Mo, Ti, Co>
         PointerState<Sw, Co>,
     >
 {
-    pub fn with_press_event<'a, Tr, EvPr, EvRe, EvLo, EvCl>(
+    pub fn with_press_event<'a, Tr, Ev>(
         mut self,
         event: SwitchEvent<Ti, Sw>,
-        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl>,
+        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
         mapping_modifiers: &MappingModifiersCache<Mo>,
-    ) -> (Self, Option<Ti>, Option<(SwitchBindings<'a, Mo, EvPr>, Co)>)
+    ) -> (Self, Option<Ti>, Option<(SwitchBindings<'a, Mo, Ev>, Co)>)
     where
         Sw: Clone + Eq + Hash,
         Mo: Clone + Eq + From<Sw> + Hash + Ord,
@@ -159,11 +159,11 @@ impl<Sw, Mo, Ti, Co>
         (self, next_scheduled, Some((mapping, coords)))
     }
 
-    pub fn with_press_timeout<'a, Tr, EvPr, EvRe, EvLo, EvCl>(
+    pub fn with_press_timeout<'a, Tr, Ev>(
         self,
         time_minus_long_press_duration: Ti, // TODO: Time at Long press handling event already happend for time before that
-        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl>,
-    ) -> (Self, Vec<(SwitchBindings<'a, Mo, EvLo>, Co)>)
+        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
+    ) -> (Self, Vec<(SwitchBindings<'a, Mo, Ev>, Co)>)
     where
         Sw: Eq + Hash,
         Mo: Eq + Hash + Ord,
@@ -207,12 +207,12 @@ impl<Sw, Mo, Ti, Co>
         (rest.with_field(timed_state), delayed_bindings)
     }
 
-    pub fn with_release_event<'a, Tr, EvPr, EvRe, EvLo, EvCl>(
+    pub fn with_release_event<'a, Tr, Ev>(
         mut self,
         event: SwitchEvent<Ti, Sw>,
-        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl>,
+        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
         mapping_modifiers: &MappingModifiersCache<Mo>,
-    ) -> (Self, Option<Ti>, Option<(SwitchBindings<'a, Mo, EvRe>, Co)>)
+    ) -> (Self, Option<Ti>, Option<(SwitchBindings<'a, Mo, Ev>, Co)>)
     where
         Sw: Clone + Eq + Hash,
         Mo: Clone + Eq + From<Sw> + Hash + Ord,
@@ -299,11 +299,11 @@ impl<Sw, Mo, Ti, Co>
         (self, next_scheduled, Some((mapping, coords)))
     }
 
-    pub fn with_release_timeout<'a, Tr, EvPr, EvRe, EvLo, EvCl>(
+    pub fn with_release_timeout<'a, Tr, Ev>(
         self,
         time_minus_click_exact_duration: Ti, // TODO: Time at Long press handling event already happend for time before that
-        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, EvPr, EvRe, EvLo, EvCl>,
-    ) -> (Self, Vec<(SwitchBindings<'a, Mo, EvCl>, Co)>)
+        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
+    ) -> (Self, Vec<(SwitchBindings<'a, Mo, Ev>, Co)>)
     where
         Sw: Eq + Hash,
         Mo: Eq + Hash + Ord,
