@@ -155,9 +155,8 @@ fn test_chain() {
     pub type KeyboardCoordsState = CoordsState<()>;
     pub type MouseCoordsState = CoordsState<Coords>;
 
-    pub type CustomState<Ts, Cs, Sh, Ps> = DeviceState<Modifiers, Cs, Ts, Sh, Ps>;
-    pub type CustomScheduler<Sw, Re, Co> =
-        SchedulerState<TimestampMs, (SwitchEvent<TimestampMs, Sw>, Modifiers, Co), Re>;
+    pub type CustomState<Ts, Cs, ShLo, ShCl, Ps> = DeviceState<Modifiers, Cs, Ts, ShLo, ShCl, Ps>;
+    pub type CustomScheduler<Sw, Re, Co> = DeviceSchedulerState<TimestampMs, Sw, Modifiers, Co, Re>;
 
     pub type KeyboardLongPressScheduler =
         CustomScheduler<KeyboardSwitch, LongPressHandleRequest, ()>;
@@ -169,27 +168,23 @@ fn test_chain() {
     pub type KeyboardPointerState = PointerState<KeyboardSwitch, ()>;
     pub type MousePointerState = PointerState<MouseSwitch, Coords>;
 
-    pub type KeyboardPressState = CustomState<
+    pub type KeyboardState = CustomState<
         KeyboardTimedState,
         KeyboardCoordsState,
         KeyboardLongPressScheduler,
-        KeyboardPointerState,
-    >;
-    pub type KeyboardReleaseState = CustomState<
-        KeyboardTimedState,
-        KeyboardCoordsState,
         KeyboardClickExactScheduler,
         KeyboardPointerState,
     >;
-    pub type KeyboardLongPressState = CustomState<MouseTimedState, KeyboardCoordsState, (), ()>;
-    pub type KeyboardClickExactState = CustomState<MouseTimedState, KeyboardCoordsState, (), ()>;
+    pub type KeyboardDelayedState = CustomState<MouseTimedState, KeyboardCoordsState, (), (), ()>;
 
-    pub type MousePressState =
-        CustomState<MouseTimedState, MouseCoordsState, MouseLongPressScheduler, MousePointerState>;
-    pub type MouseReleaseState =
-        CustomState<MouseTimedState, MouseCoordsState, MouseClickExactScheduler, MousePointerState>;
-    pub type MouseLongPressState = CustomState<MouseTimedState, MouseCoordsState, (), ()>;
-    pub type MouseClickExactState = CustomState<MouseTimedState, MouseCoordsState, (), ()>;
+    pub type MousePressState = CustomState<
+        MouseTimedState,
+        MouseCoordsState,
+        MouseLongPressScheduler,
+        MouseClickExactScheduler,
+        MousePointerState,
+    >;
+    pub type MouseDelayedState = CustomState<MouseTimedState, MouseCoordsState, (), (), ()>;
 
     pub type GlobalState = input_more::GlobalState<
         Modifiers,
