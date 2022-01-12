@@ -1,7 +1,7 @@
 use core::hash::Hash;
 use std::sync::Arc;
 
-use crate::{DeviceMapping, DeviceMappingCache, GlobalMapping, MappingModifiersCache};
+use crate::{DeviceMappingCache, GlobalMapping, Mapping, MappingModifiersCache};
 
 #[derive(Clone, Debug)]
 pub struct GlobalMappingCache<Ke, Ms, Mo> {
@@ -34,14 +34,13 @@ where
     Mo: Clone + Eq + Hash,
     KeSw: Clone + Eq + Hash,
     MsSw: Clone + Eq + Hash,
+    KeTr: Clone + Eq + Hash,
+    MsTr: Clone + Eq + Hash,
     KeEv: Clone,
     MsEv: Clone,
 {
-    pub fn from_mapping<KeEvTr, KeEvCo, MsEvTr, MsEvCo>(
-        mapping: GlobalMapping<
-            DeviceMapping<KeSw, KeTr, Mo, KeEv>,
-            DeviceMapping<MsSw, MsTr, Mo, MsEv>,
-        >,
+    pub fn from_mapping(
+        mapping: GlobalMapping<Mapping<KeSw, KeTr, Mo, KeEv>, Mapping<MsSw, MsTr, Mo, MsEv>>,
     ) -> Self {
         let keyboard_modifiers = mapping
             .keyboard

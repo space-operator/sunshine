@@ -12,7 +12,7 @@ pub enum Binding<Sw, Tr, Mo, Ev> {
     LongPress(SwitchBinding<Sw, Mo, TimedLongPressEventData, (), Ev>),
     ClickExact(SwitchBinding<Sw, Mo, TimedClickExactEventData, (), Ev>),
     Trigger(TriggerBinding<Tr, Mo, Ev>),
-    Move(MoveBinding<Mo, PointerMoveEventData<Sw>, Ev>),
+    Coords(CoordsBinding<PointerMoveEventData<Sw>, Mo, Ev>),
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -32,9 +32,9 @@ pub struct TriggerBinding<Tr, Mo, Ev> {
 }
 
 #[derive(Clone, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub struct MoveBinding<Mo, Pd, Ev> {
-    pub modifiers: Modifiers<Mo>,
+pub struct CoordsBinding<Pd, Mo, Ev> {
     pub pointer_data: Pd,
+    pub modifiers: Modifiers<Mo>,
     pub event: Ev,
 }
 
@@ -46,7 +46,7 @@ impl<Sw, Tr, Mo, Ev> Binding<Sw, Tr, Mo, Ev> {
             Self::LongPress(binding) => &binding.modifiers,
             Self::ClickExact(binding) => &binding.modifiers,
             Self::Trigger(binding) => &binding.modifiers,
-            Self::Move(binding) => &binding.modifiers,
+            Self::Coords(binding) => &binding.modifiers,
         }
     }
 }

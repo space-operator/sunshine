@@ -23,7 +23,7 @@
 )]
 
 mod binding;
-mod device_mapping;
+mod mapping;
 mod device_state;
 mod event;
 mod global_mapping;
@@ -39,7 +39,7 @@ mod switch_mapping_cache;
 mod unwrap_or;
 
 pub use binding::*;
-pub use device_mapping::*;
+pub use mapping::*;
 pub use device_state::*;
 pub use event::*;
 pub use global_mapping::*;
@@ -55,3 +55,6 @@ pub use switch_mapping_cache::*;
 pub use unwrap_or::*;
 
 pub use input_core;
+
+// TODO:
+//   coords => context

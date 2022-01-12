@@ -31,6 +31,8 @@ fn test_chain() {
             Move smth to library
         7:
             hooray
+
+            coords -> context
     */
 
     /*
@@ -51,20 +53,36 @@ fn test_chain() {
 
     use core::fmt::Debug;
     use core::hash::Hash;
-    use std::collections::HashMap;
 
     use input_core::*;
     use input_more::*;
 
-    type DurationMs = u64;
+    //type DurationMs = u64;
     type TimestampMs = u64;
-    type Coords = (u64, u64);
 
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     enum Switch {
         Keyboard(KeyboardSwitch),
         Mouse(MouseSwitch),
     }
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    struct KeyboardSwitch(&'static str);
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    struct MouseSwitch(&'static str);
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    struct KeyboardTrigger(&'static str);
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    struct MouseTrigger(&'static str);
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    struct KeyboardCoords;
+
+    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+    struct MouseCoords(u64, u64);
 
     impl From<KeyboardSwitch> for Switch {
         fn from(switch: KeyboardSwitch) -> Self {
@@ -77,12 +95,6 @@ fn test_chain() {
             Self::Mouse(switch)
         }
     }
-
-    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    struct KeyboardSwitch(&'static str);
-
-    #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    struct MouseSwitch(&'static str);
 
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     pub enum AppEvent {
@@ -101,20 +113,20 @@ fn test_chain() {
         CreateNode(u32),
     }
 
-    pub trait BuildAppEvent<Co> {
+    trait BuildAppEvent<Co> {
         fn build(&self, coords: &Co) -> Option<AppEvent>;
     }
 
-    impl BuildAppEvent<()> for BasicAppEventBuilder {
-        fn build(&self, _: &()) -> Option<AppEvent> {
+    impl BuildAppEvent<KeyboardCoords> for BasicAppEventBuilder {
+        fn build(&self, _: &KeyboardCoords) -> Option<AppEvent> {
             match self {
                 Self::Undo(id) => Some(AppEvent::Undo(*id)),
             }
         }
     }
 
-    impl BuildAppEvent<Coords> for PointerAppEventBuilder {
-        fn build(&self, coords: &Coords) -> Option<AppEvent> {
+    impl BuildAppEvent<MouseCoords> for PointerAppEventBuilder {
+        fn build(&self, coords: &MouseCoords) -> Option<AppEvent> {
             match self {
                 Self::Undo(id) => Some(AppEvent::Undo(*id)),
                 Self::CreateNode(id) => {
@@ -142,51 +154,37 @@ fn test_chain() {
         }
     }*/
 
-    pub type KeyboardMapping = DeviceMapping<KeyboardSwitch, (), Switch, BasicAppEventBuilder>;
-    pub type MouseMapping = DeviceMapping<MouseSwitch, (), Switch, PointerAppEventBuilder>;
+    type KeyboardMapping = Mapping<KeyboardSwitch, KeyboardTrigger, Switch, BasicAppEventBuilder>;
+    type MouseMapping = Mapping<MouseSwitch, MouseTrigger, Switch, PointerAppEventBuilder>;
 
-    pub type KeyboardSwitchEvent = SwitchEvent<TimestampMs, KeyboardSwitch>;
-    pub type MouseSwitchEvent = SwitchEvent<TimestampMs, MouseSwitch>;
+    type KeyboardSwitchEvent = SwitchEvent<TimestampMs, KeyboardSwitch>;
+    type MouseSwitchEvent = SwitchEvent<TimestampMs, MouseSwitch>;
+    type KeyboardTriggerEvent = TriggerEvent<TimestampMs, KeyboardTrigger>;
+    type MouseTriggerEvent = TriggerEvent<TimestampMs, MouseTrigger>;
+    type KeyboardCoordsEvent = CoordsEvent<TimestampMs, KeyboardCoords>;
+    type MouseCoordsEvent = CoordsEvent<TimestampMs, MouseCoords>;
 
-    pub type Modifiers = input_core::Modifiers<Switch>;
-    pub type KeyboardTimedState = TimedState<KeyboardSwitch>;
-    pub type MouseTimedState = TimedState<MouseSwitch>;
+    type Modifiers = input_core::Modifiers<Switch>;
+    type KeyboardTimedState = TimedState<KeyboardSwitch>;
+    type MouseTimedState = TimedState<MouseSwitch>;
 
-    pub type KeyboardCoordsState = CoordsState<()>;
-    pub type MouseCoordsState = CoordsState<Coords>;
+    type KeyboardCoordsState = CoordsState<KeyboardCoords>;
+    type MouseCoordsState = CoordsState<MouseCoords>;
 
-    pub type CustomState<Ts, Cs, ShLo, ShCl, Ps> = DeviceState<Modifiers, Cs, Ts, ShLo, ShCl, Ps>;
-    pub type CustomScheduler<Sw, Re, Co> = DeviceSchedulerState<TimestampMs, Sw, Modifiers, Co, Re>;
+    type CustomScheduler<Sw, Re, Co> = DeviceSchedulerState<TimestampMs, Sw, Switch, Co, Re>;
 
-    pub type KeyboardLongPressScheduler =
-        CustomScheduler<KeyboardSwitch, LongPressHandleRequest, ()>;
-    pub type KeyboardClickExactScheduler =
-        CustomScheduler<KeyboardSwitch, ClickExactHandleRequest, ()>;
-    pub type MouseLongPressScheduler = CustomScheduler<MouseSwitch, LongPressHandleRequest, Coords>;
-    pub type MouseClickExactScheduler =
-        CustomScheduler<MouseSwitch, ClickExactHandleRequest, Coords>;
-    pub type KeyboardPointerState = PointerState<KeyboardSwitch, ()>;
-    pub type MousePointerState = PointerState<MouseSwitch, Coords>;
+    type KeyboardLongPressScheduler =
+        CustomScheduler<KeyboardSwitch, LongPressHandleRequest, KeyboardCoords>;
+    type KeyboardClickExactScheduler =
+        CustomScheduler<KeyboardSwitch, ClickExactHandleRequest, KeyboardCoords>;
+    type MouseLongPressScheduler =
+        CustomScheduler<MouseSwitch, LongPressHandleRequest, MouseCoords>;
+    type MouseClickExactScheduler =
+        CustomScheduler<MouseSwitch, ClickExactHandleRequest, MouseCoords>;
+    type KeyboardPointerState = PointerState<KeyboardSwitch, KeyboardCoords>;
+    type MousePointerState = PointerState<MouseSwitch, MouseCoords>;
 
-    pub type KeyboardState = CustomState<
-        KeyboardTimedState,
-        KeyboardCoordsState,
-        KeyboardLongPressScheduler,
-        KeyboardClickExactScheduler,
-        KeyboardPointerState,
-    >;
-    pub type KeyboardDelayedState = CustomState<MouseTimedState, KeyboardCoordsState, (), (), ()>;
-
-    pub type MousePressState = CustomState<
-        MouseTimedState,
-        MouseCoordsState,
-        MouseLongPressScheduler,
-        MouseClickExactScheduler,
-        MousePointerState,
-    >;
-    pub type MouseDelayedState = CustomState<MouseTimedState, MouseCoordsState, (), (), ()>;
-
-    pub type GlobalState = input_more::GlobalState<
+    type GlobalState = input_more::GlobalState<
         Modifiers,
         KeyboardCoordsState,
         MouseCoordsState,
@@ -200,34 +198,11 @@ fn test_chain() {
         MousePointerState,
     >;
 
-    pub trait WithEvent<Ev>: Sized {
-        type EventBuilder;
-        type Coords;
-
-        fn with_event<'a>(
-            self,
-            event: Ev,
-            mapping: &'a GlobalMappingCache,
-        ) -> (
-            Self,
-            Option<TimestampMs>,
-            Option<(SwitchBindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
-        );
-    }
-
-    pub trait WithTimeout: Sized {
-        type EventBuilder;
-        type Coords;
-
-        fn with_timeout<'a>(
-            self,
-            time: TimestampMs,
-            mapping: &'a GlobalMappingCache,
-        ) -> (
-            Self,
-            Vec<(SwitchBindings<'a, Switch, Self::EventBuilder>, Self::Coords)>,
-        );
-    }
+    type GlobalMappingCache = input_more::GlobalMappingCache<
+        DeviceMappingCache<KeyboardSwitch, KeyboardTrigger, Switch, BasicAppEventBuilder>,
+        DeviceMappingCache<MouseSwitch, MouseTrigger, Switch, PointerAppEventBuilder>,
+        MappingModifiersCache<Switch>,
+    >;
 
     /*
         press
@@ -250,19 +225,6 @@ fn test_chain() {
     pub struct GlobalMapping {
         keyboard: KeyboardMapping,
     }*/
-
-    #[derive(Clone, Debug)]
-    pub struct GlobalMappingCache {
-        keyboard: DeviceMappingCache<KeyboardSwitch, (), Switch, BasicAppEventBuilder>,
-        mouse: DeviceMappingCache<MouseSwitch, (), Switch, PointerAppEventBuilder>,
-        modifiers: MappingModifiersCache<Switch>,
-    }
-
-    impl GlobalMappingCache {
-        fn contains(&self, switch: &Switch) -> bool {
-            self.modifiers.switches().contains(switch)
-        }
-    }
 
     let keyboard_mapping = KeyboardMapping::new(
         [
@@ -334,22 +296,17 @@ fn test_chain() {
         .collect(),
     );
 
-    /*let mapping = GlobalMapping {
-        keyboard: mapping,
-    };*/
-
-    let mapping_cache = GlobalMappingCache {
-        keyboard: DeviceMappingCache::from_bindings(keyboard_mapping.bindings()),
-        mouse: DeviceMappingCache::from_bindings(mouse_mapping.bindings()),
-        modifiers: MappingModifiersCache::from_bindings(
-            keyboard_mapping.bindings(), /* + mouse_mapping */
-        ),
+    let mapping = GlobalMapping {
+        keyboard: keyboard_mapping,
+        mouse: mouse_mapping,
     };
+
+    let mapping_cache = GlobalMappingCache::from_mapping(mapping);
 
     let mut global_state = GlobalState::new(
         Modifiers::default(),
-        KeyboardCoordsState::with_coords(()),
-        MouseCoordsState::with_coords((0, 0)),
+        KeyboardCoordsState::with_coords(KeyboardCoords),
+        MouseCoordsState::with_coords(MouseCoords(0, 0)),
         KeyboardTimedState::default(),
         MouseTimedState::default(),
         KeyboardLongPressScheduler::default(),
@@ -364,8 +321,12 @@ fn test_chain() {
     enum RawEvent {
         KeyboardPress(KeyboardSwitchEvent),
         KeyboardRelease(KeyboardSwitchEvent),
+        KeyboardTrigger(KeyboardTriggerEvent),
+        KeyboardCoords(KeyboardCoordsEvent),
         MousePress(MouseSwitchEvent),
         MouseRelease(MouseSwitchEvent),
+        MouseTrigger(MouseTriggerEvent),
+        MouseCoords(MouseCoordsEvent),
     }
 
     impl RawEvent {
@@ -373,252 +334,130 @@ fn test_chain() {
             match self {
                 RawEvent::KeyboardPress(event) => event.time,
                 RawEvent::KeyboardRelease(event) => event.time,
+                RawEvent::KeyboardTrigger(event) => event.time,
+                RawEvent::KeyboardCoords(event) => event.time,
                 RawEvent::MousePress(event) => event.time,
                 RawEvent::MouseRelease(event) => event.time,
+                RawEvent::MouseTrigger(event) => event.time,
+                RawEvent::MouseCoords(event) => event.time,
             }
         }
     }
 
-    fn build_bindings<'a, Bu, Co>(
-        bindings: SwitchBindings<'a, Switch, Bu>,
-        coords: &Co,
-    ) -> Option<HashMap<&'a Modifiers, Vec<AppEvent>>>
-    where
-        Bu: BuildAppEvent<Co>,
-    {
-        let bindings: HashMap<_, _> = bindings
-            .into_inner()
-            .into_iter()
-            .filter_map(|(modifiers, events)| {
-                let events: Vec<_> = events
-                    .into_iter()
-                    .filter_map(|binding| binding.build(coords))
-                    .collect();
-                if events.is_empty() {
-                    None
-                } else {
-                    Some((modifiers, events))
-                }
-            })
-            .collect();
-        if bindings.is_empty() {
-            None
-        } else {
-            Some(bindings)
-        }
-    }
-
-    trait GlobalStateExt: Sized {
-        fn with_timeout<'a>(
-            self,
-            time: TimestampMs,
-            mapping: &'a GlobalMappingCache,
-        ) -> (Self, Vec<HashMap<&'a Modifiers, Vec<AppEvent>>>);
-
-        fn with_event<'a>(
-            self,
-            event: RawEvent,
-            mapping: &'a GlobalMappingCache,
-        ) -> (
-            Self,
-            Option<DurationMs>,
-            Vec<HashMap<&'a Modifiers, Vec<AppEvent>>>,
-            Option<HashMap<&'a Modifiers, Vec<AppEvent>>>,
-        );
-    }
-
-    impl GlobalStateExt for GlobalState {
-        fn with_timeout<'a>(
-            self,
-            time: TimestampMs,
-            mapping: &'a GlobalMappingCache,
-        ) -> (Self, Vec<HashMap<&'a Modifiers, Vec<AppEvent>>>) {
-            let global_state = self;
-
-            let (state, global_state): (KeyboardPressState, _) = global_state.take_state();
-            let (state, press_bindings) = state.with_press_timeout(time, &mapping.keyboard);
-            let global_state = global_state.with_state(state);
-            let press_bindings = press_bindings
-                .into_iter()
-                .filter_map(|(bindings, coords)| build_bindings(bindings, &coords));
-
-            let (state, global_state): (KeyboardReleaseState, _) = global_state.take_state();
-            let (state, release_bindings) = state.with_release_timeout(time, &mapping.keyboard);
-            let global_state = global_state.with_state(state);
-            let release_bindings = release_bindings
-                .into_iter()
-                .filter_map(|(bindings, coords)| build_bindings(bindings, &coords));
-
-            (
-                global_state,
-                press_bindings.chain(release_bindings).collect(),
-            )
-        }
-
-        fn with_event<'a>(
-            self,
-            event: RawEvent,
-            mapping: &'a GlobalMappingCache,
-        ) -> (
-            Self,
-            Option<DurationMs>,
-            Vec<HashMap<&'a Modifiers, Vec<AppEvent>>>,
-            Option<HashMap<&'a Modifiers, Vec<AppEvent>>>,
-        ) {
-            let (global_state, delayed_bindings) = self.with_timeout(event.time(), &mapping);
-            let (global_state, scheduled, bindings) = match event {
-                RawEvent::KeyboardPress(event) => {
-                    let (state, global_state): (KeyboardPressState, _) = global_state.take_state();
-                    let (state, scheduled, bindings) =
-                        state.with_press_event(event, &mapping.keyboard, &mapping.modifiers);
-                    let bindings =
-                        bindings.and_then(|(bindings, coords)| build_bindings(bindings, &coords));
-                    (global_state.with_state(state), scheduled, bindings)
-                }
-                RawEvent::KeyboardRelease(event) => {
-                    let (state, global_state): (KeyboardReleaseState, _) =
-                        global_state.take_state();
-                    let (state, scheduled, bindings) =
-                        state.with_release_event(event, &mapping.keyboard, &mapping.modifiers);
-                    let bindings =
-                        bindings.and_then(|(bindings, coords)| build_bindings(bindings, &coords));
-                    (global_state.with_state(state), scheduled, bindings)
-                }
-                RawEvent::MousePress(event) => {
-                    let (state, global_state): (MousePressState, _) = global_state.take_state();
-                    let (state, scheduled, bindings) =
-                        state.with_press_event(event, &mapping.mouse, &mapping.modifiers);
-                    let bindings =
-                        bindings.and_then(|(bindings, coords)| build_bindings(bindings, &coords));
-                    (global_state.with_state(state), scheduled, bindings)
-                }
-
-                RawEvent::MouseRelease(event) => {
-                    let (state, global_state): (MouseReleaseState, _) = global_state.take_state();
-                    let (state, scheduled, bindings) =
-                        state.with_release_event(event, &mapping.mouse, &mapping.modifiers);
-                    let bindings =
-                        bindings.and_then(|(bindings, coords)| build_bindings(bindings, &coords));
-                    (global_state.with_state(state), scheduled, bindings)
-                }
-            };
-            (global_state, scheduled, delayed_bindings, bindings)
-        }
-    }
-
-    pub fn filter_events_with_longest_modifiers(
-        events: HashMap<&Modifiers, Vec<AppEvent>>,
-    ) -> Vec<AppEvent> {
-        let events: Vec<_> = events.into_iter().collect();
-
-        let events_mask: Vec<_> = events
-            .iter()
-            .map(|(modifiers, _)| {
-                events.iter().all(|(other_modifiers, _)| {
-                    modifiers.switches().is_superset(other_modifiers.switches())
-                })
-            })
-            .collect();
-
-        events
-            .into_iter()
-            .enumerate()
-            .filter_map(|(j, event)| if events_mask[j] { Some(event) } else { None })
-            .flat_map(|(_, events)| events)
-            .collect()
-    }
-
     let events = [
-        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(
-            1000,
-            KeyboardSwitch("LeftShift"),
-            //(),
-        )),
-        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(
-            1100,
-            KeyboardSwitch("LeftAlt"),
-            //(),
-        )),
-        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(
-            2000,
-            KeyboardSwitch("LeftCtrl"),
-            //(),
-        )),
-        RawEvent::KeyboardRelease(KeyboardSwitchEvent::new(
-            2100,
-            KeyboardSwitch("LeftCtrl"),
-            //(),
-        )),
-        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(
-            2200,
-            KeyboardSwitch("LeftCtrl"),
-            //(),
-        )),
-        RawEvent::KeyboardRelease(KeyboardSwitchEvent::new(
-            2300,
-            KeyboardSwitch("LeftCtrl"),
-            //(),
-        )),
-        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(
-            3000,
-            KeyboardSwitch("LeftShift"),
-            //(),
-        )),
-        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(
-            3100,
-            KeyboardSwitch("LeftAlt"),
-            //(),
-        )),
-        RawEvent::MousePress(MouseSwitchEvent::new(
-            4000,
-            MouseSwitch("LeftMouseButton"),
-            //(150, 150),
-        )),
-        RawEvent::MouseRelease(MouseSwitchEvent::new(
-            4100,
-            MouseSwitch("LeftMouseButton"),
-            //(150, 150),
-        )),
-        RawEvent::MousePress(MouseSwitchEvent::new(
-            4200,
-            MouseSwitch("LeftMouseButton"),
-            //(50, 50),
-        )),
-        RawEvent::MouseRelease(MouseSwitchEvent::new(
-            4300,
-            MouseSwitch("LeftMouseButton"),
-            //(50, 50),
-        )),
-        RawEvent::MousePress(MouseSwitchEvent::new(
-            4400,
-            MouseSwitch("LeftMouseButton"),
-            //(150, 150),
-        )),
-        RawEvent::MouseRelease(MouseSwitchEvent::new(
-            4500,
-            MouseSwitch("LeftMouseButton"),
-            //(150, 150),
-        )),
+        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(1000, KeyboardSwitch("LeftShift"))),
+        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(1100, KeyboardSwitch("LeftAlt"))),
+        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(2000, KeyboardSwitch("LeftCtrl"))),
+        RawEvent::KeyboardRelease(KeyboardSwitchEvent::new(2100, KeyboardSwitch("LeftCtrl"))),
+        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(2200, KeyboardSwitch("LeftCtrl"))),
+        RawEvent::KeyboardRelease(KeyboardSwitchEvent::new(2300, KeyboardSwitch("LeftCtrl"))),
+        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(3000, KeyboardSwitch("LeftShift"))),
+        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(3100, KeyboardSwitch("LeftAlt"))),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(4000, MouseCoords(150, 150))),
+        RawEvent::MousePress(MouseSwitchEvent::new(4100, MouseSwitch("LeftMouseButton"))),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(4200, MouseSwitch("LeftMouseButton"))),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(4300, MouseCoords(50, 50))),
+        RawEvent::MousePress(MouseSwitchEvent::new(4400, MouseSwitch("LeftMouseButton"))),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(4500, MouseSwitch("LeftMouseButton"))),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(4600, MouseCoords(150, 150))),
+        RawEvent::MousePress(MouseSwitchEvent::new(4700, MouseSwitch("LeftMouseButton"))),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(4800, MouseSwitch("LeftMouseButton"))),
     ];
 
+    // fn
+
     for event in events {
-        println!("Ev: {:?}", event);
-        let (new_global_state, scheduled, delayed_bindings, bindings) =
-            global_state.with_event(event, &mapping_cache);
-        global_state = new_global_state;
-        println!("St: {:?}", global_state);
-        println!("Sh: {:?}", scheduled);
-        for bindings in delayed_bindings {
-            println!("Bi: {:?}", bindings);
-            let events = filter_events_with_longest_modifiers(bindings);
-            println!("Ev: {:?}", events);
-        }
-        if let Some(bindings) = bindings {
-            println!("Bi: {:?}", bindings);
-            let events = filter_events_with_longest_modifiers(bindings);
-            println!("Ev: {:?}", events);
-        }
+        let result =
+            global_state.with_timeout(event.time() - 1000, event.time() - 300, &mapping_cache);
+        global_state = result.state;
+        println!("Ti: {:?}", event.time());
+        println!("BiKeLo: {:?}", result.keyboard_long_press);
+        println!("BiKeCl: {:?}", result.keyboard_click_exact);
+        println!("BiMsLo: {:?}", result.mouse_long_press);
+        println!("BiMsCl: {:?}", result.mouse_click_exact);
         println!();
+
+        println!("In: {:?}", event);
+        let (state, scheduled, keyboard_bindings, mouse_bindings) = match event {
+            RawEvent::KeyboardPress(event) => {
+                let result = global_state.with_keyboard_press_event(event, &mapping_cache);
+                (
+                    result.state,
+                    result.scheduled,
+                    result.bindings.into_iter().collect(),
+                    vec![],
+                )
+            }
+            RawEvent::KeyboardRelease(event) => {
+                let result = global_state.with_keyboard_release_event(event, &mapping_cache);
+                (
+                    result.state,
+                    result.scheduled,
+                    result.bindings.into_iter().collect(),
+                    vec![],
+                )
+            }
+            RawEvent::KeyboardTrigger(event) => {
+                let result = global_state.with_keyboard_trigger_event(event, &mapping_cache);
+                (
+                    result.state,
+                    None,
+                    result.bindings.into_iter().collect(),
+                    vec![],
+                )
+            }
+            RawEvent::KeyboardCoords(event) => {
+                let result = global_state.with_keyboard_coords_event(event, &mapping_cache);
+                (result.state, None, result.bindings, vec![])
+            }
+            RawEvent::MousePress(event) => {
+                let result = global_state.with_mouse_press_event(event, &mapping_cache);
+                (
+                    result.state,
+                    result.scheduled,
+                    vec![],
+                    result.bindings.into_iter().collect(),
+                )
+            }
+            RawEvent::MouseRelease(event) => {
+                let result = global_state.with_mouse_release_event(event, &mapping_cache);
+                (
+                    result.state,
+                    result.scheduled,
+                    vec![],
+                    result.bindings.into_iter().collect(),
+                )
+            }
+            RawEvent::MouseTrigger(event) => {
+                let result = global_state.with_mouse_trigger_event(event, &mapping_cache);
+                (
+                    result.state,
+                    None,
+                    vec![],
+                    result.bindings.into_iter().collect(),
+                )
+            }
+            RawEvent::MouseCoords(event) => {
+                let result = global_state.with_mouse_coords_event(event, &mapping_cache);
+                (result.state, None, vec![], result.bindings)
+            }
+        };
+        global_state = state;
+        println!("Sh: {:?}", scheduled);
+
+        for (bindings, coords) in keyboard_bindings {
+            println!("Bi: {:?}", bindings);
+            let app_events = bindings.build(|builder| builder.build(&coords));
+            println!("Ev: {:?}", app_events);
+            println!();
+        }
+
+        for (bindings, coords) in mouse_bindings {
+            println!("Bi: {:?}", bindings);
+            let app_events = bindings.build(|builder| builder.build(&coords));
+            println!("Ev: {:?}", app_events);
+            println!();
+        }
     }
 
     panic!();

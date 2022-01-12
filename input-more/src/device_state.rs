@@ -6,8 +6,8 @@ use input_core::{
 };
 
 use crate::{
-    define_markers, define_struct_take_and_with_field, DeviceMappingCache, MappingModifiersCache,
-    SwitchBindings, SwitchEvent, SwitchMappingCache,
+    define_markers, define_struct_take_and_with_field, CoordsEvent, DeviceMappingCache,
+    FilteredBindings, MappingModifiersCache, SwitchEvent, SwitchMappingCache, TriggerEvent,
 };
 
 #[derive(Clone, Debug, Default)]
@@ -76,7 +76,7 @@ impl<Sw, Mo, Ti, Co>
         event: SwitchEvent<Ti, Sw>,
         mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
         mapping_modifiers: &MappingModifiersCache<Mo>,
-    ) -> (Self, Option<Ti>, Option<(SwitchBindings<'a, Mo, Ev>, Co)>)
+    ) -> (Self, Option<Ti>, Option<(FilteredBindings<'a, Mo, Ev>, Co)>)
     where
         Sw: Clone + Eq + Hash,
         Mo: Clone + Eq + From<Sw> + Hash + Ord,
@@ -150,7 +150,7 @@ impl<Sw, Mo, Ti, Co>
         let mapping = unwrap_or_return!(mapping, (self, next_scheduled, None)); // FIXME
 
         let mapping = mapping.filter_by_pointer_data(&());
-        let mapping = mapping.expect("filtering should never fails");
+        let mapping = mapping.expect("filtering should never fail");
 
         let (coords_state, rest): (CoordsState<Co>, _) = self.take_field();
         let coords = coords_state.coords().clone();
@@ -163,7 +163,7 @@ impl<Sw, Mo, Ti, Co>
         self,
         time_minus_long_press_duration: Ti, // TODO: Time at Long press handling event already happend for time before that
         mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
-    ) -> (Self, Vec<(SwitchBindings<'a, Mo, Ev>, Co)>)
+    ) -> (Self, Vec<(FilteredBindings<'a, Mo, Ev>, Co)>)
     where
         Sw: Eq + Hash,
         Mo: Eq + Hash + Ord,
@@ -212,7 +212,7 @@ impl<Sw, Mo, Ti, Co>
         event: SwitchEvent<Ti, Sw>,
         mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
         mapping_modifiers: &MappingModifiersCache<Mo>,
-    ) -> (Self, Option<Ti>, Option<(SwitchBindings<'a, Mo, Ev>, Co)>)
+    ) -> (Self, Option<Ti>, Option<(FilteredBindings<'a, Mo, Ev>, Co)>)
     where
         Sw: Clone + Eq + Hash,
         Mo: Clone + Eq + From<Sw> + Hash + Ord,
@@ -303,7 +303,7 @@ impl<Sw, Mo, Ti, Co>
         self,
         time_minus_click_exact_duration: Ti, // TODO: Time at Long press handling event already happend for time before that
         mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
-    ) -> (Self, Vec<(SwitchBindings<'a, Mo, Ev>, Co)>)
+    ) -> (Self, Vec<(FilteredBindings<'a, Mo, Ev>, Co)>)
     where
         Sw: Eq + Hash,
         Mo: Eq + Hash + Ord,
@@ -346,6 +346,73 @@ impl<Sw, Mo, Ti, Co>
         }
         (rest.with_field(timed_state), delayed_bindings)
     }
+
+    pub fn with_trigger_event<'a, Tr, Ev>(
+        mut self,
+        event: TriggerEvent<Ti, Tr>,
+        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
+    ) -> (Self, Option<(FilteredBindings<'a, Mo, Ev>, Co)>)
+    where
+        Tr: Eq + Hash,
+        Mo: Clone + Hash + Ord,
+        Co: Clone,
+    {
+        use crate::{unwrap_or_return, StructTakeField, StructWithField};
+
+        let (modifiers, rest): (Modifiers<Mo>, _) = self.take_field();
+        self = rest.with_field(modifiers.clone());
+
+        let mapping = &mapping.trigger;
+        let mapping = mapping.filter_by_switch(&event.trigger);
+        let mapping = unwrap_or_return!(mapping, (self, None));
+        let mapping = mapping.filter_by_modifiers(&modifiers);
+        let bindings = unwrap_or_return!(mapping, (self, None));
+
+        let (coords_state, rest): (CoordsState<Co>, _) = self.take_field();
+        let coords = coords_state.coords().clone();
+        self = rest.with_field(coords_state);
+        (self, Some((bindings, coords)))
+    }
+
+    pub fn with_coords_event<'a, Tr, Ev>(
+        mut self,
+        event: CoordsEvent<Ti, Co>,
+        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
+    ) -> (Self, Vec<(FilteredBindings<'a, Mo, Ev>, Co)>)
+    where
+        Sw: Clone + Eq + Hash,
+        Mo: Clone + Hash + Ord,
+        Co: Clone + Eq,
+    {
+        use crate::{unwrap_or_continue, StructTakeField, StructWithField};
+
+        let (modifiers, rest): (Modifiers<Mo>, _) = self.take_field();
+        self = rest.with_field(modifiers.clone());
+
+        let (_, rest): (CoordsState<Co>, _) = self.take_field();
+        self = rest.with_field(CoordsState::with_coords(event.coords.clone()));
+
+        let (pointer_state, rest): (PointerState<Sw, Co>, _) = self.take_field();
+        let (pointer_state, (events, _)) =
+            pointer_state.with_move_event(|coords| coords != &event.coords); // TODO : Add margins
+        self = rest.with_field(pointer_state);
+
+        let mut all_bindings = vec![];
+        let mapping = &mapping.coords;
+        for event in events {
+            let mapping = mapping.filter_by_pointer_data(&event);
+            let mapping = unwrap_or_continue!(mapping);
+            let mapping = mapping.filter_by_modifiers(&modifiers);
+            let bindings = unwrap_or_continue!(mapping);
+
+            let (coords_state, rest): (CoordsState<Co>, _) = self.take_field();
+            let coords = coords_state.coords().clone();
+            self = rest.with_field(coords_state);
+            all_bindings.push((bindings, coords));
+        }
+
+        (self, all_bindings)
+    }
 }
 
 fn with_timeout_event<'a, Sw, Mo, Ti, Co, Rq, Td, Bi>(
@@ -360,7 +427,7 @@ fn with_timeout_event<'a, Sw, Mo, Ti, Co, Rq, Td, Bi>(
         Sw,
         Rq,
     ) -> (TimedState<Sw>, Option<TimedEventData<Td>>),
-) -> (TimedState<Sw>, Option<(SwitchBindings<'a, Mo, Bi>, Co)>)
+) -> (TimedState<Sw>, Option<(FilteredBindings<'a, Mo, Bi>, Co)>)
 where
     Sw: Eq + Hash,
     Mo: Eq + Hash + Ord,

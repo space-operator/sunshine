@@ -19,7 +19,7 @@ where
     }
 
     /*pub fn from_bindings<'a, Sw, Tr, Ev>(
-        mapping: impl IntoIterator<Item = &'a Binding<Sw, Tr, Mo, Ev>>,
+        mapping: impl IntoIterator<Item = &'a Binding<Mo, Sw, Tr, Co, Ev>>,
     ) -> Self
     where
         Sw: 'a,
