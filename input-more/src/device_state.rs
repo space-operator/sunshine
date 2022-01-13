@@ -133,12 +133,9 @@ impl<Sw, Mo, Ti, Co>
         let next_scheduled = scheduler.next_scheduled().cloned();
         self = rest.with_field(scheduler);
 
-        // FIXME: filter all
         let mapping = mapping
             .press
             .and_then(|mapping| mapping.filter_by_timed_data(&()));
-
-        //let mapping = unwrap_or_return!(mapping, (self, next_scheduled, None)); // FIXME
 
         let (pointer_state, rest): (PointerState<Sw, Co>, _) = self.take_field();
         let (coords_state, rest): (CoordsState<Co>, _) = rest.take_field();
@@ -276,18 +273,15 @@ impl<Sw, Mo, Ti, Co>
             None => (None, None),
         };
 
-        // FIXME: filter all
         let mapping = mapping
             .release
             .and_then(|mapping| mapping.filter_by_timed_data(&timed_data));
-
-        //let mapping = unwrap_or_return!(mapping, (self, next_scheduled, None)); // FIXME
 
         let (pointer_state, rest): (PointerState<Sw, Co>, _) = self.take_field();
         let (pointer_state, result) = pointer_state.with_release_event(&event.switch);
         let pointer_data = result.unwrap();
         self = rest.with_field(pointer_state);
-        let mapping = unwrap_or_return!(mapping, (self, next_scheduled, None)); // FIXME
+        let mapping = unwrap_or_return!(mapping, (self, next_scheduled, None));
 
         let mapping = mapping.filter_by_pointer_data(&pointer_data);
         let mapping = unwrap_or_return!(mapping, (self, next_scheduled, None));

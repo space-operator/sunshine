@@ -8,7 +8,7 @@ use input_core::{
 
 use crate::{
     Binding, CoordsMappingCache, SwitchMappingByModifiers, SwitchMappingBySwitch,
-    SwitchMappingCache, TriggerMappingCache,
+    SwitchMappingByTimed, SwitchMappingCache, TriggerMappingCache,
 };
 
 #[derive(Clone, Debug)]

@@ -33,6 +33,7 @@ fn test_chain() {
             hooray
 
             coords -> context
+            priority appevents
     */
 
     /*
@@ -53,12 +54,13 @@ fn test_chain() {
 
     use core::fmt::Debug;
     use core::hash::Hash;
+    use std::collections::{HashMap, HashSet};
 
     use input_core::*;
     use input_more::*;
 
-    //type DurationMs = u64;
-    type TimestampMs = u64;
+    //type DurationMs = i64;
+    type TimestampMs = i64;
 
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
     enum Switch {
@@ -82,7 +84,7 @@ fn test_chain() {
     struct KeyboardCoords;
 
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-    struct MouseCoords(u64, u64);
+    struct MouseCoords(i64, i64);
 
     impl From<KeyboardSwitch> for Switch {
         fn from(switch: KeyboardSwitch) -> Self {
@@ -96,48 +98,140 @@ fn test_chain() {
         }
     }
 
+    #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
+    struct NodeId(u32);
+
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     pub enum AppEvent {
-        Undo(u32),
-        CreateNode(u32, &'static str),
+        Unselect,
+        SelectNode(NodeId),
+        CreateNode(MouseCoords),
+        EditNode(NodeId),
+        StartSelection(MouseCoords),
+        EndSelection(MouseCoords, MouseCoords),
+        CancelSelection,
+        StartMove(MouseCoords),
+        EndMove(MouseCoords, MouseCoords),
+        CancelMove,
     }
 
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     pub enum BasicAppEventBuilder {
-        Undo(u32),
+        Unselect,
+        CancelSelection,
+        CancelMove,
     }
 
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
     pub enum PointerAppEventBuilder {
-        Undo(u32),
-        CreateNode(u32),
+        Unselect,
+        SelectNode,
+        CreateNode,
+        EditNode,
+        StartSelection,
+        EndSelection,
+        CancelSelection,
+        StartMove,
+        EndMove,
+        CancelMove,
+    }
+
+    #[derive(Clone, Debug, Default)]
+    struct AppContext {
+        nodes: HashMap<NodeId, MouseCoords>,
+        selected: HashSet<NodeId>,
+        ui_state: UiState,
+    }
+
+    #[derive(Clone, Debug)]
+    enum UiState {
+        Default,
+        Selection(MouseCoords),
+        Move(MouseCoords),
+    }
+
+    impl Default for UiState {
+        fn default() -> Self {
+            Self::Default
+        }
+    }
+
+    impl AppContext {
+        fn node_at(&self, coords: &MouseCoords) -> Option<NodeId> {
+            self.nodes
+                .iter()
+                .find(|(_, node_coords)| {
+                    (node_coords.0 - coords.0).abs() < 10 && (node_coords.1 - coords.1).abs() < 10
+                })
+                .map(|(id, _)| *id)
+        }
     }
 
     trait BuildAppEvent<Co> {
-        fn build(&self, coords: &Co) -> Option<AppEvent>;
+        fn build(&self, coords: &Co, ctx: &AppContext) -> Option<AppEvent>;
     }
 
     impl BuildAppEvent<KeyboardCoords> for BasicAppEventBuilder {
-        fn build(&self, _: &KeyboardCoords) -> Option<AppEvent> {
+        fn build(&self, _: &KeyboardCoords, ctx: &AppContext) -> Option<AppEvent> {
             match self {
-                Self::Undo(id) => Some(AppEvent::Undo(*id)),
+                Self::Unselect => {
+                    if ctx.selected.is_empty() {
+                        None
+                    } else {
+                        Some(AppEvent::Unselect)
+                    }
+                }
+                Self::CancelSelection => match ctx.ui_state {
+                    UiState::Selection(_) => Some(AppEvent::CancelSelection),
+                    UiState::Default | UiState::Move(_) => None,
+                },
+                Self::CancelMove => match ctx.ui_state {
+                    UiState::Move(_) => Some(AppEvent::CancelMove),
+                    UiState::Default | UiState::Selection(_) => None,
+                },
             }
         }
     }
 
     impl BuildAppEvent<MouseCoords> for PointerAppEventBuilder {
-        fn build(&self, coords: &MouseCoords) -> Option<AppEvent> {
+        fn build(&self, coords: &MouseCoords, ctx: &AppContext) -> Option<AppEvent> {
             match self {
-                Self::Undo(id) => Some(AppEvent::Undo(*id)),
-                Self::CreateNode(id) => {
-                    if (100..=200).contains(&coords.0) && (100..=200).contains(&coords.1) {
-                        Some(AppEvent::CreateNode(*id, "first"))
-                    } else if (300..=400).contains(&coords.0) && (300..=400).contains(&coords.1) {
-                        Some(AppEvent::CreateNode(*id, "second"))
-                    } else {
+                Self::Unselect => {
+                    if ctx.selected.is_empty() {
                         None
+                    } else {
+                        Some(AppEvent::Unselect)
                     }
                 }
+                Self::SelectNode => ctx.node_at(coords).map(AppEvent::SelectNode),
+                Self::CreateNode => Some(AppEvent::CreateNode(*coords)),
+                Self::EditNode => ctx.node_at(coords).map(AppEvent::SelectNode),
+                Self::StartSelection => match ctx.ui_state {
+                    UiState::Default => Some(AppEvent::StartSelection(*coords)),
+                    UiState::Selection(_) | UiState::Move(_) => None,
+                },
+                Self::EndSelection => match ctx.ui_state {
+                    UiState::Selection(start_coords) => {
+                        Some(AppEvent::EndSelection(start_coords, *coords))
+                    }
+                    UiState::Default | UiState::Move(_) => None,
+                },
+                Self::CancelSelection => match ctx.ui_state {
+                    UiState::Selection(_) => Some(AppEvent::CancelSelection),
+                    UiState::Default | UiState::Move(_) => None,
+                },
+                Self::StartMove => match ctx.ui_state {
+                    UiState::Default => Some(AppEvent::StartMove(*coords)),
+                    UiState::Selection(_) | UiState::Move(_) => None,
+                },
+                Self::EndMove => match ctx.ui_state {
+                    UiState::Move(start_coords) => Some(AppEvent::EndMove(start_coords, *coords)),
+                    UiState::Default | UiState::Selection(_) => None,
+                },
+                Self::CancelMove => match ctx.ui_state {
+                    UiState::Move(_) => Some(AppEvent::CancelMove),
+                    UiState::Default | UiState::Selection(_) => None,
+                },
             }
         }
     }
@@ -226,72 +320,100 @@ fn test_chain() {
         keyboard: KeyboardMapping,
     }*/
 
+    let lmb = MouseSwitch("LeftMouseButton");
+    let click = Some(TimedEventData {
+        kind: TimedReleaseEventKind::Click,
+        num_possible_clicks: 1,
+    });
+    let dbl_click = Some(TimedEventData {
+        kind: TimedReleaseEventKind::Click,
+        num_possible_clicks: 2,
+    });
+
     let keyboard_mapping = KeyboardMapping::new(
-        [
-            Binding::Press(SwitchBinding {
-                switch: KeyboardSwitch("LeftCtrl"),
-                modifiers: Modifiers::new(),
-                timed_data: (),
-                pointer_data: (),
-                event: BasicAppEventBuilder::Undo(10),
-            }),
-            Binding::Press(SwitchBinding {
-                switch: KeyboardSwitch("LeftCtrl"),
-                modifiers: Modifiers::new()
-                    .with_press_event(Switch::Keyboard(KeyboardSwitch("LeftShift")))
-                    .0,
-                timed_data: (),
-                pointer_data: (),
-                event: BasicAppEventBuilder::Undo(110),
-            }),
-            Binding::Press(SwitchBinding {
-                switch: KeyboardSwitch("LeftCtrl"),
-                modifiers: Modifiers::new()
-                    .with_press_event(Switch::Keyboard(KeyboardSwitch("LeftAlt")))
-                    .0,
-                timed_data: (),
-                pointer_data: (),
-                event: BasicAppEventBuilder::Undo(120),
-            }),
-            Binding::Release(SwitchBinding {
-                switch: KeyboardSwitch("LeftCtrl"),
-                modifiers: Modifiers::new(),
-                timed_data: None,
-                pointer_data: None,
-                event: BasicAppEventBuilder::Undo(20),
-            }),
-            Binding::Release(SwitchBinding {
-                switch: KeyboardSwitch("LeftCtrl"),
-                modifiers: Modifiers::new(),
-                timed_data: Some(TimedReleaseEventData {
-                    kind: TimedReleaseEventKind::Click,
-                    num_possible_clicks: 1,
-                }),
-                pointer_data: None,
-                event: BasicAppEventBuilder::Undo(30),
-            }),
-            Binding::Release(SwitchBinding {
-                switch: KeyboardSwitch("LeftCtrl"),
-                modifiers: Modifiers::new(),
-                timed_data: Some(TimedReleaseEventData {
-                    kind: TimedReleaseEventKind::Click,
-                    num_possible_clicks: 2,
-                }),
-                pointer_data: None,
-                event: BasicAppEventBuilder::Undo(40),
-            }),
-        ]
+        [Binding::Release(SwitchBinding {
+            switch: KeyboardSwitch("Escape"),
+            modifiers: Modifiers::new(),
+            timed_data: click,
+            pointer_data: None,
+            event: BasicAppEventBuilder::Unselect,
+        })]
         .into_iter()
         .collect(),
     );
     let mouse_mapping = MouseMapping::new(
-        [Binding::Press(SwitchBinding {
-            switch: MouseSwitch("LeftMouseButton"),
-            modifiers: Modifiers::new(),
-            timed_data: (),
-            pointer_data: (),
-            event: PointerAppEventBuilder::CreateNode(10),
-        })]
+        [
+            Binding::Release(SwitchBinding {
+                switch: lmb,
+                modifiers: Modifiers::new(),
+                timed_data: click,
+                pointer_data: None,
+                event: PointerAppEventBuilder::Unselect,
+            }),
+            Binding::Release(SwitchBinding {
+                switch: lmb,
+                modifiers: Modifiers::new(),
+                timed_data: click,
+                pointer_data: None,
+                event: PointerAppEventBuilder::SelectNode,
+            }),
+            Binding::Release(SwitchBinding {
+                switch: lmb,
+                modifiers: Modifiers::new(),
+                timed_data: dbl_click,
+                pointer_data: None,
+                event: PointerAppEventBuilder::CreateNode,
+            }),
+            Binding::Release(SwitchBinding {
+                switch: lmb,
+                modifiers: Modifiers::new(),
+                timed_data: dbl_click,
+                pointer_data: None,
+                event: PointerAppEventBuilder::EditNode,
+            }),
+            Binding::Press(SwitchBinding {
+                switch: lmb,
+                modifiers: Modifiers::new(),
+                timed_data: (),
+                pointer_data: (),
+                event: PointerAppEventBuilder::StartSelection,
+            }),
+            Binding::Press(SwitchBinding {
+                switch: lmb,
+                modifiers: Modifiers::new(),
+                timed_data: (),
+                pointer_data: (),
+                event: PointerAppEventBuilder::StartMove,
+            }),
+            Binding::Release(SwitchBinding {
+                switch: lmb,
+                modifiers: Modifiers::new(),
+                timed_data: None,
+                pointer_data: None,
+                event: PointerAppEventBuilder::CancelSelection,
+            }),
+            Binding::Release(SwitchBinding {
+                switch: lmb,
+                modifiers: Modifiers::new(),
+                timed_data: None,
+                pointer_data: None,
+                event: PointerAppEventBuilder::CancelMove,
+            }),
+            Binding::Release(SwitchBinding {
+                switch: lmb,
+                modifiers: Modifiers::new(),
+                timed_data: None,
+                pointer_data: Some(PointerChangeEventData::DragEnd),
+                event: PointerAppEventBuilder::EndSelection,
+            }),
+            Binding::Release(SwitchBinding {
+                switch: lmb,
+                modifiers: Modifiers::new(),
+                timed_data: None,
+                pointer_data: Some(PointerChangeEventData::DragEnd),
+                event: PointerAppEventBuilder::EndMove,
+            }),
+        ]
         .into_iter()
         .collect(),
     );
@@ -344,29 +466,47 @@ fn test_chain() {
         }
     }
 
+    let mut context = AppContext {
+        nodes: [
+            (NodeId(1), MouseCoords(100, 100)),
+            (NodeId(2), MouseCoords(200, 200)),
+            (NodeId(3), MouseCoords(300, 100)),
+        ]
+        .into_iter()
+        .collect(),
+        selected: [NodeId(2)].into_iter().collect(),
+        ui_state: UiState::Default,
+    };
+
+    let mut time = {
+        let mut time = 1000;
+        move || {
+            time += 100;
+            time
+        }
+    };
+
     let events = [
-        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(1000, KeyboardSwitch("LeftShift"))),
-        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(1100, KeyboardSwitch("LeftAlt"))),
-        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(2000, KeyboardSwitch("LeftCtrl"))),
-        RawEvent::KeyboardRelease(KeyboardSwitchEvent::new(2100, KeyboardSwitch("LeftCtrl"))),
-        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(2200, KeyboardSwitch("LeftCtrl"))),
-        RawEvent::KeyboardRelease(KeyboardSwitchEvent::new(2300, KeyboardSwitch("LeftCtrl"))),
-        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(3000, KeyboardSwitch("LeftShift"))),
-        RawEvent::KeyboardPress(KeyboardSwitchEvent::new(3100, KeyboardSwitch("LeftAlt"))),
-        RawEvent::MouseCoords(MouseCoordsEvent::new(4000, MouseCoords(150, 150))),
-        RawEvent::MousePress(MouseSwitchEvent::new(4100, MouseSwitch("LeftMouseButton"))),
-        RawEvent::MouseRelease(MouseSwitchEvent::new(4200, MouseSwitch("LeftMouseButton"))),
-        RawEvent::MouseCoords(MouseCoordsEvent::new(4300, MouseCoords(50, 50))),
-        RawEvent::MousePress(MouseSwitchEvent::new(4400, MouseSwitch("LeftMouseButton"))),
-        RawEvent::MouseRelease(MouseSwitchEvent::new(4500, MouseSwitch("LeftMouseButton"))),
-        RawEvent::MouseCoords(MouseCoordsEvent::new(4600, MouseCoords(150, 150))),
-        RawEvent::MousePress(MouseSwitchEvent::new(4700, MouseSwitch("LeftMouseButton"))),
-        RawEvent::MouseRelease(MouseSwitchEvent::new(4800, MouseSwitch("LeftMouseButton"))),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(time(), MouseCoords(50, 50))),
+        RawEvent::MousePress(MouseSwitchEvent::new(time(), lmb)),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(time(), lmb)),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(time(), MouseCoords(100, 100))),
+        RawEvent::MousePress(MouseSwitchEvent::new(time(), lmb)),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(time(), lmb)),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(time(), MouseCoords(200, 200))),
+        RawEvent::MousePress(MouseSwitchEvent::new(time(), lmb)),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(time(), lmb)),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(time(), MouseCoords(300, 100))),
+        RawEvent::MousePress(MouseSwitchEvent::new(time(), lmb)),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(time(), lmb)),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(time(), MouseCoords(100, 100))),
+        RawEvent::MousePress(MouseSwitchEvent::new(time(), lmb)),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(time(), MouseCoords(100, 300))),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(time(), lmb)),
     ];
 
-    // fn
-
     for event in events {
+        println!("Co: {:?}", context);
         let result =
             global_state.with_timeout(event.time() - 1000, event.time() - 300, &mapping_cache);
         global_state = result.state;
@@ -447,16 +587,43 @@ fn test_chain() {
 
         for (bindings, coords) in keyboard_bindings {
             println!("Bi: {:?}", bindings);
-            let app_events = bindings.build(|builder| builder.build(&coords));
+            let app_events = bindings.build(|builder| builder.build(&coords, &context));
             println!("Ev: {:?}", app_events);
             println!();
         }
 
         for (bindings, coords) in mouse_bindings {
             println!("Bi: {:?}", bindings);
-            let app_events = bindings.build(|builder| builder.build(&coords));
+            let app_events = bindings.build(|builder| builder.build(&coords, &context));
             println!("Ev: {:?}", app_events);
             println!();
+
+            for event in app_events {
+                match event {
+                    AppEvent::Unselect => {}
+                    AppEvent::SelectNode(_) => {}
+                    AppEvent::CreateNode(_) => {}
+                    AppEvent::EditNode(_) => {}
+                    AppEvent::StartSelection(start) => {
+                        context.ui_state = UiState::Selection(start);
+                    }
+                    AppEvent::EndSelection(_, _) => {
+                        context.ui_state = UiState::Default;
+                    }
+                    AppEvent::CancelSelection => {
+                        context.ui_state = UiState::Default;
+                    }
+                    AppEvent::StartMove(start) => {
+                        context.ui_state = UiState::Move(start);
+                    }
+                    AppEvent::EndMove(_, _) => {
+                        context.ui_state = UiState::Default;
+                    }
+                    AppEvent::CancelMove => {
+                        context.ui_state = UiState::Default;
+                    }
+                }
+            }
         }
     }
 
