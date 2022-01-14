@@ -300,6 +300,11 @@ impl<Mo, Ti, Sw, Co, CsMs, TsMs, ShMsLo, ShMsCl, PoMs>
         Mo: Clone + Eq + From<Sw> + Hash + Ord,
         Ti: Clone + Ord,
         Co: Clone,
+        // TODO: Remove after debugging
+        Ev: std::fmt::Debug,
+        Tr: std::fmt::Debug,
+        Mo: std::fmt::Debug,
+        Ev: std::fmt::Debug,
     {
         let (state, global_state): (KeyboardDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
         let (state, scheduled, bindings) =
@@ -326,6 +331,11 @@ impl<Mo, Ti, Sw, Co, CsMs, TsMs, ShMsLo, ShMsCl, PoMs>
         Mo: Clone + Eq + From<Sw> + Hash + Ord,
         Ti: Clone + Ord,
         Co: Clone,
+        // TODO: Remove after debugging
+        Ev: std::fmt::Debug,
+        Tr: std::fmt::Debug,
+        Mo: std::fmt::Debug,
+        Ev: std::fmt::Debug,
     {
         let (state, global_state): (KeyboardDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
         let (state, scheduled, bindings) =
@@ -416,6 +426,11 @@ impl<Mo, Ti, Sw, Co, CsKe, TsKe, ShKeLo, ShKeCl, PoKe>
         Mo: Clone + Eq + From<Sw> + Hash + Ord,
         Ti: Clone + Ord,
         Co: Clone,
+        // TODO: Remove after debugging
+        Ev: std::fmt::Debug,
+        Tr: std::fmt::Debug,
+        Mo: std::fmt::Debug,
+        Ev: std::fmt::Debug,
     {
         let (state, global_state): (MouseDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
         let (state, scheduled, bindings) =
@@ -442,6 +457,11 @@ impl<Mo, Ti, Sw, Co, CsKe, TsKe, ShKeLo, ShKeCl, PoKe>
         Mo: Clone + Eq + From<Sw> + Hash + Ord,
         Ti: Clone + Ord,
         Co: Clone,
+        // TODO: Remove after debugging
+        Ev: std::fmt::Debug,
+        Tr: std::fmt::Debug,
+        Mo: std::fmt::Debug,
+        Ev: std::fmt::Debug,
     {
         let (state, global_state): (MouseDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
         let (state, scheduled, bindings) =

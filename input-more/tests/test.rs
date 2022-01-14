@@ -34,6 +34,8 @@ fn test_chain() {
 
             coords -> context
             priority appevents
+            //   how to create binding for any relase event but not only for click | dblclick | longpress
+
     */
 
     /*
@@ -205,7 +207,7 @@ fn test_chain() {
                 }
                 Self::SelectNode => ctx.node_at(coords).map(AppEvent::SelectNode),
                 Self::CreateNode => Some(AppEvent::CreateNode(*coords)),
-                Self::EditNode => ctx.node_at(coords).map(AppEvent::SelectNode),
+                Self::EditNode => ctx.node_at(coords).map(AppEvent::EditNode),
                 Self::StartSelection => match ctx.ui_state {
                     UiState::Default => Some(AppEvent::StartSelection(*coords)),
                     UiState::Selection(_) | UiState::Move(_) => None,
@@ -234,6 +236,51 @@ fn test_chain() {
                 },
             }
         }
+    }
+
+    fn filter_by_priority(events: Vec<AppEvent>) -> impl Iterator<Item = AppEvent> {
+        let mut is_unselect_used = false;
+        let mut is_select_node_used = false;
+        let mut is_create_node_used = false;
+        let mut is_edit_node_used = false;
+        let mut is_start_selection_used = false;
+        let mut is_end_selection_used = false;
+        let mut is_cancel_selection_used = false;
+        let mut is_start_move_used = false;
+        let mut is_end_move_used = false;
+        let mut is_cancel_move_used = false;
+        for event in &events {
+            match event {
+                AppEvent::Unselect => is_unselect_used = true,
+                AppEvent::SelectNode(_) => is_select_node_used = true,
+                AppEvent::CreateNode(_) => is_create_node_used = true,
+                AppEvent::EditNode(_) => is_edit_node_used = true,
+                AppEvent::StartSelection(_) => is_start_selection_used = true,
+                AppEvent::EndSelection(_, _) => is_end_selection_used = true,
+                AppEvent::CancelSelection => is_cancel_selection_used = true,
+                AppEvent::StartMove(_) => is_start_move_used = true,
+                AppEvent::EndMove(_, _) => is_end_move_used = true,
+                AppEvent::CancelMove => is_cancel_move_used = true,
+            }
+        }
+
+        let is_end_or_cancel_move_or_selection = is_end_selection_used
+            || is_cancel_selection_used
+            || is_end_move_used
+            || is_cancel_move_used;
+
+        events.into_iter().filter(move |event| match event {
+            AppEvent::Unselect => !is_create_node_used && !is_select_node_used,
+            AppEvent::SelectNode(_) => !is_create_node_used,
+            AppEvent::CreateNode(_) => !is_edit_node_used && !is_end_or_cancel_move_or_selection,
+            AppEvent::EditNode(_) => !is_end_or_cancel_move_or_selection,
+            AppEvent::StartSelection(_) => !is_create_node_used && !is_edit_node_used,
+            AppEvent::EndSelection(_, _) => true,
+            AppEvent::CancelSelection => true,
+            AppEvent::StartMove(_) => !is_create_node_used && !is_edit_node_used,
+            AppEvent::EndMove(_, _) => true,
+            AppEvent::CancelMove => true,
+        })
     }
 
     /*#[derive(Clone, Debug, Default)]
@@ -321,6 +368,7 @@ fn test_chain() {
     }*/
 
     let lmb = MouseSwitch("LeftMouseButton");
+    let rmb = MouseSwitch("RightMouseButton");
     let click = Some(TimedEventData {
         kind: TimedReleaseEventKind::Click,
         num_possible_clicks: 1,
@@ -378,13 +426,7 @@ fn test_chain() {
                 pointer_data: (),
                 event: PointerAppEventBuilder::StartSelection,
             }),
-            Binding::Press(SwitchBinding {
-                switch: lmb,
-                modifiers: Modifiers::new(),
-                timed_data: (),
-                pointer_data: (),
-                event: PointerAppEventBuilder::StartMove,
-            }),
+            //
             Binding::Release(SwitchBinding {
                 switch: lmb,
                 modifiers: Modifiers::new(),
@@ -396,18 +438,55 @@ fn test_chain() {
                 switch: lmb,
                 modifiers: Modifiers::new(),
                 timed_data: None,
+                pointer_data: Some(PointerChangeEventData::DragEnd),
+                event: PointerAppEventBuilder::EndSelection,
+            }),
+            //
+            Binding::Release(SwitchBinding {
+                switch: lmb,
+                modifiers: Modifiers::new(),
+                timed_data: click, // FIXME
                 pointer_data: None,
-                event: PointerAppEventBuilder::CancelMove,
+                event: PointerAppEventBuilder::CancelSelection,
             }),
             Binding::Release(SwitchBinding {
                 switch: lmb,
                 modifiers: Modifiers::new(),
-                timed_data: None,
+                timed_data: click, // FIXME
                 pointer_data: Some(PointerChangeEventData::DragEnd),
                 event: PointerAppEventBuilder::EndSelection,
             }),
             Binding::Release(SwitchBinding {
                 switch: lmb,
+                modifiers: Modifiers::new(),
+                timed_data: dbl_click, // FIXME
+                pointer_data: None,
+                event: PointerAppEventBuilder::CancelSelection,
+            }),
+            Binding::Release(SwitchBinding {
+                switch: lmb,
+                modifiers: Modifiers::new(),
+                timed_data: dbl_click, // FIXME
+                pointer_data: Some(PointerChangeEventData::DragEnd),
+                event: PointerAppEventBuilder::EndSelection,
+            }),
+            //
+            Binding::Press(SwitchBinding {
+                switch: rmb,
+                modifiers: Modifiers::new(),
+                timed_data: (),
+                pointer_data: (),
+                event: PointerAppEventBuilder::StartMove,
+            }),
+            Binding::Release(SwitchBinding {
+                switch: rmb,
+                modifiers: Modifiers::new(),
+                timed_data: None,
+                pointer_data: None,
+                event: PointerAppEventBuilder::CancelMove,
+            }),
+            Binding::Release(SwitchBinding {
+                switch: rmb,
                 modifiers: Modifiers::new(),
                 timed_data: None,
                 pointer_data: Some(PointerChangeEventData::DragEnd),
@@ -478,34 +557,47 @@ fn test_chain() {
         ui_state: UiState::Default,
     };
 
-    let mut time = {
+    let mut delay = {
         let mut time = 1000;
-        move || {
-            time += 100;
+        move |delay| {
+            time += delay;
             time
         }
     };
 
     let events = [
-        RawEvent::MouseCoords(MouseCoordsEvent::new(time(), MouseCoords(50, 50))),
-        RawEvent::MousePress(MouseSwitchEvent::new(time(), lmb)),
-        RawEvent::MouseRelease(MouseSwitchEvent::new(time(), lmb)),
-        RawEvent::MouseCoords(MouseCoordsEvent::new(time(), MouseCoords(100, 100))),
-        RawEvent::MousePress(MouseSwitchEvent::new(time(), lmb)),
-        RawEvent::MouseRelease(MouseSwitchEvent::new(time(), lmb)),
-        RawEvent::MouseCoords(MouseCoordsEvent::new(time(), MouseCoords(200, 200))),
-        RawEvent::MousePress(MouseSwitchEvent::new(time(), lmb)),
-        RawEvent::MouseRelease(MouseSwitchEvent::new(time(), lmb)),
-        RawEvent::MouseCoords(MouseCoordsEvent::new(time(), MouseCoords(300, 100))),
-        RawEvent::MousePress(MouseSwitchEvent::new(time(), lmb)),
-        RawEvent::MouseRelease(MouseSwitchEvent::new(time(), lmb)),
-        RawEvent::MouseCoords(MouseCoordsEvent::new(time(), MouseCoords(100, 100))),
-        RawEvent::MousePress(MouseSwitchEvent::new(time(), lmb)),
-        RawEvent::MouseCoords(MouseCoordsEvent::new(time(), MouseCoords(100, 300))),
-        RawEvent::MouseRelease(MouseSwitchEvent::new(time(), lmb)),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(delay(100), MouseCoords(50, 50))),
+        RawEvent::MousePress(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(delay(2000), MouseCoords(100, 100))),
+        RawEvent::MousePress(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(delay(2000), MouseCoords(200, 200))),
+        RawEvent::MousePress(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(delay(2000), MouseCoords(300, 100))),
+        RawEvent::MousePress(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(delay(100), lmb)),
+        //
+        RawEvent::MouseCoords(MouseCoordsEvent::new(delay(2000), MouseCoords(79, 79))),
+        RawEvent::MousePress(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MousePress(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(delay(2000), MouseCoords(200, 200))),
+        RawEvent::MousePress(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MousePress(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(delay(100), lmb)),
+        //
+        RawEvent::MouseCoords(MouseCoordsEvent::new(delay(2000), MouseCoords(101, 101))),
+        RawEvent::MousePress(MouseSwitchEvent::new(delay(100), lmb)),
+        RawEvent::MouseCoords(MouseCoordsEvent::new(delay(100), MouseCoords(200, 200))),
+        RawEvent::MouseRelease(MouseSwitchEvent::new(delay(100), lmb)),
     ];
 
     for event in events {
+        println!("St: {:?}", global_state);
         println!("Co: {:?}", context);
         let result =
             global_state.with_timeout(event.time() - 1000, event.time() - 300, &mapping_cache);
@@ -585,46 +677,50 @@ fn test_chain() {
         global_state = state;
         println!("Sh: {:?}", scheduled);
 
+        let mut all_app_events = Vec::new();
+
         for (bindings, coords) in keyboard_bindings {
             println!("Bi: {:?}", bindings);
             let app_events = bindings.build(|builder| builder.build(&coords, &context));
             println!("Ev: {:?}", app_events);
-            println!();
+            all_app_events.extend(filter_by_priority(app_events));
         }
 
         for (bindings, coords) in mouse_bindings {
             println!("Bi: {:?}", bindings);
             let app_events = bindings.build(|builder| builder.build(&coords, &context));
             println!("Ev: {:?}", app_events);
-            println!();
+            all_app_events.extend(filter_by_priority(app_events));
+        }
 
-            for event in app_events {
-                match event {
-                    AppEvent::Unselect => {}
-                    AppEvent::SelectNode(_) => {}
-                    AppEvent::CreateNode(_) => {}
-                    AppEvent::EditNode(_) => {}
-                    AppEvent::StartSelection(start) => {
-                        context.ui_state = UiState::Selection(start);
-                    }
-                    AppEvent::EndSelection(_, _) => {
-                        context.ui_state = UiState::Default;
-                    }
-                    AppEvent::CancelSelection => {
-                        context.ui_state = UiState::Default;
-                    }
-                    AppEvent::StartMove(start) => {
-                        context.ui_state = UiState::Move(start);
-                    }
-                    AppEvent::EndMove(_, _) => {
-                        context.ui_state = UiState::Default;
-                    }
-                    AppEvent::CancelMove => {
-                        context.ui_state = UiState::Default;
-                    }
+        println!("Ev: {:?}", all_app_events);
+        for event in all_app_events {
+            match event {
+                AppEvent::Unselect => {}
+                AppEvent::SelectNode(_) => {}
+                AppEvent::CreateNode(_) => {}
+                AppEvent::EditNode(_) => {}
+                AppEvent::StartSelection(start) => {
+                    context.ui_state = UiState::Selection(start);
+                }
+                AppEvent::EndSelection(_, _) => {
+                    context.ui_state = UiState::Default;
+                }
+                AppEvent::CancelSelection => {
+                    context.ui_state = UiState::Default;
+                }
+                AppEvent::StartMove(start) => {
+                    context.ui_state = UiState::Move(start);
+                }
+                AppEvent::EndMove(_, _) => {
+                    context.ui_state = UiState::Default;
+                }
+                AppEvent::CancelMove => {
+                    context.ui_state = UiState::Default;
                 }
             }
         }
+        println!();
     }
 
     panic!();

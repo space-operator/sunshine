@@ -82,6 +82,11 @@ impl<Sw, Mo, Ti, Co>
         Mo: Clone + Eq + From<Sw> + Hash + Ord,
         Ti: Clone + Ord,
         Co: Clone,
+        // TODO: Remove after debugging
+        Ev: std::fmt::Debug,
+        Tr: std::fmt::Debug,
+        Mo: std::fmt::Debug,
+        Ev: std::fmt::Debug,
     {
         use crate::{unwrap_or_return, StructTakeField, StructWithField};
 
@@ -104,10 +109,12 @@ impl<Sw, Mo, Ti, Co>
         };
         self = rest.with_field(modifiers.clone());
 
+        println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (self, None, None));
 
         let mapping = mapping.filter_by_modifiers(&modifiers);
 
+        println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (self, None, None));
 
         let (timed_state, rest): (TimedState<Sw>, _) = self.take_field();
@@ -144,6 +151,7 @@ impl<Sw, Mo, Ti, Co>
         //result.unwrap(); // FIXME
         let rest = rest.with_field(coords_state);
         self = rest.with_field(pointer_state);
+        println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (self, next_scheduled, None)); // FIXME
 
         let mapping = mapping.filter_by_pointer_data(&());
@@ -153,6 +161,7 @@ impl<Sw, Mo, Ti, Co>
         let coords = coords_state.coords().clone();
         self = rest.with_field(coords_state);
 
+        println!("{:?}", mapping);
         (self, next_scheduled, Some((mapping, coords)))
     }
 
@@ -215,6 +224,11 @@ impl<Sw, Mo, Ti, Co>
         Mo: Clone + Eq + From<Sw> + Hash + Ord,
         Ti: Clone + Ord,
         Co: Clone,
+        // TODO: Remove after debugging
+        Ev: std::fmt::Debug,
+        Tr: std::fmt::Debug,
+        Mo: std::fmt::Debug,
+        Ev: std::fmt::Debug,
     {
         use crate::{unwrap_or_return, StructTakeField, StructWithField};
 
@@ -238,10 +252,12 @@ impl<Sw, Mo, Ti, Co>
         };
         self = rest.with_field(modifiers.clone());
 
+        println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (self, None, None));
 
         let mapping = mapping.filter_by_modifiers(&modifiers);
 
+        println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (self, None, None));
 
         let (timed_state, rest): (TimedState<Sw>, _) = self.take_field();
@@ -281,15 +297,18 @@ impl<Sw, Mo, Ti, Co>
         let (pointer_state, result) = pointer_state.with_release_event(&event.switch);
         let pointer_data = result.unwrap();
         self = rest.with_field(pointer_state);
+        println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (self, next_scheduled, None));
 
         let mapping = mapping.filter_by_pointer_data(&pointer_data);
+        println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (self, next_scheduled, None));
 
         let (coords_state, rest): (CoordsState<Co>, _) = self.take_field();
         let coords = coords_state.coords().clone();
         self = rest.with_field(coords_state);
 
+        println!("{:?}", mapping);
         (self, next_scheduled, Some((mapping, coords)))
     }
 
@@ -306,7 +325,6 @@ impl<Sw, Mo, Ti, Co>
         use crate::{StructTakeField, StructWithField};
 
         let (mut timed_state, rest): (TimedState<Sw>, _) = self.take_field();
-
         let (scheduler, rest): (
             DeviceSchedulerState<Ti, Sw, Mo, Co, ClickExactHandleRequest>,
             _,
@@ -319,6 +337,10 @@ impl<Sw, Mo, Ti, Co>
         let mut delayed_bindings = Vec::new();
         for (_, requests) in requests {
             for ((event, modifiers, coords), request) in requests {
+                let result = timed_state.with_reset_click_count(&event.switch);
+                timed_state = result.0;
+                result.1.unwrap();
+
                 let (new_timed_state, result) = with_timeout_event(
                     &mapping.click_exact,
                     timed_state,

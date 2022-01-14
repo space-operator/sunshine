@@ -298,7 +298,12 @@ impl<'a, Mo, Bu> FilteredBindings<'a, Mo, Bu> {
     where
         F: FnMut(&Bu) -> Option<Ev>,
         Mo: Eq + Hash + Ord,
+        // TODO: Remove Display
+        Mo: std::fmt::Debug,
+        Ev: std::fmt::Debug,
+        Bu: std::fmt::Debug,
     {
+        println!("BuBi {:?}", self);
         let bindings: HashMap<_, _> = self
             .into_inner()
             .into_iter()
@@ -315,6 +320,7 @@ impl<'a, Mo, Bu> FilteredBindings<'a, Mo, Bu> {
             })
             .collect();
 
+        println!("BuBi {:?}", bindings);
         let events_mask: Vec<_> = bindings
             .iter()
             .map(|(modifiers, _)| {
@@ -324,11 +330,15 @@ impl<'a, Mo, Bu> FilteredBindings<'a, Mo, Bu> {
             })
             .collect();
 
-        bindings
+        println!("BuMa {:?}", events_mask);
+        let result = bindings
             .into_iter()
             .enumerate()
             .filter_map(|(j, event)| if events_mask[j] { Some(event) } else { None })
             .flat_map(|(_, events)| events)
-            .collect()
+            .collect();
+
+        println!("BuEv {:?}", result);
+        result
     }
 }

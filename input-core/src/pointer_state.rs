@@ -63,8 +63,8 @@ impl<Sw, Co> PointerState<Sw, Co> {
     where
         Sw: Eq + Hash,
     {
-        let switches = self.switches;
-        match switches.get(switch) {
+        let mut switches = self.switches;
+        match switches.remove(switch) {
             Some(state) => {
                 let data = match state {
                     SwitchState::Pressed(_) => None,

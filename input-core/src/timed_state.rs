@@ -207,20 +207,18 @@ impl<Sw> TimedState<Sw> {
         }
     }
 
-    pub fn with_reset_click_count(self, switch: Sw) -> (Self, Result<(), WithResetClickCountError>)
+    pub fn with_reset_click_count(self, switch: &Sw) -> (Self, Result<(), WithResetClickCountError>)
     where
         Sw: Eq + Hash,
     {
-        use std::collections::hash_map::Entry;
-
         let mut switches = self.switches;
-        let entry = switches.entry(switch);
+        let entry = switches.get_mut(&switch);
         match entry {
-            Entry::Occupied(mut entry) => {
-                entry.get_mut().num_possible_clicks = 0;
+            Some(state) => {
+                state.num_possible_clicks = 0;
                 (Self::from(switches), Ok(()))
             }
-            Entry::Vacant(_) => (Self::from(switches), Err(WithResetClickCountError::Default)),
+            None => (Self::from(switches), Err(WithResetClickCountError::Default)),
         }
     }
 }
