@@ -60,6 +60,7 @@ fn test_chain() {
 
     use input_core::*;
     use input_more::*;
+    use input_more_stable as input_more;
 
     //type DurationMs = i64;
     type TimestampMs = i64;
@@ -639,8 +640,7 @@ fn test_chain() {
                 )
             }
             RawEvent::KeyboardCoords(event) => {
-                let result =
-                    global_state.with_keyboard_coords_event(event, &mapping_cache, |a, b| a == b);
+                let result = global_state.with_keyboard_coords_event(event, &mapping_cache);
                 (result.state, None, result.bindings, vec![])
             }
             RawEvent::MousePress(event) => {
@@ -671,8 +671,7 @@ fn test_chain() {
                 )
             }
             RawEvent::MouseCoords(event) => {
-                let result =
-                    global_state.with_mouse_coords_event(event, &mapping_cache, |a, b| a == b);
+                let result = global_state.with_mouse_coords_event(event, &mapping_cache);
                 (result.state, None, vec![], result.bindings)
             }
         };

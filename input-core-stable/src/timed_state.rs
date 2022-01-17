@@ -1,5 +1,4 @@
 use core::hash::Hash;
-use std::collections::hash_map::OccupiedEntry;
 use std::collections::HashMap;
 use std::sync::{Arc, Weak};
 
@@ -87,106 +86,139 @@ impl<Sw> TimedState<Sw> {
         self.switches.keys()
     }
 
-    pub fn on_press_event(&mut self, switch: Sw) -> Result<LongPressHandleRequest, TimedPressError>
+    pub fn with_press_event(
+        self,
+        switch: Sw,
+    ) -> (Self, Result<LongPressHandleRequest, TimedPressError>)
     where
         Sw: Eq + Hash,
     {
         use std::collections::hash_map::Entry;
 
-        let entry = self.switches.entry(switch);
+        let mut switches = self.switches;
+        let entry = switches.entry(switch);
         match entry {
-            Entry::Occupied(mut entry) => entry.get_mut().on_press_event(),
+            Entry::Occupied(entry) => {
+                let (switch, state) = entry.remove_entry();
+                let (state, request) = state.with_press_event();
+                let _ = switches.insert(switch, state);
+                (Self::from(switches), request)
+            }
             Entry::Vacant(entry) => {
                 let (state, request) = SwitchState::from_pressed();
                 let _: &mut _ = entry.insert(state);
-                Ok(request)
+                (Self::from(switches), Ok(request))
             }
         }
     }
 
-    pub fn on_release_event(
-        &mut self,
+    pub fn with_release_event(
+        self,
         switch: Sw,
-    ) -> Result<Option<(TimedReleaseEventData, ClickExactHandleRequest)>, TimedReleaseError>
+    ) -> (
+        Self,
+        Result<Option<(TimedReleaseEventData, ClickExactHandleRequest)>, TimedReleaseError>,
+    )
     where
         Sw: Eq + Hash,
     {
         use std::collections::hash_map::Entry;
 
-        let entry = self.switches.entry(switch);
+        let mut switches = self.switches;
+        let entry = switches.entry(switch);
         match entry {
-            Entry::Occupied(mut entry) => entry.get_mut().on_release_event().map(Some),
-            Entry::Vacant(_) => Ok(None),
+            Entry::Occupied(entry) => {
+                let (switch, state) = entry.remove_entry();
+                let (state, result) = state.with_release_event();
+                let _ = switches.insert(switch, state);
+                (Self::from(switches), result.map(Some))
+            }
+            Entry::Vacant(_) => (Self::from(switches), Ok(None)),
         }
     }
 
-    fn on_timeout_event<T, E>(
-        &mut self,
+    fn with_timeout_event<T, E>(
+        self,
         switch: Sw,
-        callback: impl FnOnce(OccupiedEntry<'_, Sw, SwitchState>) -> Result<T, E>,
+        callback: impl FnOnce(SwitchState) -> (Option<SwitchState>, Result<T, E>),
         err: E,
-    ) -> Result<Option<T>, E>
+    ) -> (Self, Result<Option<T>, E>)
     where
         Sw: Eq + Hash,
     {
         use std::collections::hash_map::Entry;
 
-        let entry = self.switches.entry(switch);
+        let mut switches = self.switches;
+        let entry = switches.entry(switch);
         match entry {
-            Entry::Occupied(entry) => callback(entry).map(Some),
-            Entry::Vacant(_) => Err(err),
+            Entry::Occupied(entry) => {
+                let (switch, state) = entry.remove_entry();
+                let (state, result) = callback(state);
+                if let Some(state) = state {
+                    let _ = switches.insert(switch, state);
+                }
+                (Self::from(switches), result.map(Some))
+            }
+            Entry::Vacant(_) => (Self::from(switches), Err(err)),
         }
     }
 
-    pub fn on_long_press_event(
-        &mut self,
+    pub fn with_long_press_event(
+        self,
         switch: Sw,
         request: LongPressHandleRequest,
-    ) -> Result<Option<TimedLongPressEventData>, TimedLongClickError>
+    ) -> (
+        Self,
+        Result<Option<TimedLongPressEventData>, TimedLongClickError>,
+    )
     where
         Sw: Eq + Hash,
     {
         if let Some(_) = request.0.upgrade() {
-            self.on_timeout_event(
+            self.with_timeout_event(
                 switch,
                 SwitchState::with_long_press_event,
                 TimedLongClickError::Default,
             )
         } else {
-            Ok(None)
+            (self, Ok(None))
         }
     }
 
-    pub fn on_click_exact_event(
-        &mut self,
+    pub fn with_click_exact_event(
+        self,
         switch: Sw,
         request: ClickExactHandleRequest,
-    ) -> Result<Option<TimedClickExactEventData>, TimedClickExactError>
+    ) -> (
+        Self,
+        Result<Option<TimedClickExactEventData>, TimedClickExactError>,
+    )
     where
         Sw: Eq + Hash,
     {
         if let Some(_) = request.0.upgrade() {
-            self.on_timeout_event(
+            self.with_timeout_event(
                 switch,
                 SwitchState::with_click_exact_event,
                 TimedClickExactError::Default,
             )
         } else {
-            Ok(None)
+            (self, Ok(None))
         }
     }
 
-    pub fn on_reset_click_count(&mut self, switch: &Sw) -> Result<(), WithResetClickCountError>
+    pub fn with_reset_click_count(self, switch: &Sw) -> (Self, Result<(), WithResetClickCountError>)
     where
         Sw: Eq + Hash,
     {
-        let entry = self.switches.get_mut(&switch);
+        let mut switches = self.switches;
+        let entry = switches.get_mut(&switch);
         match entry {
             Some(state) => {
                 state.num_possible_clicks = 0;
-                Ok(())
+                (Self::from(switches), Ok(()))
             }
-            None => Err(WithResetClickCountError::Default),
+            None => (Self::from(switches), Err(WithResetClickCountError::Default)),
         }
     }
 }
@@ -214,95 +246,100 @@ impl SwitchState {
         (state, request)
     }
 
-    fn on_press_event(&mut self) -> Result<LongPressHandleRequest, TimedPressError> {
+    fn with_press_event(self) -> (Self, Result<LongPressHandleRequest, TimedPressError>) {
         use SwitchStateKind::{LongPressed, LongReleased, Pressed, Released};
 
         match self.kind {
-            Pressed(_) => Err(TimedPressError::AlreadyPressed),
-            LongPressed => Err(TimedPressError::AlreadyLongPressed),
+            Pressed(_) => (self, Err(TimedPressError::AlreadyPressed)),
+            LongPressed => (self, Err(TimedPressError::AlreadyLongPressed)),
             Released(_) | LongReleased(_) => {
                 let tag = Arc::new(());
                 let request = LongPressHandleRequest(Arc::downgrade(&tag));
-                self.kind = Pressed(tag);
-                self.num_possible_clicks += 1;
-                Ok(request)
+                let state = Self::new(Pressed(tag), self.num_possible_clicks + 1);
+                (state, Ok(request))
             }
         }
     }
 
-    fn on_release_event(
-        &mut self,
-    ) -> Result<(TimedReleaseEventData, ClickExactHandleRequest), TimedReleaseError> {
+    fn with_release_event(
+        self,
+    ) -> (
+        Self,
+        Result<(TimedReleaseEventData, ClickExactHandleRequest), TimedReleaseError>,
+    ) {
         use SwitchStateKind::{LongPressed, LongReleased, Pressed, Released};
 
         match self.kind {
             Pressed(_) => {
                 let tag = Arc::new(());
                 let request = ClickExactHandleRequest(Arc::downgrade(&tag));
-                self.kind = Released(tag);
+                let state = Self::new(Released(tag), self.num_possible_clicks);
                 let event =
                     TimedEventData::new(TimedReleaseEventKind::Click, self.num_possible_clicks);
-                Ok((event, request))
+                (state, Ok((event, request)))
             }
 
             LongPressed => {
                 let tag = Arc::new(());
                 let request = ClickExactHandleRequest(Arc::downgrade(&tag));
-                self.kind = LongReleased(tag);
+                let state = Self::new(LongReleased(tag), self.num_possible_clicks);
                 let event =
                     TimedEventData::new(TimedReleaseEventKind::LongClick, self.num_possible_clicks);
-                Ok((event, request))
+                (state, Ok((event, request)))
             }
 
-            Released(_) => Err(TimedReleaseError::AlreadyReleased),
-            LongReleased(_) => Err(TimedReleaseError::AlreadyLongReleased),
+            Released(_) => (self, Err(TimedReleaseError::AlreadyReleased)),
+            LongReleased(_) => (self, Err(TimedReleaseError::AlreadyLongReleased)),
         }
     }
 
-    fn with_long_press_event<Sw>(
-        mut entry: OccupiedEntry<'_, Sw, SwitchState>,
-    ) -> Result<TimedLongPressEventData, TimedLongClickError> {
+    fn with_long_press_event(
+        self,
+    ) -> (
+        Option<Self>,
+        Result<TimedLongPressEventData, TimedLongClickError>,
+    ) {
         use SwitchStateKind::{LongPressed, LongReleased, Pressed, Released};
 
-        let state = entry.get_mut();
-        match state.kind {
+        match self.kind {
             Pressed(_) => {
-                state.kind = LongPressed;
+                let state = Self::new(LongPressed, self.num_possible_clicks);
                 let event = TimedLongPressEventData::new(
                     TimedLongPressEventKind::LongPress,
-                    state.num_possible_clicks,
+                    self.num_possible_clicks,
                 );
-                Ok(event)
+                (Some(state), Ok(event))
             }
-            LongPressed => Err(TimedLongClickError::LongPressed),
-            Released(_) => Err(TimedLongClickError::Released),
-            LongReleased(_) => Err(TimedLongClickError::LongReleased),
+            LongPressed => (Some(self), Err(TimedLongClickError::LongPressed)),
+            Released(_) => (Some(self), Err(TimedLongClickError::Released)),
+            LongReleased(_) => (Some(self), Err(TimedLongClickError::LongReleased)),
         }
     }
 
-    fn with_click_exact_event<Sw>(
-        entry: OccupiedEntry<'_, Sw, SwitchState>,
-    ) -> Result<TimedClickExactEventData, TimedClickExactError> {
+    fn with_click_exact_event(
+        self,
+    ) -> (
+        Option<Self>,
+        Result<TimedClickExactEventData, TimedClickExactError>,
+    ) {
         use SwitchStateKind::{LongPressed, LongReleased, Pressed, Released};
 
-        match entry.get().kind {
-            Pressed(_) => Err(TimedClickExactError::Pressed),
-            LongPressed => Err(TimedClickExactError::LongPressed),
+        match self.kind {
+            Pressed(_) => (Some(self), Err(TimedClickExactError::Pressed)),
+            LongPressed => (Some(self), Err(TimedClickExactError::LongPressed)),
             Released(_) => {
-                let state = entry.remove();
                 let event = TimedClickExactEventData::new(
                     TimedClickExactEventKind::ClickExact,
-                    state.num_possible_clicks,
+                    self.num_possible_clicks,
                 );
-                Ok(event)
+                (None, Ok(event))
             }
             LongReleased(_) => {
-                let state = entry.remove();
                 let event = TimedClickExactEventData::new(
                     TimedClickExactEventKind::LongClickExact,
-                    state.num_possible_clicks,
+                    self.num_possible_clicks,
                 );
-                Ok(event)
+                (None, Ok(event))
             }
         }
     }

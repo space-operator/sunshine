@@ -209,7 +209,7 @@ impl<Mo, Ti, KeSw, MsSw, KeCo, MsCo>
         Mo: Eq + Hash + Ord,
         Ti: Clone + Ord,
     {
-        let (mut state, global_state): (
+        let (state, global_state): (
             DeviceState<
                 Modifiers<Mo>,
                 CoordsState<KeCo>,
@@ -220,13 +220,13 @@ impl<Mo, Ti, KeSw, MsSw, KeCo, MsCo>
             >,
             _,
         ) = self.take_state();
-        let keyboard_long_press =
+        let (state, keyboard_long_press) =
             state.with_press_timeout(time_minus_long_press_duration.clone(), mapping.keyboard());
-        let keyboard_click_exact =
+        let (state, keyboard_click_exact) =
             state.with_release_timeout(time_minus_click_exact_duration.clone(), mapping.keyboard());
         let global_state = global_state.with_state(state);
 
-        let (mut state, global_state): (
+        let (state, global_state): (
             DeviceState<
                 Modifiers<Mo>,
                 CoordsState<MsCo>,
@@ -237,9 +237,9 @@ impl<Mo, Ti, KeSw, MsSw, KeCo, MsCo>
             >,
             _,
         ) = global_state.take_state();
-        let mouse_long_press =
+        let (state, mouse_long_press) =
             state.with_press_timeout(time_minus_long_press_duration.clone(), mapping.mouse());
-        let mouse_click_exact =
+        let (state, mouse_click_exact) =
             state.with_release_timeout(time_minus_click_exact_duration.clone(), mapping.mouse());
         let state = global_state.with_state(state);
 
@@ -306,8 +306,8 @@ impl<Mo, Ti, Sw, Co, CsMs, TsMs, ShMsLo, ShMsCl, PoMs>
         Mo: std::fmt::Debug,
         Ev: std::fmt::Debug,
     {
-        let (mut state, global_state): (KeyboardDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
-        let (scheduled, bindings) =
+        let (state, global_state): (KeyboardDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
+        let (state, scheduled, bindings) =
             state.with_press_event(event, mapping.keyboard(), mapping.modifiers());
 
         GlobalStateWithEventResult {
@@ -337,8 +337,8 @@ impl<Mo, Ti, Sw, Co, CsMs, TsMs, ShMsLo, ShMsCl, PoMs>
         Mo: std::fmt::Debug,
         Ev: std::fmt::Debug,
     {
-        let (mut state, global_state): (KeyboardDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
-        let (scheduled, bindings) =
+        let (state, global_state): (KeyboardDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
+        let (state, scheduled, bindings) =
             state.with_release_event(event, mapping.keyboard(), mapping.modifiers());
 
         GlobalStateWithEventResult {
@@ -362,8 +362,8 @@ impl<Mo, Ti, Sw, Co, CsMs, TsMs, ShMsLo, ShMsCl, PoMs>
         Mo: Clone + Hash + Ord,
         Co: Clone,
     {
-        let (mut state, global_state): (KeyboardDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
-        let bindings = state.with_trigger_event(event, mapping.keyboard());
+        let (state, global_state): (KeyboardDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
+        let (state, bindings) = state.with_trigger_event(event, mapping.keyboard());
 
         GlobalStateWithEventResult {
             state: global_state.with_state(state),
@@ -372,7 +372,7 @@ impl<Mo, Ti, Sw, Co, CsMs, TsMs, ShMsLo, ShMsCl, PoMs>
         }
     }
 
-    pub fn with_keyboard_coords_event<'a, F, Tr, MsMa, Ev>(
+    pub fn with_keyboard_coords_event<'a, Tr, MsMa, Ev>(
         self,
         event: CoordsEvent<Ti, Co>,
         mapping: &'a GlobalMappingCache<
@@ -380,16 +380,14 @@ impl<Mo, Ti, Sw, Co, CsMs, TsMs, ShMsLo, ShMsCl, PoMs>
             MsMa,
             MappingModifiersCache<Mo>,
         >,
-        is_dragged_fn: F,
     ) -> GlobalStateWithEventResult<Self, (), Vec<(FilteredBindings<'a, Mo, Ev>, Co)>>
     where
-        F: FnMut(&Co, &Co) -> bool,
         Sw: Clone + Eq + Hash,
         Mo: Clone + Hash + Ord,
         Co: Clone + Eq,
     {
-        let (mut state, global_state): (KeyboardDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
-        let bindings = state.with_coords_event(event, mapping.keyboard(), is_dragged_fn);
+        let (state, global_state): (KeyboardDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
+        let (state, bindings) = state.with_coords_event(event, mapping.keyboard());
 
         GlobalStateWithEventResult {
             state: global_state.with_state(state),
@@ -434,8 +432,8 @@ impl<Mo, Ti, Sw, Co, CsKe, TsKe, ShKeLo, ShKeCl, PoKe>
         Mo: std::fmt::Debug,
         Ev: std::fmt::Debug,
     {
-        let (mut state, global_state): (MouseDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
-        let (scheduled, bindings) =
+        let (state, global_state): (MouseDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
+        let (state, scheduled, bindings) =
             state.with_press_event(event, mapping.mouse(), mapping.modifiers());
 
         GlobalStateWithEventResult {
@@ -465,8 +463,8 @@ impl<Mo, Ti, Sw, Co, CsKe, TsKe, ShKeLo, ShKeCl, PoKe>
         Mo: std::fmt::Debug,
         Ev: std::fmt::Debug,
     {
-        let (mut state, global_state): (MouseDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
-        let (scheduled, bindings) =
+        let (state, global_state): (MouseDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
+        let (state, scheduled, bindings) =
             state.with_release_event(event, mapping.mouse(), mapping.modifiers());
 
         GlobalStateWithEventResult {
@@ -490,8 +488,8 @@ impl<Mo, Ti, Sw, Co, CsKe, TsKe, ShKeLo, ShKeCl, PoKe>
         Mo: Clone + Hash + Ord,
         Co: Clone,
     {
-        let (mut state, global_state): (MouseDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
-        let bindings = state.with_trigger_event(event, mapping.mouse());
+        let (state, global_state): (MouseDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
+        let (state, bindings) = state.with_trigger_event(event, mapping.mouse());
 
         GlobalStateWithEventResult {
             state: global_state.with_state(state),
@@ -500,7 +498,7 @@ impl<Mo, Ti, Sw, Co, CsKe, TsKe, ShKeLo, ShKeCl, PoKe>
         }
     }
 
-    pub fn with_mouse_coords_event<'a, F, Tr, KeMa, Ev>(
+    pub fn with_mouse_coords_event<'a, Tr, KeMa, Ev>(
         self,
         event: CoordsEvent<Ti, Co>,
         mapping: &'a GlobalMappingCache<
@@ -508,16 +506,14 @@ impl<Mo, Ti, Sw, Co, CsKe, TsKe, ShKeLo, ShKeCl, PoKe>
             DeviceMappingCache<Sw, Tr, Mo, Ev>,
             MappingModifiersCache<Mo>,
         >,
-        is_dragged_fn: F,
     ) -> GlobalStateWithEventResult<Self, (), Vec<(FilteredBindings<'a, Mo, Ev>, Co)>>
     where
-        F: FnMut(&Co, &Co) -> bool,
         Sw: Clone + Eq + Hash,
         Mo: Clone + Hash + Ord,
         Co: Clone + Eq,
     {
-        let (mut state, global_state): (MouseDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
-        let bindings = state.with_coords_event(event, mapping.mouse(), is_dragged_fn);
+        let (state, global_state): (MouseDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
+        let (state, bindings) = state.with_coords_event(event, mapping.mouse());
 
         GlobalStateWithEventResult {
             state: global_state.with_state(state),
@@ -559,7 +555,7 @@ fn test1() {
         (),
     );
 
-    let (mut state, global_state): (
+    let (state, global_state): (
         DeviceState<i32, (i8, i8, i8), bool, &str, String, (u8, u8)>,
         _,
     ) = global_state.take_state();
@@ -589,7 +585,7 @@ fn test1() {
 fn test2() {
     let mut global_state = GlobalState::new(1, false, (), "123", (), (), ());
 
-    let (mut state, global_state): (State<i32, bool, &str>, _) = global_state.take_state();
+    let (state, global_state): (State<i32, bool, &str>, _) = global_state.take_state();
     let state = State {
         modifiers: state.modifiers + 10,
         timed_state: !state.timed_state,

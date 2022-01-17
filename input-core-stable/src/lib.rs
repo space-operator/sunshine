@@ -26,17 +26,17 @@
 mod coords_state;
 mod modifiers;
 mod pointer_state;
-//mod result_with_context;
+mod result_with_context;
 mod scheduler;
-//mod timed_event_ext;
+mod timed_event_ext;
 mod timed_state;
 
 pub use coords_state::*;
 pub use modifiers::*;
 pub use pointer_state::*;
-//pub use result_with_context::*;
+pub use result_with_context::*;
 pub use scheduler::*;
-//pub use timed_event_ext::*;
+pub use timed_event_ext::*;
 pub use timed_state::*;
 
 /*
