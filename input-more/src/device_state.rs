@@ -1,3 +1,4 @@
+use core::borrow::BorrowMut;
 use core::hash::Hash;
 
 use input_core::{
@@ -63,38 +64,35 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
 pub type DeviceSchedulerState<Ti, Sw, Mo, Co, Re> =
     SchedulerState<Ti, (SwitchEvent<Ti, Sw>, Modifiers<Mo>, Co), Re>;
 
-impl<Sw, Mo, Ti, Co>
-    DeviceState<
-        Modifiers<Mo>,
-        CoordsState<Co>,
-        TimedState<Sw>,
-        DeviceSchedulerState<Ti, Sw, Mo, Co, LongPressHandleRequest>,
-        DeviceSchedulerState<Ti, Sw, Mo, Co, ClickExactHandleRequest>,
-        PointerState<Sw, Co>,
-    >
-{
-    pub fn with_press_event<'a, Tr, Ev>(
+impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
+    pub fn with_press_event<'a, Sw, MoMo, Ti, Co, Tr, Ev>(
         &mut self,
         event: SwitchEvent<Ti, Sw>,
-        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
-        mapping_modifiers: &MappingModifiersCache<Mo>,
-    ) -> (Option<Ti>, Option<(FilteredBindings<'a, Mo, Ev>, Co)>)
+        mapping: &'a DeviceMappingCache<Sw, Tr, MoMo, Ev>,
+        mapping_modifiers: &MappingModifiersCache<MoMo>,
+    ) -> (Option<Ti>, Option<(FilteredBindings<'a, MoMo, Ev>, Co)>)
     where
+        Mo: BorrowMut<Modifiers<MoMo>>,
+        Cs: BorrowMut<CoordsState<Co>>,
+        Ts: BorrowMut<TimedState<Sw>>,
+        ShLo: BorrowMut<DeviceSchedulerState<Ti, Sw, MoMo, Co, LongPressHandleRequest>>,
+        ShCl: BorrowMut<DeviceSchedulerState<Ti, Sw, MoMo, Co, ClickExactHandleRequest>>,
+        Po: BorrowMut<PointerState<Sw, Co>>,
         Sw: Clone + Eq + Hash,
-        Mo: Clone + Eq + From<Sw> + Hash + Ord,
+        MoMo: Clone + Eq + From<Sw> + Hash + Ord,
         Ti: Clone + Ord,
         Co: Clone,
         // TODO: Remove after debugging
         Ev: std::fmt::Debug,
         Tr: std::fmt::Debug,
-        Mo: std::fmt::Debug,
+        MoMo: std::fmt::Debug,
         Ev: std::fmt::Debug,
     {
         use crate::unwrap_or_return;
 
         let mapping = mapping.filter_by_switch(&event.switch);
 
-        let modifier = Mo::from(event.switch.clone());
+        let modifier = MoMo::from(event.switch.clone());
         let is_used_as_modifier = mapping_modifiers.switches().contains(&modifier);
 
         if mapping.is_none() && !is_used_as_modifier {
@@ -102,31 +100,34 @@ impl<Sw, Mo, Ti, Co>
         }
 
         if is_used_as_modifier {
-            let result = self.modifiers.on_press_event(modifier);
+            let result = self.modifiers.borrow_mut().on_press_event(modifier);
             // result.unwrap(); // FIXME
         }
 
         println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (None, None));
 
-        let mapping = mapping.filter_by_modifiers(&self.modifiers);
+        let mapping = mapping.filter_by_modifiers(self.modifiers.borrow());
 
         println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (None, None));
 
-        let result = self.timed_state.on_press_event(event.switch.clone());
+        let result = self
+            .timed_state
+            .borrow_mut()
+            .on_press_event(event.switch.clone());
         let request = result.unwrap();
 
-        self.long_press_scheduler.schedule(
+        self.long_press_scheduler.borrow_mut().schedule(
             event.time.clone(),
             (
                 event.clone(),
-                self.modifiers.clone(),
-                self.coords_state.coords().clone(),
+                self.modifiers.borrow().clone(),
+                self.coords_state.borrow().coords().clone(),
             ),
             request,
         );
-        let next_scheduled = self.long_press_scheduler.next_scheduled().cloned();
+        let next_scheduled = self.long_press_scheduler.borrow().next_scheduled().cloned();
 
         let mapping = mapping
             .press
@@ -134,7 +135,8 @@ impl<Sw, Mo, Ti, Co>
 
         let result = self
             .pointer_state
-            .with_press_event(event.switch, self.coords_state.coords().clone());
+            .borrow_mut()
+            .with_press_event(event.switch, self.coords_state.borrow().coords().clone());
         //result.unwrap(); // FIXME
         println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (next_scheduled, None)); // FIXME
@@ -142,24 +144,31 @@ impl<Sw, Mo, Ti, Co>
         let mapping = mapping.filter_by_pointer_data(&());
         let mapping = mapping.expect("filtering should never fail");
 
-        let coords = self.coords_state.coords().clone();
+        let coords = self.coords_state.borrow().coords().clone();
 
         println!("{:?}", mapping);
         (next_scheduled, Some((mapping, coords)))
     }
 
-    pub fn with_press_timeout<'a, Tr, Ev>(
+    pub fn with_press_timeout<'a, Sw, MoMo, Ti, Co, Tr, Ev>(
         &mut self,
         time_minus_long_press_duration: Ti, // TODO: Time at Long press handling event already happend for time before that
-        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
-    ) -> Vec<(FilteredBindings<'a, Mo, Ev>, Co)>
+        mapping: &'a DeviceMappingCache<Sw, Tr, MoMo, Ev>,
+    ) -> Vec<(FilteredBindings<'a, MoMo, Ev>, Co)>
     where
+        Mo: BorrowMut<Modifiers<MoMo>>,
+        Cs: BorrowMut<CoordsState<Co>>,
+        Ts: BorrowMut<TimedState<Sw>>,
+        ShLo: BorrowMut<DeviceSchedulerState<Ti, Sw, MoMo, Co, LongPressHandleRequest>>,
+        ShCl: BorrowMut<DeviceSchedulerState<Ti, Sw, MoMo, Co, ClickExactHandleRequest>>,
+        Po: BorrowMut<PointerState<Sw, Co>>,
         Sw: Eq + Hash,
-        Mo: Eq + Hash + Ord,
+        MoMo: Eq + Hash + Ord,
         Ti: Ord,
     {
         let requests = self
             .long_press_scheduler
+            .borrow_mut()
             .take_scheduled(&time_minus_long_press_duration);
 
         let mut delayed_bindings = Vec::new();
@@ -171,7 +180,10 @@ impl<Sw, Mo, Ti, Co>
                     &modifiers,
                     coords,
                     |switch| {
-                        let result = self.timed_state.on_long_press_event(switch, request);
+                        let result = self
+                            .timed_state
+                            .borrow_mut()
+                            .on_long_press_event(switch, request);
                         result.unwrap()
                     },
                 );
@@ -183,28 +195,34 @@ impl<Sw, Mo, Ti, Co>
         delayed_bindings
     }
 
-    pub fn with_release_event<'a, Tr, Ev>(
+    pub fn with_release_event<'a, Sw, MoMo, Ti, Co, Tr, Ev>(
         &mut self,
         event: SwitchEvent<Ti, Sw>,
-        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
-        mapping_modifiers: &MappingModifiersCache<Mo>,
-    ) -> (Option<Ti>, Option<(FilteredBindings<'a, Mo, Ev>, Co)>)
+        mapping: &'a DeviceMappingCache<Sw, Tr, MoMo, Ev>,
+        mapping_modifiers: &MappingModifiersCache<MoMo>,
+    ) -> (Option<Ti>, Option<(FilteredBindings<'a, MoMo, Ev>, Co)>)
     where
+        Mo: BorrowMut<Modifiers<MoMo>>,
+        Cs: BorrowMut<CoordsState<Co>>,
+        Ts: BorrowMut<TimedState<Sw>>,
+        ShLo: BorrowMut<DeviceSchedulerState<Ti, Sw, MoMo, Co, LongPressHandleRequest>>,
+        ShCl: BorrowMut<DeviceSchedulerState<Ti, Sw, MoMo, Co, ClickExactHandleRequest>>,
+        Po: BorrowMut<PointerState<Sw, Co>>,
         Sw: Clone + Eq + Hash,
-        Mo: Clone + Eq + From<Sw> + Hash + Ord,
+        MoMo: Clone + Eq + From<Sw> + Hash + Ord,
         Ti: Clone + Ord,
         Co: Clone,
         // TODO: Remove after debugging
         Ev: std::fmt::Debug,
         Tr: std::fmt::Debug,
-        Mo: std::fmt::Debug,
+        MoMo: std::fmt::Debug,
         Ev: std::fmt::Debug,
     {
         use crate::unwrap_or_return;
 
         let mapping = mapping.filter_by_switch(&event.switch);
 
-        let modifier = Mo::from(event.switch.clone());
+        let modifier = MoMo::from(event.switch.clone());
         let is_used_as_modifier = mapping_modifiers.switches().contains(&modifier);
 
         if mapping.is_none() && !is_used_as_modifier {
@@ -212,35 +230,40 @@ impl<Sw, Mo, Ti, Co>
         }
 
         if is_used_as_modifier {
-            let result = self.modifiers.on_release_event(&modifier);
+            let result = self.modifiers.borrow_mut().on_release_event(&modifier);
             result.unwrap();
         }
 
         println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (None, None));
 
-        let mapping = mapping.filter_by_modifiers(&self.modifiers);
+        let mapping = mapping.filter_by_modifiers(self.modifiers.borrow());
 
         println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (None, None));
 
         let timed_data = self
             .timed_state
+            .borrow_mut()
             .on_release_event(event.switch.clone())
             .unwrap();
 
         let (timed_data, next_scheduled) = match timed_data {
             Some((timed_data, request)) => {
-                self.click_exact_scheduler.schedule(
+                self.click_exact_scheduler.borrow_mut().schedule(
                     event.time.clone(),
                     (
                         event.clone(),
-                        self.modifiers.clone(),
-                        self.coords_state.coords().clone(),
+                        self.modifiers.borrow().clone(),
+                        self.coords_state.borrow().coords().clone(),
                     ),
                     request,
                 );
-                let next_scheduled = self.click_exact_scheduler.next_scheduled().cloned();
+                let next_scheduled = self
+                    .click_exact_scheduler
+                    .borrow()
+                    .next_scheduled()
+                    .cloned();
                 (Some(timed_data), next_scheduled)
             }
             None => (None, None),
@@ -252,6 +275,7 @@ impl<Sw, Mo, Ti, Co>
 
         let pointer_data = self
             .pointer_state
+            .borrow_mut()
             .with_release_event(&event.switch)
             .unwrap();
         println!("{:?}", mapping);
@@ -261,30 +285,38 @@ impl<Sw, Mo, Ti, Co>
         println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (next_scheduled, None));
 
-        let coords = self.coords_state.coords().clone();
+        let coords = self.coords_state.borrow().coords().clone();
 
         println!("{:?}", mapping);
         (next_scheduled, Some((mapping, coords)))
     }
 
-    pub fn with_release_timeout<'a, Tr, Ev>(
+    pub fn with_release_timeout<'a, Sw, MoMo, Ti, Co, Tr, Ev>(
         &mut self,
         time_minus_click_exact_duration: Ti, // TODO: Time at Long press handling event already happend for time before that
-        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
-    ) -> Vec<(FilteredBindings<'a, Mo, Ev>, Co)>
+        mapping: &'a DeviceMappingCache<Sw, Tr, MoMo, Ev>,
+    ) -> Vec<(FilteredBindings<'a, MoMo, Ev>, Co)>
     where
+        Mo: BorrowMut<Modifiers<MoMo>>,
+        Cs: BorrowMut<CoordsState<Co>>,
+        Ts: BorrowMut<TimedState<Sw>>,
+        ShLo: BorrowMut<DeviceSchedulerState<Ti, Sw, MoMo, Co, LongPressHandleRequest>>,
+        ShCl: BorrowMut<DeviceSchedulerState<Ti, Sw, MoMo, Co, ClickExactHandleRequest>>,
+        Po: BorrowMut<PointerState<Sw, Co>>,
         Sw: Eq + Hash,
-        Mo: Eq + Hash + Ord,
+        MoMo: Eq + Hash + Ord,
         Ti: Ord,
     {
         let requests = self
             .click_exact_scheduler
+            .borrow_mut()
             .take_scheduled(&time_minus_click_exact_duration);
 
         let mut delayed_bindings = Vec::new();
         for (_, requests) in requests {
             for ((event, modifiers, coords), request) in requests {
                 self.timed_state
+                    .borrow_mut()
                     .on_reset_click_count(&event.switch)
                     .unwrap();
 
@@ -294,7 +326,10 @@ impl<Sw, Mo, Ti, Co>
                     &modifiers,
                     coords,
                     |switch| {
-                        let result = self.timed_state.on_click_exact_event(switch, request);
+                        let result = self
+                            .timed_state
+                            .borrow_mut()
+                            .on_click_exact_event(switch, request);
                         result.unwrap()
                     },
                 );
@@ -306,14 +341,20 @@ impl<Sw, Mo, Ti, Co>
         delayed_bindings
     }
 
-    pub fn with_trigger_event<'a, Tr, Ev>(
+    pub fn with_trigger_event<'a, Sw, MoMo, Ti, Co, Tr, Ev>(
         &mut self,
         event: TriggerEvent<Ti, Tr>,
-        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
-    ) -> Option<(FilteredBindings<'a, Mo, Ev>, Co)>
+        mapping: &'a DeviceMappingCache<Sw, Tr, MoMo, Ev>,
+    ) -> Option<(FilteredBindings<'a, MoMo, Ev>, Co)>
     where
+        Mo: BorrowMut<Modifiers<MoMo>>,
+        Cs: BorrowMut<CoordsState<Co>>,
+        Ts: BorrowMut<TimedState<Sw>>,
+        ShLo: BorrowMut<DeviceSchedulerState<Ti, Sw, MoMo, Co, LongPressHandleRequest>>,
+        ShCl: BorrowMut<DeviceSchedulerState<Ti, Sw, MoMo, Co, ClickExactHandleRequest>>,
+        Po: BorrowMut<PointerState<Sw, Co>>,
         Tr: Eq + Hash,
-        Mo: Clone + Hash + Ord,
+        MoMo: Clone + Hash + Ord,
         Co: Clone,
     {
         use crate::unwrap_or_return;
@@ -321,31 +362,40 @@ impl<Sw, Mo, Ti, Co>
         let mapping = &mapping.trigger;
         let mapping = mapping.filter_by_switch(&event.trigger);
         let mapping = unwrap_or_return!(mapping, None);
-        let mapping = mapping.filter_by_modifiers(&self.modifiers);
+        let mapping = mapping.filter_by_modifiers(self.modifiers.borrow());
         let bindings = unwrap_or_return!(mapping, None);
 
-        let coords = self.coords_state.coords().clone();
+        let coords = self.coords_state.borrow().coords().clone();
         Some((bindings, coords))
     }
 
-    pub fn with_coords_event<'a, F, Tr, Ev>(
+    pub fn with_coords_event<'a, F, Sw, MoMo, Ti, Co, Tr, Ev>(
         &mut self,
         event: CoordsEvent<Ti, Co>,
-        mapping: &'a DeviceMappingCache<Sw, Tr, Mo, Ev>,
+        mapping: &'a DeviceMappingCache<Sw, Tr, MoMo, Ev>,
         mut is_dragged_fn: F,
-    ) -> Vec<(FilteredBindings<'a, Mo, Ev>, Co)>
+    ) -> Vec<(FilteredBindings<'a, MoMo, Ev>, Co)>
     where
         F: FnMut(&Co, &Co) -> bool,
+        Mo: BorrowMut<Modifiers<MoMo>>,
+        Cs: BorrowMut<CoordsState<Co>>,
+        Ts: BorrowMut<TimedState<Sw>>,
+        ShLo: BorrowMut<DeviceSchedulerState<Ti, Sw, MoMo, Co, LongPressHandleRequest>>,
+        ShCl: BorrowMut<DeviceSchedulerState<Ti, Sw, MoMo, Co, ClickExactHandleRequest>>,
+        Po: BorrowMut<PointerState<Sw, Co>>,
         Sw: Clone + Eq + Hash,
-        Mo: Clone + Hash + Ord,
+        MoMo: Clone + Hash + Ord,
         Co: Clone + Eq,
     {
         use crate::unwrap_or_continue;
 
-        self.coords_state.set_coords(event.coords.clone());
+        self.coords_state
+            .borrow_mut()
+            .set_coords(event.coords.clone());
 
         let data = self
             .pointer_state
+            .borrow_mut()
             .with_move_event(|coords| is_dragged_fn(coords, &event.coords));
 
         let mut all_bindings = vec![];
@@ -353,7 +403,7 @@ impl<Sw, Mo, Ti, Co>
         for pointer_data in data {
             let mapping = mapping.filter_by_pointer_data(&pointer_data);
             let mapping = unwrap_or_continue!(mapping);
-            let mapping = mapping.filter_by_modifiers(&self.modifiers);
+            let mapping = mapping.filter_by_modifiers(self.modifiers.borrow());
             let bindings = unwrap_or_continue!(mapping);
 
             let coords = event.coords.clone();

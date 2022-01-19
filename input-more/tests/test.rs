@@ -40,7 +40,7 @@ fn test_chain() {
 
     /*
         switch without coords
-        mousemove without switch
+        PointerMove without switch
 
         switch
         trigger
@@ -110,9 +110,11 @@ fn test_chain() {
         CreateNode(MouseCoords),
         EditNode(NodeId),
         StartSelection(MouseCoords),
+        ContinueSelection(MouseCoords, MouseCoords),
         EndSelection(MouseCoords, MouseCoords),
         CancelSelection,
         StartMove(MouseCoords),
+        ContinueMove(MouseCoords, MouseCoords),
         EndMove(MouseCoords, MouseCoords),
         CancelMove,
     }
@@ -133,9 +135,11 @@ fn test_chain() {
         StartSelection,
         EndSelection,
         CancelSelection,
+        ContinueSelection,
         StartMove,
         EndMove,
         CancelMove,
+        ContinueMove,
     }
 
     #[derive(Clone, Debug, Default)]
@@ -234,6 +238,18 @@ fn test_chain() {
                     UiState::Move(_) => Some(AppEvent::CancelMove),
                     UiState::Default | UiState::Selection(_) => None,
                 },
+                Self::ContinueSelection => match ctx.ui_state {
+                    UiState::Selection(start_coords) => {
+                        Some(AppEvent::ContinueSelection(start_coords, *coords))
+                    }
+                    UiState::Default | UiState::Move(_) => None,
+                },
+                Self::ContinueMove => match ctx.ui_state {
+                    UiState::Move(start_coords) => {
+                        Some(AppEvent::ContinueMove(start_coords, *coords))
+                    }
+                    UiState::Default | UiState::Selection(_) => None,
+                },
             }
         }
     }
@@ -246,9 +262,11 @@ fn test_chain() {
         let mut is_start_selection_used = false;
         let mut is_end_selection_used = false;
         let mut is_cancel_selection_used = false;
+        let mut is_continue_selection_used = false;
         let mut is_start_move_used = false;
         let mut is_end_move_used = false;
         let mut is_cancel_move_used = false;
+        let mut is_continue_move_used = false;
         for event in &events {
             match event {
                 AppEvent::Unselect => is_unselect_used = true,
@@ -258,14 +276,16 @@ fn test_chain() {
                 AppEvent::StartSelection(_) => is_start_selection_used = true,
                 AppEvent::EndSelection(_, _) => is_end_selection_used = true,
                 AppEvent::CancelSelection => is_cancel_selection_used = true,
+                AppEvent::ContinueSelection(_, _) => is_continue_selection_used = true,
                 AppEvent::StartMove(_) => is_start_move_used = true,
                 AppEvent::EndMove(_, _) => is_end_move_used = true,
                 AppEvent::CancelMove => is_cancel_move_used = true,
+                AppEvent::ContinueMove(_, _) => is_continue_move_used = true,
             }
         }
 
         let is_end_or_cancel_move_or_selection = is_end_selection_used
-            || is_cancel_selection_used
+            //|| is_cancel_selection_used
             || is_end_move_used
             || is_cancel_move_used;
 
@@ -277,9 +297,11 @@ fn test_chain() {
             AppEvent::StartSelection(_) => !is_create_node_used && !is_edit_node_used,
             AppEvent::EndSelection(_, _) => true,
             AppEvent::CancelSelection => true,
+            AppEvent::ContinueSelection(_, _) => true,
             AppEvent::StartMove(_) => !is_create_node_used && !is_edit_node_used,
             AppEvent::EndMove(_, _) => true,
             AppEvent::CancelMove => true,
+            AppEvent::ContinueMove(_, _) => true,
         })
     }
 
@@ -492,6 +514,39 @@ fn test_chain() {
                 pointer_data: Some(PointerChangeEventData::DragEnd),
                 event: PointerAppEventBuilder::EndMove,
             }),
+            //
+            Binding::Coords(CoordsBinding {
+                pointer_data: PointerMoveEventData {
+                    switch: lmb,
+                    kind: PointerMoveEventKind::DragMove,
+                },
+                modifiers: Modifiers::new(),
+                event: PointerAppEventBuilder::ContinueSelection,
+            }),
+            Binding::Coords(CoordsBinding {
+                pointer_data: PointerMoveEventData {
+                    switch: lmb,
+                    kind: PointerMoveEventKind::DragStart, // FIXME
+                },
+                modifiers: Modifiers::new(),
+                event: PointerAppEventBuilder::ContinueSelection,
+            }),
+            Binding::Coords(CoordsBinding {
+                pointer_data: PointerMoveEventData {
+                    switch: rmb,
+                    kind: PointerMoveEventKind::DragMove,
+                },
+                modifiers: Modifiers::new(),
+                event: PointerAppEventBuilder::ContinueMove,
+            }),
+            Binding::Coords(CoordsBinding {
+                pointer_data: PointerMoveEventData {
+                    switch: rmb,
+                    kind: PointerMoveEventKind::DragStart, // FIXME
+                },
+                modifiers: Modifiers::new(),
+                event: PointerAppEventBuilder::ContinueMove,
+            }),
         ]
         .into_iter()
         .collect(),
@@ -601,7 +656,6 @@ fn test_chain() {
         println!("Co: {:?}", context);
         let result =
             global_state.with_timeout(event.time() - 1000, event.time() - 300, &mapping_cache);
-        global_state = result.state;
         println!("Ti: {:?}", event.time());
         println!("BiKeLo: {:?}", result.keyboard_long_press);
         println!("BiKeCl: {:?}", result.keyboard_click_exact);
@@ -610,11 +664,10 @@ fn test_chain() {
         println!();
 
         println!("In: {:?}", event);
-        let (state, scheduled, keyboard_bindings, mouse_bindings) = match event {
+        let (scheduled, keyboard_bindings, mouse_bindings) = match event {
             RawEvent::KeyboardPress(event) => {
                 let result = global_state.with_keyboard_press_event(event, &mapping_cache);
                 (
-                    result.state,
                     result.scheduled,
                     result.bindings.into_iter().collect(),
                     vec![],
@@ -623,7 +676,6 @@ fn test_chain() {
             RawEvent::KeyboardRelease(event) => {
                 let result = global_state.with_keyboard_release_event(event, &mapping_cache);
                 (
-                    result.state,
                     result.scheduled,
                     result.bindings.into_iter().collect(),
                     vec![],
@@ -631,22 +683,16 @@ fn test_chain() {
             }
             RawEvent::KeyboardTrigger(event) => {
                 let result = global_state.with_keyboard_trigger_event(event, &mapping_cache);
-                (
-                    result.state,
-                    None,
-                    result.bindings.into_iter().collect(),
-                    vec![],
-                )
+                (None, result.bindings.into_iter().collect(), vec![])
             }
             RawEvent::KeyboardCoords(event) => {
                 let result =
                     global_state.with_keyboard_coords_event(event, &mapping_cache, |a, b| a == b);
-                (result.state, None, result.bindings, vec![])
+                (None, result.bindings, vec![])
             }
             RawEvent::MousePress(event) => {
                 let result = global_state.with_mouse_press_event(event, &mapping_cache);
                 (
-                    result.state,
                     result.scheduled,
                     vec![],
                     result.bindings.into_iter().collect(),
@@ -655,7 +701,6 @@ fn test_chain() {
             RawEvent::MouseRelease(event) => {
                 let result = global_state.with_mouse_release_event(event, &mapping_cache);
                 (
-                    result.state,
                     result.scheduled,
                     vec![],
                     result.bindings.into_iter().collect(),
@@ -663,20 +708,16 @@ fn test_chain() {
             }
             RawEvent::MouseTrigger(event) => {
                 let result = global_state.with_mouse_trigger_event(event, &mapping_cache);
-                (
-                    result.state,
-                    None,
-                    vec![],
-                    result.bindings.into_iter().collect(),
-                )
+                (None, vec![], result.bindings.into_iter().collect())
             }
             RawEvent::MouseCoords(event) => {
                 let result =
-                    global_state.with_mouse_coords_event(event, &mapping_cache, |a, b| a == b);
-                (result.state, None, vec![], result.bindings)
+                    global_state.with_mouse_coords_event(event, &mapping_cache, |lhs, rhs| {
+                        (lhs.0 - rhs.0).pow(2) + (lhs.1 - rhs.1).pow(2) >= 5 * 5
+                    });
+                (None, vec![], result.bindings)
             }
         };
-        global_state = state;
         println!("Sh: {:?}", scheduled);
 
         let mut all_app_events = Vec::new();
@@ -698,10 +739,12 @@ fn test_chain() {
         println!("Ev: {:?}", all_app_events);
         for event in all_app_events {
             match event {
-                AppEvent::Unselect => {}
-                AppEvent::SelectNode(_) => {}
-                AppEvent::CreateNode(_) => {}
-                AppEvent::EditNode(_) => {}
+                AppEvent::Unselect
+                | AppEvent::SelectNode(_)
+                | AppEvent::CreateNode(_)
+                | AppEvent::EditNode(_)
+                | AppEvent::ContinueMove(_, _)
+                | AppEvent::ContinueSelection(_, _) => {}
                 AppEvent::StartSelection(start) => {
                     context.ui_state = UiState::Selection(start);
                 }

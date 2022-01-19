@@ -31,10 +31,6 @@ mod global_state;
 mod mapping;
 mod mapping_cache;
 mod mapping_modifiers_cache;
-mod marker;
-mod struct_take_and_with_field;
-mod struct_take_field;
-mod struct_with_field;
 mod switch_mapping_cache;
 mod unwrap_or;
 
@@ -47,10 +43,6 @@ pub use global_state::*;
 pub use mapping::*;
 pub use mapping_cache::*;
 pub use mapping_modifiers_cache::*;
-pub use marker::*;
-pub use struct_take_and_with_field::*;
-pub use struct_take_field::*;
-pub use struct_with_field::*;
 pub use switch_mapping_cache::*;
 pub use unwrap_or::*;
 
