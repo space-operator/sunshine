@@ -37,47 +37,56 @@ impl<Sw, Co> PointerState<Sw, Co> {
         Self::default()
     }
 
-    pub fn with_press_event(&mut self, switch: Sw, coords: Co) -> Result<(), PointerPressError>
+    pub fn with_press_event(self, switch: Sw, coords: Co) -> (Self, Result<(), PointerPressError>)
     where
         Sw: Eq + Hash,
     {
         use std::collections::hash_map::Entry;
 
-        match self.switches.entry(switch) {
-            Entry::Occupied(_) => Err(PointerPressError::AlreadyPressed),
+        let mut switches = self.switches;
+        match switches.entry(switch) {
+            Entry::Occupied(_) => (Self { switches }, Err(PointerPressError::AlreadyPressed)),
             Entry::Vacant(entry) => {
                 let _ = entry.insert(SwitchState::Pressed(coords));
-                Ok(())
+                (Self { switches }, Ok(()))
             }
         }
     }
 
     pub fn with_release_event(
-        &mut self,
+        self,
         switch: &Sw,
-    ) -> Result<Option<PointerChangeEventData>, PointerReleaseError>
+    ) -> (
+        Self,
+        Result<Option<PointerChangeEventData>, PointerReleaseError>,
+    )
     where
         Sw: Eq + Hash,
     {
-        match self.switches.remove(switch) {
+        let mut switches = self.switches;
+        match switches.remove(switch) {
             Some(state) => {
                 let data = match state {
                     SwitchState::Pressed(_) => None,
                     SwitchState::Moving => Some(PointerChangeEventData::DragEnd),
                 };
-                Ok(data)
+                (Self { switches }, Ok(data))
             }
-            None => Err(PointerReleaseError::AlreadyReleased),
+            None => (Self { switches }, Err(PointerReleaseError::AlreadyReleased)),
         }
     }
 
-    pub fn with_move_event<F>(&mut self, mut is_dragged_fn: F) -> Vec<PointerMoveEventData<Sw>>
+    pub fn with_move_event<F>(
+        self,
+        mut is_dragged_fn: F,
+    ) -> (Self, (Vec<PointerMoveEventData<Sw>>, F))
     where
         Sw: Clone + Eq + Hash,
         F: FnMut(&Co) -> bool,
     {
-        let events = self
-            .switches
+        let mut switches = self.switches;
+
+        let events = switches
             .iter_mut()
             .filter_map(|(switch, state)| match state {
                 SwitchState::Pressed(coords) => {
@@ -98,7 +107,7 @@ impl<Sw, Co> PointerState<Sw, Co> {
             })
             .collect();
 
-        events
+        (Self { switches }, (events, is_dragged_fn))
     }
 }
 

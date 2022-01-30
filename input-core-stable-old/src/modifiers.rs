@@ -23,31 +23,38 @@ impl<Sw> Modifiers<Sw> {
         self.switches
     }
 
-    pub fn on_press_event(&mut self, switch: Sw) -> Result<(), ModifiersPressError>
+    pub fn with_press_event(self, switch: Sw) -> (Self, Result<(), ModifiersPressError>)
     where
         Sw: Clone + Eq + Hash + Ord,
     {
-        let switches = Arc::make_mut(&mut self.switches);
-        let is_added = switches.insert(switch);
-
-        if is_added {
-            Ok(())
-        } else {
-            Err(ModifiersPressError::AlreadyPressed)
-        }
+        let mut switches = self.switches;
+        let switches_mut = Arc::make_mut(&mut switches);
+        let is_added = switches_mut.insert(switch);
+        (
+            Self::from(switches),
+            if is_added {
+                Ok(())
+            } else {
+                Err(ModifiersPressError::AlreadyPressed)
+            },
+        )
     }
 
-    pub fn on_release_event(&mut self, switch: &Sw) -> Result<(), ModifiersReleaseError>
+    pub fn with_release_event(self, switch: &Sw) -> (Self, Result<(), ModifiersReleaseError>)
     where
         Sw: Clone + Eq + Hash + Ord,
     {
-        let switches = Arc::make_mut(&mut self.switches);
-        let is_removed = switches.remove(switch.borrow());
-        if is_removed {
-            Ok(())
-        } else {
-            Err(ModifiersReleaseError::AlreadyReleased)
-        }
+        let mut switches = self.switches;
+        let switches_mut = Arc::make_mut(&mut switches);
+        let is_removed = switches_mut.remove(switch.borrow());
+        (
+            Self::from(switches),
+            if is_removed {
+                Ok(())
+            } else {
+                Err(ModifiersReleaseError::AlreadyReleased)
+            },
+        )
     }
 }
 

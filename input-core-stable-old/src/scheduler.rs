@@ -1,4 +1,3 @@
-use core::mem::take;
 use std::collections::BTreeMap;
 
 use crate::{ClickExactHandleRequest, LongPressHandleRequest};
@@ -24,24 +23,27 @@ impl<Ti, Da, Rq> SchedulerState<Ti, Da, Rq> {
         self.requests.keys().next()
     }
 
-    pub fn schedule(&mut self, time: Ti, data: Da, request: Rq)
+    pub fn schedule(self, time: Ti, data: Da, request: Rq) -> Self
     where
         Ti: Ord,
     {
-        self.requests.entry(time).or_default().push((data, request));
+        let mut requests = self.requests;
+        let requests_by_time = requests.entry(time).or_default();
+        requests_by_time.push((data, request));
+        Self::from(requests)
     }
 
-    pub fn take_scheduled(&mut self, time: &Ti) -> impl Iterator<Item = (Ti, Vec<(Da, Rq)>)>
+    pub fn take_scheduled(self, time: &Ti) -> (Self, Vec<(Ti, Vec<(Da, Rq)>)>)
     where
         Ti: Ord,
     {
-        let mut scheduled = take(&mut self.requests);
-        self.requests = scheduled.split_off(time);
-        if let Some((key, value)) = self.requests.remove_entry(time) {
+        let mut scheduled = self.requests;
+        let mut requests = scheduled.split_off(time);
+        if let Some((key, value)) = requests.remove_entry(time) {
             let prev = scheduled.insert(key, value);
             assert!(prev.is_none());
         }
-        scheduled.into_iter()
+        (Self::from(requests), scheduled.into_iter().collect())
     }
 }
 

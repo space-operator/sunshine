@@ -8,10 +8,6 @@ impl<Co> CoordsState<Co> {
         Self { coords }
     }
 
-    pub fn set_coords(&mut self, coords: Co) {
-        self.coords = coords;
-    }
-
     pub fn coords(&self) -> &Co {
         &self.coords
     }

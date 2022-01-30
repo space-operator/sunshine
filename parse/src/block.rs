@@ -86,7 +86,7 @@ fn test() {
     for line in lines {
         parser = parser.with(&line);
     }
-    //println!("{:#?}", parser.into_blocks());
+    println!("{:#?}", parser.into_blocks());
     //panic!();
 }
 
