@@ -79,7 +79,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "input-core-stable"
+name = "input-core-dev"
 version = "0.1.0"
 dependencies = [
  "thiserror",
@@ -93,10 +93,10 @@ dependencies = [
 ]
 
 [[package]]
-name = "input-more-stable"
+name = "input-more-dev"
 version = "0.1.0"
 dependencies = [
- "input-core-stable",
+ "input-core-dev",
 ]
 
 [[package]]

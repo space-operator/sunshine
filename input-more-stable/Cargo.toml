@@ -1,8 +1,0 @@
-[package]
-name = "input-more-stable"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies.input-core]
-package = "input-core-stable"
-path = "../input-core-stable"

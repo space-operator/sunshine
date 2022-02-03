@@ -125,7 +125,7 @@ impl<Sw> TimedState<Sw> {
         switch: Sw,
         callback: impl FnOnce(OccupiedEntry<'_, Sw, SwitchState>) -> Result<T, E>,
         err: E,
-    ) -> Result<Option<T>, E>
+    ) -> Result<T, E>
     where
         Sw: Eq + Hash,
     {
@@ -133,7 +133,7 @@ impl<Sw> TimedState<Sw> {
 
         let entry = self.switches.entry(switch);
         match entry {
-            Entry::Occupied(entry) => callback(entry).map(Some),
+            Entry::Occupied(entry) => callback(entry),
             Entry::Vacant(_) => Err(err),
         }
     }
@@ -152,6 +152,7 @@ impl<Sw> TimedState<Sw> {
                 SwitchState::with_long_press_event,
                 TimedLongClickError::Default,
             )
+            .map(Some)
         } else {
             Ok(None)
         }
@@ -171,6 +172,7 @@ impl<Sw> TimedState<Sw> {
                 SwitchState::with_click_exact_event,
                 TimedClickExactError::Default,
             )
+            .map(Some)
         } else {
             Ok(None)
         }

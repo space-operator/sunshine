@@ -101,7 +101,9 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
 
         if is_used_as_modifier {
             let result = self.modifiers.borrow_mut().on_press_event(modifier);
-            // result.unwrap(); // FIXME
+            if let Err(err) = result {
+                eprintln!("{:?}", err);
+            }
         }
 
         println!("{:?}", mapping);
@@ -116,17 +118,19 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
             .timed_state
             .borrow_mut()
             .on_press_event(event.switch.clone());
-        let request = result.unwrap();
-
-        self.long_press_scheduler.borrow_mut().schedule(
-            event.time.clone(),
-            (
-                event.clone(),
-                self.modifiers.borrow().clone(),
-                self.coords_state.borrow().coords().clone(),
+        match result {
+            Ok(request) => self.long_press_scheduler.borrow_mut().schedule(
+                event.time.clone(),
+                (
+                    event.clone(),
+                    self.modifiers.borrow().clone(),
+                    self.coords_state.borrow().coords().clone(),
+                ),
+                request,
             ),
-            request,
-        );
+            Err(err) => eprintln!("{:?}", err),
+        }
+
         let next_scheduled = self.long_press_scheduler.borrow().next_scheduled().cloned();
 
         let mapping = mapping
@@ -137,7 +141,9 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
             .pointer_state
             .borrow_mut()
             .with_press_event(event.switch, self.coords_state.borrow().coords().clone());
-        //result.unwrap(); // FIXME
+        if let Err(err) = result {
+            eprintln!("{:?}", err);
+        }
         println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (next_scheduled, None)); // FIXME
 
@@ -184,7 +190,13 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
                             .timed_state
                             .borrow_mut()
                             .on_long_press_event(switch, request);
-                        result.unwrap()
+                        match result {
+                            Ok(data) => data,
+                            Err(err) => {
+                                eprintln!("{:?}", err);
+                                None
+                            }
+                        }
                     },
                 );
                 if let Some((bindings, coords)) = result {
@@ -231,7 +243,9 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
 
         if is_used_as_modifier {
             let result = self.modifiers.borrow_mut().on_release_event(&modifier);
-            result.unwrap();
+            if let Err(err) = result {
+                eprintln!("{:?}", err);
+            }
         }
 
         println!("{:?}", mapping);
@@ -245,8 +259,14 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
         let timed_data = self
             .timed_state
             .borrow_mut()
-            .on_release_event(event.switch.clone())
-            .unwrap();
+            .on_release_event(event.switch.clone());
+        let timed_data = match timed_data {
+            Ok(ok) => ok,
+            Err(err) => {
+                eprintln!("{:?}", err);
+                None
+            }
+        };
 
         let (timed_data, next_scheduled) = match timed_data {
             Some((timed_data, request)) => {
@@ -276,8 +296,15 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
         let pointer_data = self
             .pointer_state
             .borrow_mut()
-            .with_release_event(&event.switch)
-            .unwrap();
+            .with_release_event(&event.switch);
+        let pointer_data = match pointer_data {
+            Ok(ok) => ok,
+            Err(err) => {
+                eprintln!("{:?}", err);
+                None
+            }
+        };
+
         println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (next_scheduled, None));
 
@@ -315,10 +342,13 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
         let mut delayed_bindings = Vec::new();
         for (_, requests) in requests {
             for ((event, modifiers, coords), request) in requests {
-                self.timed_state
+                let result = self
+                    .timed_state
                     .borrow_mut()
-                    .on_reset_click_count(&event.switch)
-                    .unwrap();
+                    .on_reset_click_count(&event.switch);
+                if let Err(err) = result {
+                    eprintln!("{:?}", err);
+                }
 
                 let result = with_timeout_event(
                     &mapping.click_exact,
@@ -330,7 +360,13 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
                             .timed_state
                             .borrow_mut()
                             .on_click_exact_event(switch, request);
-                        result.unwrap()
+                        match result {
+                            Ok(data) => data,
+                            Err(err) => {
+                                eprintln!("{:?}", err);
+                                None
+                            }
+                        }
                     },
                 );
                 if let Some((bindings, coords)) = result {

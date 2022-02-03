@@ -6,9 +6,9 @@ edition = "2021"
 [workspace]
 members = [
     "input-core",
-    "input-core-stable",
+    "input-core-dev",
     "input-more",
-    "input-more-stable",
+    "input-more-dev",
     "parse",
     "logic",
 ]
