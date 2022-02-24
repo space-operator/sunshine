@@ -37,7 +37,7 @@ impl<Sw, Co> PointerState<Sw, Co> {
         Self::default()
     }
 
-    pub fn with_press_event(&mut self, switch: Sw, coords: Co) -> Result<(), PointerPressError>
+    pub fn on_press_event(&mut self, switch: Sw, coords: Co) -> Result<(), PointerPressError>
     where
         Sw: Eq + Hash,
     {
@@ -52,7 +52,7 @@ impl<Sw, Co> PointerState<Sw, Co> {
         }
     }
 
-    pub fn with_release_event(
+    pub fn on_release_event(
         &mut self,
         switch: &Sw,
     ) -> Result<Option<PointerChangeEventData>, PointerReleaseError>
@@ -71,7 +71,7 @@ impl<Sw, Co> PointerState<Sw, Co> {
         }
     }
 
-    pub fn with_move_event<F>(&mut self, mut is_dragged_fn: F) -> Vec<PointerMoveEventData<Sw>>
+    pub fn on_move_event<F>(&mut self, mut is_dragged_fn: F) -> Vec<PointerMoveEventData<Sw>>
     where
         Sw: Clone + Eq + Hash,
         F: FnMut(&Co) -> bool,

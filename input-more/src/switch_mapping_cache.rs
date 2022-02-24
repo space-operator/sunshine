@@ -338,7 +338,7 @@ impl<'a, Mo, Bu> FilteredBindings<'a, Mo, Bu> {
             .flat_map(|(_, events)| events)
             .collect();
 
-        println!("BuEv {:?}", result);
+        //println!("BuEv {:?}", result);
         result
     }
 }

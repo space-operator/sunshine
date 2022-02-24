@@ -209,6 +209,15 @@ impl<Mo, Ti, KeSw, MsSw, KeCo, MsCo>
         MsSw: Eq + Hash,
         Mo: Eq + Hash + Ord,
         Ti: Clone + Ord,
+        //
+        Ti: std::fmt::Debug,
+        Mo: std::fmt::Debug,
+        KeEv: std::fmt::Debug,
+        KeTr: std::fmt::Debug,
+        KeSw: Clone + std::fmt::Debug,
+        MsEv: std::fmt::Debug,
+        MsTr: std::fmt::Debug,
+        MsSw: Clone + std::fmt::Debug,
     {
         let mut state = self.as_keyboard_state_mut();
         let keyboard_long_press =
@@ -282,6 +291,8 @@ impl<Mo, Ti, Sw, Co, CsMs, TsMs, ShMsLo, ShMsCl, PoMs>
         Co: Clone,
         // TODO: Remove after debugging
         Ev: std::fmt::Debug,
+        Ti: std::fmt::Debug,
+        Sw: std::fmt::Debug,
         Tr: std::fmt::Debug,
         Mo: std::fmt::Debug,
         Ev: std::fmt::Debug,
@@ -312,6 +323,8 @@ impl<Mo, Ti, Sw, Co, CsMs, TsMs, ShMsLo, ShMsCl, PoMs>
         Co: Clone,
         // TODO: Remove after debugging
         Ev: std::fmt::Debug,
+        Ti: std::fmt::Debug,
+        Sw: std::fmt::Debug,
         Tr: std::fmt::Debug,
         Mo: std::fmt::Debug,
         Ev: std::fmt::Debug,
@@ -426,6 +439,8 @@ impl<Mo, Ti, Sw, Co, CsKe, TsKe, ShKeLo, ShKeCl, PoKe>
         Co: Clone,
         // TODO: Remove after debugging
         Ev: std::fmt::Debug,
+        Ti: std::fmt::Debug,
+        Sw: std::fmt::Debug,
         Tr: std::fmt::Debug,
         Mo: std::fmt::Debug,
         Ev: std::fmt::Debug,
@@ -456,6 +471,8 @@ impl<Mo, Ti, Sw, Co, CsKe, TsKe, ShKeLo, ShKeCl, PoKe>
         Co: Clone,
         // TODO: Remove after debugging
         Ev: std::fmt::Debug,
+        Ti: std::fmt::Debug,
+        Sw: std::fmt::Debug,
         Tr: std::fmt::Debug,
         Mo: std::fmt::Debug,
         Ev: std::fmt::Debug,

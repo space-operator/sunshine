@@ -3,7 +3,7 @@ use core::hash::Hash;
 
 use input_core::{
     ClickExactHandleRequest, CoordsState, LongPressHandleRequest, Modifiers, PointerState,
-    SchedulerState, TimedEventData, TimedState,
+    SchedulerState, TimedEventData, TimedState, PointerChangeEventData,
 };
 
 use crate::{
@@ -84,6 +84,8 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
         Co: Clone,
         // TODO: Remove after debugging
         Ev: std::fmt::Debug,
+        Ti: std::fmt::Debug,
+        Sw: std::fmt::Debug,
         Tr: std::fmt::Debug,
         MoMo: std::fmt::Debug,
         Ev: std::fmt::Debug,
@@ -102,16 +104,17 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
         if is_used_as_modifier {
             let result = self.modifiers.borrow_mut().on_press_event(modifier);
             if let Err(err) = result {
-                eprintln!("{:?}", err);
+                eprintln!(
+                    "input_more::DeviceState::with_press_event: input_core::Modifiers::on_press_event returned an error: {:?} for event: {:?}",
+                    err, event
+                );
             }
         }
 
-        println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (None, None));
 
         let mapping = mapping.filter_by_modifiers(self.modifiers.borrow());
 
-        println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (None, None));
 
         let result = self
@@ -128,7 +131,11 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
                 ),
                 request,
             ),
-            Err(err) => eprintln!("{:?}", err),
+            Err(err) => 
+            eprintln!(
+                "input_more::DeviceState::with_press_event: input_core::TimedState::on_press_event returned an error: {:?} for event: {:?}",
+                err, event
+            ),
         }
 
         let next_scheduled = self.long_press_scheduler.borrow().next_scheduled().cloned();
@@ -140,11 +147,13 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
         let result = self
             .pointer_state
             .borrow_mut()
-            .with_press_event(event.switch, self.coords_state.borrow().coords().clone());
+            .on_press_event(event.switch.clone(), self.coords_state.borrow().coords().clone());
         if let Err(err) = result {
-            eprintln!("{:?}", err);
+            eprintln!(
+                "input_more::DeviceState::with_press_event: input_core::PointerState::on_press_event returned an error: {:?} for event: {:?}",
+                err, event
+            );
         }
-        println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (next_scheduled, None)); // FIXME
 
         let mapping = mapping.filter_by_pointer_data(&());
@@ -152,7 +161,6 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
 
         let coords = self.coords_state.borrow().coords().clone();
 
-        println!("{:?}", mapping);
         (next_scheduled, Some((mapping, coords)))
     }
 
@@ -171,6 +179,13 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
         Sw: Eq + Hash,
         MoMo: Eq + Hash + Ord,
         Ti: Ord,
+        // TODO: Remove after debugging
+        Ev: std::fmt::Debug,
+        Ti: std::fmt::Debug,
+        Sw: Clone + std::fmt::Debug,
+        Tr: std::fmt::Debug,
+        MoMo: std::fmt::Debug,
+        Ev: std::fmt::Debug,
     {
         let requests = self
             .long_press_scheduler
@@ -182,7 +197,7 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
             for ((event, modifiers, coords), request) in requests {
                 let result = with_timeout_event(
                     &mapping.long_press,
-                    event.switch,
+                    event.switch.clone(),
                     &modifiers,
                     coords,
                     |switch| {
@@ -193,7 +208,10 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
                         match result {
                             Ok(data) => data,
                             Err(err) => {
-                                eprintln!("{:?}", err);
+                                eprintln!(
+                                    "input_more::DeviceState::with_press_timeout: input_core::TimedState::on_long_press_event returned an error: {:?} for event: {:?}",
+                                    err, event
+                                );
                                 None
                             }
                         }
@@ -226,6 +244,8 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
         Co: Clone,
         // TODO: Remove after debugging
         Ev: std::fmt::Debug,
+        Ti: std::fmt::Debug,
+        Sw: std::fmt::Debug,
         Tr: std::fmt::Debug,
         MoMo: std::fmt::Debug,
         Ev: std::fmt::Debug,
@@ -244,16 +264,17 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
         if is_used_as_modifier {
             let result = self.modifiers.borrow_mut().on_release_event(&modifier);
             if let Err(err) = result {
-                eprintln!("{:?}", err);
+                eprintln!(
+                    "input_more::DeviceState::with_release_event: input_core::Modifiers::on_release_event returned an error: {:?} for event: {:?}",
+                    err, event
+                );
             }
         }
 
-        println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (None, None));
 
         let mapping = mapping.filter_by_modifiers(self.modifiers.borrow());
 
-        println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (None, None));
 
         let timed_data = self
@@ -263,7 +284,10 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
         let timed_data = match timed_data {
             Ok(ok) => ok,
             Err(err) => {
-                eprintln!("{:?}", err);
+                eprintln!(
+                    "input_more::DeviceState::with_release_event: input_core::TimedState::on_release_event returned an error: {:?} for event: {:?}",
+                    err, event
+                );
                 None
             }
         };
@@ -296,25 +320,30 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
         let pointer_data = self
             .pointer_state
             .borrow_mut()
-            .with_release_event(&event.switch);
+            .on_release_event(&event.switch);
         let pointer_data = match pointer_data {
             Ok(ok) => ok,
             Err(err) => {
-                eprintln!("{:?}", err);
+                eprintln!(
+                    "input_more::DeviceState::with_release_event: input_core::PointerState::on_release_event returned an error: {:?} for event: {:?}",
+                    err, event
+                );
                 None
             }
         };
+        if let Some(PointerChangeEventData::DragEnd) = pointer_data {
+            self
+            .timed_state
+            .borrow_mut().on_reset_click_count(&event.switch).unwrap();
+        }
 
-        println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (next_scheduled, None));
 
         let mapping = mapping.filter_by_pointer_data(&pointer_data);
-        println!("{:?}", mapping);
         let mapping = unwrap_or_return!(mapping, (next_scheduled, None));
 
         let coords = self.coords_state.borrow().coords().clone();
 
-        println!("{:?}", mapping);
         (next_scheduled, Some((mapping, coords)))
     }
 
@@ -333,6 +362,13 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
         Sw: Eq + Hash,
         MoMo: Eq + Hash + Ord,
         Ti: Ord,
+        // TODO: Remove after debugging
+        Ev: std::fmt::Debug,
+        Ti: std::fmt::Debug,
+        Sw: Clone + std::fmt::Debug,
+        Tr: std::fmt::Debug,
+        MoMo: std::fmt::Debug,
+        Ev: std::fmt::Debug,
     {
         let requests = self
             .click_exact_scheduler
@@ -347,12 +383,15 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
                     .borrow_mut()
                     .on_reset_click_count(&event.switch);
                 if let Err(err) = result {
-                    eprintln!("{:?}", err);
+                    eprintln!(
+                        "input_more::DeviceState::with_release_timeout: input_core::TimedState::on_reset_click_count returned an error: {:?} for event: {:?}",
+                        err, event
+                    );
                 }
 
                 let result = with_timeout_event(
                     &mapping.click_exact,
-                    event.switch,
+                    event.switch.clone(),
                     &modifiers,
                     coords,
                     |switch| {
@@ -363,7 +402,10 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
                         match result {
                             Ok(data) => data,
                             Err(err) => {
-                                eprintln!("{:?}", err);
+                                eprintln!(
+                                    "input_more::DeviceState::with_release_timeout: input_core::TimedState::on_click_exact_event returned an error: {:?} for event: {:?}",
+                                    err, event
+                                );
                                 None
                             }
                         }
@@ -432,7 +474,7 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
         let data = self
             .pointer_state
             .borrow_mut()
-            .with_move_event(|coords| is_dragged_fn(coords, &event.coords));
+            .on_move_event(|coords| is_dragged_fn(coords, &event.coords));
 
         let mut all_bindings = vec![];
         let mapping = &mapping.coords;
