@@ -384,7 +384,7 @@ impl<Mo, Ti, Sw, Co, CsMs, TsMs, ShMsLo, ShMsCl, PoMs>
     where
         Sw: Clone + Eq + Hash,
         Mo: Clone + Hash + Ord,
-        Co: Clone + Eq,
+        Co: Clone,
     {
         let (state, global_state): (KeyboardDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
         let (state, bindings) = state.with_coords_event(event, mapping.keyboard());
@@ -510,7 +510,7 @@ impl<Mo, Ti, Sw, Co, CsKe, TsKe, ShKeLo, ShKeCl, PoKe>
     where
         Sw: Clone + Eq + Hash,
         Mo: Clone + Hash + Ord,
-        Co: Clone + Eq,
+        Co: Clone,
     {
         let (state, global_state): (MouseDeviceState<Ti, Mo, Co, Sw>, _) = self.take_state();
         let (state, bindings) = state.with_coords_event(event, mapping.mouse());

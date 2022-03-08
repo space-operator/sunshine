@@ -463,7 +463,7 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
         Po: BorrowMut<PointerState<Sw, Co>>,
         Sw: Clone + Eq + Hash,
         MoMo: Clone + Hash + Ord,
-        Co: Clone + Eq,
+        Co: Clone,
     {
         use crate::unwrap_or_continue;
 

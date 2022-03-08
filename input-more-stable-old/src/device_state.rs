@@ -398,7 +398,7 @@ impl<Sw, Mo, Ti, Co>
     where
         Sw: Clone + Eq + Hash,
         Mo: Clone + Hash + Ord,
-        Co: Clone + Eq,
+        Co: Clone,
     {
         use crate::{unwrap_or_continue, StructTakeField, StructWithField};
 

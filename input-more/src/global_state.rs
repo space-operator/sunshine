@@ -376,7 +376,7 @@ impl<Mo, Ti, Sw, Co, CsMs, TsMs, ShMsLo, ShMsCl, PoMs>
         F: FnMut(&Co, &Co) -> bool,
         Sw: Clone + Eq + Hash,
         Mo: Clone + Hash + Ord,
-        Co: Clone + Eq,
+        Co: Clone,
     {
         let mut state = self.as_keyboard_state_mut();
         let bindings = state.with_coords_event(event, mapping.keyboard(), is_dragged_fn);
@@ -524,7 +524,7 @@ impl<Mo, Ti, Sw, Co, CsKe, TsKe, ShKeLo, ShKeCl, PoKe>
         F: FnMut(&Co, &Co) -> bool,
         Sw: Clone + Eq + Hash,
         Mo: Clone + Hash + Ord,
-        Co: Clone + Eq,
+        Co: Clone,
     {
         let mut state = self.as_mouse_state_mut();
         let bindings = state.with_coords_event(event, mapping.mouse(), is_dragged_fn);

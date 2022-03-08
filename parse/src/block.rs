@@ -7,9 +7,10 @@ pub struct BlockId<'a>(pub &'a str);
 
 #[allow(dead_code)]
 #[derive(Clone, Debug, Default)]
+// deserialize, serialize
 pub struct Block {
-    span_text: String,
-    children: Vec<Block>,
+    pub span_text: String,
+    pub children: Vec<Block>,
 }
 
 #[derive(Clone, Debug, Default)]
