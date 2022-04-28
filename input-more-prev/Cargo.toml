@@ -1,7 +1,0 @@
-[package]
-name = "input-more"
-version = "0.1.0"
-edition = "2021"
-
-[dependencies.input-core]
-path = "../input-core"
