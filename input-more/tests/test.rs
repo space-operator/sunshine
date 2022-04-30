@@ -7,7 +7,6 @@ fn test_chain() {
     use input_core::*;
     use input_more::*;
 
-    //type DurationMs = i64;
     type TimestampMs = i64;
 
     #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
@@ -50,7 +49,7 @@ fn test_chain() {
     struct NodeId(u32);
 
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-    pub enum AppEvent {
+    enum AppEvent {
         Unselect,
         SelectNode(NodeId),
         CreateNode(MouseCoords),
@@ -65,8 +64,9 @@ fn test_chain() {
         CancelMove,
     }
 
+    #[allow(dead_code)]
     #[derive(Clone, Debug, Eq, Hash, PartialEq)]
-    pub enum BasicAppEventBuilder {
+    enum BasicAppEventBuilder {
         Unselect,
         CancelSelection,
         CancelMove,
@@ -200,6 +200,7 @@ fn test_chain() {
         }
     }
 
+    #[allow(unused_assignments, unused_variables)]
     fn filter_by_priority(events: Vec<AppEvent>) -> impl Iterator<Item = AppEvent> {
         let mut is_unselect_used = false;
         let mut is_select_node_used = false;
@@ -519,6 +520,7 @@ fn test_chain() {
         MousePointerState::default(),
     );
 
+    #[allow(dead_code)]
     #[derive(Clone, Debug)]
     enum RawEvent {
         KeyboardPress(KeyboardSwitchEvent),
