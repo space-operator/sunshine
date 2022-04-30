@@ -2,6 +2,8 @@ use core::hash::Hash;
 
 use crate::{DeviceMappingCache, GlobalMapping, Mapping, MappingModifiersCache};
 
+/// A generic structure that stores input mapping cache
+/// for keyboard and mouse devices and the corresponding modifiers cache.
 #[derive(Clone, Debug)]
 pub struct GlobalMappingCache<Ke, Ms, Mo> {
     keyboard: Ke,
@@ -10,14 +12,17 @@ pub struct GlobalMappingCache<Ke, Ms, Mo> {
 }
 
 impl<Ke, Ms, Mo> GlobalMappingCache<Ke, Ms, Mo> {
+    /// Returns a mapping cache for keyboard device.
     pub fn keyboard(&self) -> &Ke {
         &self.keyboard
     }
 
+    /// Returns a mapping cache for mouse device.
     pub fn mouse(&self) -> &Ms {
         &self.mouse
     }
 
+    /// Returns a modifiers cache.
     pub fn modifiers(&self) -> &Mo {
         &self.modifiers
     }
@@ -38,6 +43,7 @@ where
     KeEv: Clone,
     MsEv: Clone,
 {
+    /// Builds `GlobalMappingCache` structure from a given `GlobalMapping`.
     pub fn from_mapping(
         mapping: GlobalMapping<Mapping<KeSw, KeTr, Mo, KeEv>, Mapping<MsSw, MsTr, Mo, MsEv>>,
     ) -> Self {

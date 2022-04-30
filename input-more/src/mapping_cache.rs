@@ -10,16 +10,26 @@ use crate::{
     SwitchMappingCache, TriggerMappingCache,
 };
 
+/// A generic structure that stores input mapping cache.
+///
+/// The structure is used to speed up and optimize the input bindings lookup.
 #[derive(Clone, Debug)]
 pub struct MappingCache<Pr, Re, Lo, Cl, Tr, Co> {
+    /// Mapping cache for press events.
     pub press: Pr,
+    /// Mapping cache for release events.
     pub release: Re,
+    /// Mapping cache for long press events.
     pub long_press: Lo,
+    /// Mapping cache for click exact events.
     pub click_exact: Cl,
+    /// Mapping cache for trigger events.
     pub trigger: Tr,
+    /// Mapping cache for move events.
     pub coords: Co,
 }
 
+/// A structure that stores input mapping cache for a specified device.
 pub type DeviceMappingCache<Sw, Tr, Mo, Ev> = MappingCache<
     SwitchMappingCache<Sw, Mo, (), (), Ev>,
     SwitchMappingCache<Sw, Mo, Option<TimedReleaseEventData>, Option<PointerReleaseEventData>, Ev>,
@@ -30,6 +40,7 @@ pub type DeviceMappingCache<Sw, Tr, Mo, Ev> = MappingCache<
 >;
 
 impl<Sw, Tr, Mo, Ev> DeviceMappingCache<Sw, Tr, Mo, Ev> {
+    /// Builds `DeviceMappingCache` structure from specified device mapping.
     pub fn from_bindings<'a>(mapping: impl IntoIterator<Item = &'a Binding<Sw, Tr, Mo, Ev>>) -> Self
     where
         Sw: 'a + Clone + Eq + Hash,
@@ -74,6 +85,11 @@ impl<Sw, Mo, TdPr, TdRe, TdLo, TdCl, PdPr, PdRe, PrLo, PrCl, Ev, TrCa, CoCa>
         CoCa,
     >
 {
+    /// Filters `DeviceMappingCache` by a specified switch.
+    ///
+    /// If there are no bindings for the given switch, the method returns None.
+    /// Otherwise, the method returns a temporary structure
+    /// with matching bindings intended for further filtering.
     pub fn filter_by_switch<'a>(
         &'a self,
         switch: &Sw,
@@ -119,6 +135,11 @@ impl<'a, Mo, TdPr, TdRe, TdLo, TdCl, PdPr, PdRe, PrLo, PrCl, TrCa, CoCa, Ev>
         CoCa,
     >
 {
+    /// Filters `DeviceMappingCache` by a currently enabled/pressed modifiers.
+    ///
+    /// If there are no bindings for the given switch, the method returns None.
+    /// Otherwise, the method returns a temporary structure
+    /// with matching bindings intended for further filtering.
     pub fn filter_by_modifiers(
         &self,
         modifiers: &Modifiers<Mo>,
