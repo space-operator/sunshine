@@ -1,59 +1,5 @@
 #[test]
 fn test_chain() {
-    /*
-    TODO:
-        1:
-            Modifiers -> [AppEventBinding]
-            filter event+data(like coords) by events in app
-                from Modifiers -> [Event + Data]
-                into Modifiers -> [Option<AppEvent>]
-                into Modifiers -> [AppEvent]
-            filter events by modifiers in input
-                find longest Modifiers
-                if different modifiers then drop
-                if equal modifiers
-            emit AppEvent
-        2:
-            We do not need to store anything except Modifiers in Events,
-            because we copy events only for timed processing,
-            but use data separated from events for mapping.
-        3:
-            PointerState
-        4:
-            State::with_press_event, State::with_release_event
-        5:
-        >   Remain coords only in PointerMove event, but not in switchers
-        6:
-            Triggers and PointerMove
-        5:
-            Mouse
-        6:
-            Move smth to library
-        7:
-            hooray
-
-            coords -> context
-            priority appevents
-            //   how to create binding for any relase event but not only for click | dblclick | longpress
-
-    */
-
-    /*
-        switch without coords
-        PointerMove without switch
-
-        switch
-        trigger
-        coords
-
-        state
-            co
-        touch with coords
-        touchmove with coords
-        switch without coords
-        untouch without coords
-    */
-
     use core::fmt::Debug;
     use core::hash::Hash;
     use std::collections::{HashMap, HashSet};
