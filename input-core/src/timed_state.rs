@@ -255,7 +255,7 @@ impl<Sw> TimedState<Sw> {
     ///
     /// After calling this function the counting of the number of clicks
     /// for a given switch will start from the beginning.
-    pub fn on_reset_click_count(&mut self, switch: &Sw) -> Result<(), WithResetClickCountError>
+    pub fn on_reset_click_count(&mut self, switch: &Sw) -> Result<(), TimedResetClickCountError>
     where
         Sw: Eq + Hash,
     {
@@ -265,7 +265,7 @@ impl<Sw> TimedState<Sw> {
                 state.num_possible_clicks = 0;
                 Ok(())
             }
-            None => Err(WithResetClickCountError::Default),
+            None => Err(TimedResetClickCountError::Default),
         }
     }
 }
@@ -437,7 +437,7 @@ pub enum TimedClickExactError {
 
 /// The error type which is returned from `TimedState::on_reset_click_count`.
 #[derive(Clone, Copy, Debug, Error)]
-pub enum WithResetClickCountError {
+pub enum TimedResetClickCountError {
     #[error("No handler calls requested for Default state")]
     Default,
 }
