@@ -85,13 +85,13 @@ enum SwitchStateKind {
 /// A long press scheduled callback request.
 ///
 /// The internal pointer is invalidated if the state changes before the callback is called.
-#[derive(Clone, Debug)]
+#[derive(Debug)] // the request should not be cloneable
 pub struct LongPressHandleRequest(Weak<()>);
 
 /// A click exact scheduled callback request.
 ///
 /// The internal pointer is invalidated if the state changes before the callback is called.
-#[derive(Clone, Debug)]
+#[derive(Debug)] // the request should not be cloneable
 pub struct ClickExactHandleRequest(Weak<()>);
 
 impl<Ki> TimedEventData<Ki> {
