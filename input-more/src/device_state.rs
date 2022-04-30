@@ -3,7 +3,7 @@ use core::hash::Hash;
 
 use input_core::{
     ClickExactHandleRequest, CoordsState, LongPressHandleRequest, Modifiers, PointerState,
-    SchedulerState, TimedEventData, TimedState, PointerChangeEventData,
+    SchedulerState, TimedEventData, TimedState, PointerReleaseEventData,
 };
 
 use crate::{
@@ -331,7 +331,7 @@ impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
                 None
             }
         };
-        if let Some(PointerChangeEventData::DragEnd) = pointer_data {
+        if let Some(PointerReleaseEventData::DragEnd) = pointer_data {
             self
             .timed_state
             .borrow_mut().on_reset_click_count(&event.switch).unwrap();

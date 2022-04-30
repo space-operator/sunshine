@@ -460,7 +460,7 @@ fn test_chain() {
                 switch: lmb,
                 modifiers: Modifiers::new(),
                 timed_data: None,
-                pointer_data: Some(PointerChangeEventData::DragEnd),
+                pointer_data: Some(PointerReleaseEventData::DragEnd),
                 event: PointerAppEventBuilder::EndSelection,
             }),
             //
@@ -475,7 +475,7 @@ fn test_chain() {
                 switch: lmb,
                 modifiers: Modifiers::new(),
                 timed_data: click, // FIXME
-                pointer_data: Some(PointerChangeEventData::DragEnd),
+                pointer_data: Some(PointerReleaseEventData::DragEnd),
                 event: PointerAppEventBuilder::EndSelection,
             }),
             Binding::Release(SwitchBinding {
@@ -489,7 +489,7 @@ fn test_chain() {
                 switch: lmb,
                 modifiers: Modifiers::new(),
                 timed_data: dbl_click, // FIXME
-                pointer_data: Some(PointerChangeEventData::DragEnd),
+                pointer_data: Some(PointerReleaseEventData::DragEnd),
                 event: PointerAppEventBuilder::EndSelection,
             }),
             //
@@ -511,7 +511,7 @@ fn test_chain() {
                 switch: rmb,
                 modifiers: Modifiers::new(),
                 timed_data: None,
-                pointer_data: Some(PointerChangeEventData::DragEnd),
+                pointer_data: Some(PointerReleaseEventData::DragEnd),
                 event: PointerAppEventBuilder::EndMove,
             }),
             //

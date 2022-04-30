@@ -2,7 +2,7 @@ use core::hash::Hash;
 use core::marker::PhantomData;
 
 use input_core::{
-    Modifiers, PointerChangeEventData, PointerMoveEventData, TimedClickExactEventData,
+    Modifiers, PointerMoveEventData, PointerReleaseEventData, TimedClickExactEventData,
     TimedLongPressEventData, TimedReleaseEventData,
 };
 
@@ -23,7 +23,7 @@ pub struct MappingCache<Pr, Re, Lo, Cl, Tr, Co> {
 
 pub type DeviceMappingCache<Sw, Tr, Mo, Ev> = MappingCache<
     SwitchMappingCache<Sw, Mo, (), (), Ev>,
-    SwitchMappingCache<Sw, Mo, Option<TimedReleaseEventData>, Option<PointerChangeEventData>, Ev>,
+    SwitchMappingCache<Sw, Mo, Option<TimedReleaseEventData>, Option<PointerReleaseEventData>, Ev>,
     SwitchMappingCache<Sw, Mo, TimedLongPressEventData, (), Ev>,
     SwitchMappingCache<Sw, Mo, TimedClickExactEventData, (), Ev>,
     TriggerMappingCache<Tr, Mo, Ev>,

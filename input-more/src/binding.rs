@@ -1,5 +1,5 @@
 use input_core::{
-    Modifiers, PointerChangeEventData, PointerMoveEventData, TimedClickExactEventData,
+    Modifiers, PointerMoveEventData, PointerReleaseEventData, TimedClickExactEventData,
     TimedLongPressEventData, TimedReleaseEventData,
 };
 
@@ -7,7 +7,7 @@ use input_core::{
 pub enum Binding<Sw, Tr, Mo, Ev> {
     Press(SwitchBinding<Sw, Mo, (), (), Ev>),
     Release(
-        SwitchBinding<Sw, Mo, Option<TimedReleaseEventData>, Option<PointerChangeEventData>, Ev>,
+        SwitchBinding<Sw, Mo, Option<TimedReleaseEventData>, Option<PointerReleaseEventData>, Ev>,
     ),
     LongPress(SwitchBinding<Sw, Mo, TimedLongPressEventData, (), Ev>),
     ClickExact(SwitchBinding<Sw, Mo, TimedClickExactEventData, (), Ev>),

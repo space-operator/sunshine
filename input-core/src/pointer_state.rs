@@ -26,7 +26,7 @@ pub enum PointerMoveEventKind {
 
 /// A enumeration that specifies switch pointer release event kind.
 #[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
-pub enum PointerChangeEventData {
+pub enum PointerReleaseEventData {
     DragEnd,
 }
 
@@ -72,7 +72,7 @@ impl<Sw, Co> PointerState<Sw, Co> {
     pub fn on_release_event(
         &mut self,
         switch: &Sw,
-    ) -> Result<Option<PointerChangeEventData>, PointerReleaseError>
+    ) -> Result<Option<PointerReleaseEventData>, PointerReleaseError>
     where
         Sw: Eq + Hash,
     {
@@ -80,7 +80,7 @@ impl<Sw, Co> PointerState<Sw, Co> {
             Some(state) => {
                 let data = match state {
                     SwitchState::Pressed(_) => None,
-                    SwitchState::Moving => Some(PointerChangeEventData::DragEnd),
+                    SwitchState::Moving => Some(PointerReleaseEventData::DragEnd),
                 };
                 Ok(data)
             }
