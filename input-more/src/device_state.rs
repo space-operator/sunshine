@@ -21,25 +21,6 @@ pub struct DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
     pub pointer_state: Po,
 }
 
-/*
-define_markers!(
-    ModifiersMarker,
-    CoordStateMarker,
-    TimedStateMarker,
-    SchedulerPressMarker,
-    SchedulerReleaseMarker,
-    PointerMarker
-);
-
-define_struct_take_and_with_field!(DeviceState {
-    modifiers: Mo + ModifiersMarker,
-    coords_state: Cs + CoordStateMarker,
-    timed_state: Ts + TimedStateMarker,
-    long_press_scheduler: ShLo + SchedulerPressMarker,
-    click_exact_scheduler: ShCl + SchedulerReleaseMarker,
-    pointer_state: Po + PointerMarker,
-});
-*/
 
 impl<Mo, Cs, Ts, ShLo, ShCl, Po> DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po> {
     pub fn new(
@@ -512,39 +493,3 @@ where
 
     Some((bindings, coords))
 }
-/*pub fn with_press_event<Ti, Sw, Co, KePrMa, KeReMa, KeLoMa, KeClMa>(
-    self,
-    event: SwitchEvent<Ti, Sw, Co, (), ()>,
-    mapping: &GlobalMapping<KePrMa, KeReMa, KeLoMa, KeClMa>,
-) -> Self {
-    self
-}
-
-pub fn with_release_event<Ti, Sw, Co, KePrMa, KeReMa, KeLoMa, KeClMa>(
-    self,
-    event: SwitchEvent<Ti, Sw, Co, (), ()>,
-    mapping: &GlobalMapping<KePrMa, KeReMa, KeLoMa, KeClMa>,
-) -> Self {
-    self
-}*/
-
-/*
-#[test]
-fn test() {
-    use crate::{StructTakeField, StructWithField};
-    let state = DeviceState::new(1, (false,), false, "123", (1, 2, 3), (1, 2));
-
-    let (modifiers, rest): (i32, _) = state.take_field();
-    let state: DeviceState<_, _, _, _, _, _> = rest.with_field(modifiers + 10);
-
-    let (timed, rest): (bool, _) = state.take_field();
-    let state: DeviceState<_, _, _, _, _, _> = rest.with_field(!timed);
-
-    let (scheduler, rest): (&str, _) = state.take_field();
-    let state: DeviceState<_, _, _, _, _, _> = rest.with_field(&scheduler[1..3]);
-
-    assert_eq!(state.modifiers, 11);
-    assert_eq!(state.timed_state, true);
-    assert_eq!(state.long_press_scheduler, "23");
-}
-*/

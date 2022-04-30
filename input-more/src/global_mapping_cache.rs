@@ -1,5 +1,4 @@
 use core::hash::Hash;
-use std::sync::Arc;
 
 use crate::{DeviceMappingCache, GlobalMapping, Mapping, MappingModifiersCache};
 

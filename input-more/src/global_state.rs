@@ -2,7 +2,7 @@ use core::hash::Hash;
 
 use input_core::{
     ClickExactHandleRequest, CoordsState, LongPressHandleRequest, Modifiers, PointerState,
-    SchedulerState, TimedState,
+    TimedState,
 };
 
 use crate::{
@@ -24,36 +24,6 @@ pub struct GlobalState<Mo, CsKe, CsMs, TsKe, TsMs, ShKeLo, ShKeCl, ShMsLo, ShMsC
     pub keyboard_pointer_state: PoKe,
     pub mouse_pointer_state: PoMs,
 }
-
-/*
-define_markers!(
-    GlobalModifiersMarker,
-    KeyboardCoordsStateMarker,
-    MouseCoordsStateMarker,
-    KeyboardTimedStateMarker,
-    MouseTimedStateMarker,
-    KeyboardLongPressSchedulerMarker,
-    KeyboardClickExactSchedulerMarker,
-    MouseLongPressSchedulerMarker,
-    MouseClickExactSchedulerMarker,
-    KeyboardPointerStateMarker,
-    MousePointerStateMarker,
-);
-
-define_struct_take_and_with_field!(GlobalState {
-    modifiers: Mo + GlobalModifiersMarker,
-    keyboard_coords_state: CsKe + KeyboardCoordsStateMarker,
-    mouse_coords_state: CsMs + MouseCoordsStateMarker,
-    keyboard_timed_state: TsKe + KeyboardTimedStateMarker,
-    mouse_timed_state: TsMs + MouseTimedStateMarker,
-    keyboard_long_press_scheduler: ShKeLo + KeyboardLongPressSchedulerMarker,
-    keyboard_click_exact_scheduler: ShKeCl + KeyboardClickExactSchedulerMarker,
-    mouse_long_press_scheduler: ShMsLo + MouseLongPressSchedulerMarker,
-    mouse_click_exact_scheduler: ShMsCl + MouseClickExactSchedulerMarker,
-    keyboard_pointer_state: PoKe + KeyboardPointerStateMarker,
-    mouse_pointer_state: PoMs + MousePointerStateMarker,
-});
-*/
 
 impl<Mo, CsKe, CsMs, TsKe, TsMs, ShKeLo, ShKeCl, ShMsLo, ShMsCl, PoKe, PoMs>
     GlobalState<Mo, CsKe, CsMs, TsKe, TsMs, ShKeLo, ShKeCl, ShMsLo, ShMsCl, PoKe, PoMs>
@@ -85,98 +55,6 @@ impl<Mo, CsKe, CsMs, TsKe, TsMs, ShKeLo, ShKeCl, ShMsLo, ShMsCl, PoKe, PoMs>
             mouse_pointer_state,
         }
     }
-
-    /*
-        pub fn take_state<
-            Cs,
-            Ts,
-            ShLo,
-            ShCl,
-            Po,
-            Re1,
-            Ma1,
-            Re2,
-            Ma2,
-            Re3,
-            Ma3,
-            Re4,
-            Ma4,
-            Re5,
-            Ma5,
-            Re6,
-            Ma6,
-        >(
-            self,
-        ) -> (DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po>, Re6)
-        where
-            Self: StructTakeField<Mo, Ma1, Rest = Re1>,
-            Re1: StructTakeField<Cs, Ma2, Rest = Re2>,
-            Re2: StructTakeField<Ts, Ma3, Rest = Re3>,
-            Re3: StructTakeField<ShLo, Ma4, Rest = Re4>,
-            Re4: StructTakeField<ShCl, Ma5, Rest = Re5>,
-            Re5: StructTakeField<Po, Ma6, Rest = Re6>,
-        {
-            let (modifiers, rest) = self.take_field();
-            let (coords_state, rest) = rest.take_field();
-            let (timed_state, rest) = rest.take_field();
-            let (press_scheduler, rest) = rest.take_field();
-            let (release_scheduler, rest) = rest.take_field();
-            let (pointer_state, rest) = rest.take_field();
-            (
-                DeviceState::new(
-                    modifiers,
-                    coords_state,
-                    timed_state,
-                    press_scheduler,
-                    release_scheduler,
-                    pointer_state,
-                ),
-                rest,
-            )
-        }
-    }
-
-    impl<Mo, CsKe, CsMs, TsKe, TsMs, ShKeLo, ShKeCl, ShMsLo, ShMsCl, PoKe, PoMs>
-        GlobalState<PhantomData<Mo>, CsKe, CsMs, TsKe, TsMs, ShKeLo, ShKeCl, ShMsLo, ShMsCl, PoKe, PoMs>
-    {
-        pub fn with_state<
-            Cs,
-            Ts,
-            ShLo,
-            ShCl,
-            Po,
-            Re1,
-            Ma1,
-            Re2,
-            Ma2,
-            Re3,
-            Ma3,
-            Re4,
-            Ma4,
-            Re5,
-            Ma5,
-            Re6,
-            Ma6,
-        >(
-            self,
-            state: DeviceState<Mo, Cs, Ts, ShLo, ShCl, Po>,
-        ) -> Re6
-        where
-            Self: StructWithField<Mo, Ma1, Output = Re1>,
-            Re1: StructWithField<Cs, Ma2, Output = Re2>,
-            Re2: StructWithField<Ts, Ma3, Output = Re3>,
-            Re3: StructWithField<ShLo, Ma4, Output = Re4>,
-            Re4: StructWithField<ShCl, Ma5, Output = Re5>,
-            Re5: StructWithField<Po, Ma6, Output = Re6>,
-        {
-            self.with_field(state.modifiers)
-                .with_field(state.coords_state)
-                .with_field(state.timed_state)
-                .with_field(state.long_press_scheduler)
-                .with_field(state.click_exact_scheduler)
-                .with_field(state.pointer_state)
-        }
-        */
 }
 
 impl<Mo, Ti, KeSw, MsSw, KeCo, MsCo>
@@ -549,59 +427,3 @@ pub struct GlobalStateWithTimeoutResult<'a, Mo, KeEv, KeCo, MsEv, MsCo> {
     pub mouse_long_press: Vec<(FilteredBindings<'a, Mo, MsEv>, MsCo)>,
     pub mouse_click_exact: Vec<(FilteredBindings<'a, Mo, MsEv>, MsCo)>,
 }
-
-/*
-#[test]
-fn test1() {
-    let global_state = GlobalState::new(
-        1,
-        (1, 2, 3),
-        (),
-        false,
-        (),
-        "123",
-        "123".to_owned(),
-        (),
-        (),
-        (1, 2),
-        (),
-    );
-
-    let (mut state, global_state): (
-        DeviceState<i32, (i8, i8, i8), bool, &str, String, (u8, u8)>,
-        _,
-    ) = global_state.take_state();
-    let state = DeviceState {
-        modifiers: state.modifiers + 10,
-        coords_state: (
-            state.coords_state.1,
-            state.coords_state.2,
-            state.coords_state.0,
-        ),
-        timed_state: !state.timed_state,
-        long_press_scheduler: &state.long_press_scheduler[1..3],
-        click_exact_scheduler: state.click_exact_scheduler[1..3].to_owned(),
-        pointer_state: (state.pointer_state.1, state.pointer_state.0),
-    };
-    let global_state = global_state.with_state(state);
-
-    assert_eq!(global_state.modifiers, 11);
-    assert_eq!(global_state.keyboard_coords_state, (2, 3, 1));
-    assert_eq!(global_state.keyboard_timed_state, true);
-    assert_eq!(global_state.keyboard_long_press_scheduler, "23");
-    assert_eq!(global_state.keyboard_pointer_state, (2, 1));
-}
-*/
-/*
-#[test]
-fn test2() {
-    let mut global_state = GlobalState::new(1, false, (), "123", (), (), ());
-
-    let (mut state, global_state): (State<i32, bool, &str>, _) = global_state.take_state();
-    let state = State {
-        modifiers: state.modifiers + 10,
-        timed_state: !state.timed_state,
-        scheduler: &state.scheduler[1..3],
-    };
-    global_state.with_field(state.modifiers);
-}*/

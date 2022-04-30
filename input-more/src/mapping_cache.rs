@@ -1,5 +1,4 @@
 use core::hash::Hash;
-use core::marker::PhantomData;
 
 use input_core::{
     Modifiers, PointerMoveEventData, PointerReleaseEventData, TimedClickExactEventData,
@@ -8,7 +7,7 @@ use input_core::{
 
 use crate::{
     Binding, CoordsMappingCache, SwitchMappingByModifiers, SwitchMappingBySwitch,
-    SwitchMappingByTimed, SwitchMappingCache, TriggerMappingCache,
+    SwitchMappingCache, TriggerMappingCache,
 };
 
 #[derive(Clone, Debug)]
